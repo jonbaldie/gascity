@@ -27,7 +27,7 @@ type sessionCreateRequest struct {
 	Message           string            `json:"message,omitempty"`
 	Async             bool              `json:"async,omitempty"`
 	Options           map[string]string `json:"options,omitempty"`
-	// ProjectID is an opaque identifier for the MC project context.
+	// ProjectID is an opaque identifier for the real-world app project context.
 	// Stored in bead metadata for session-to-project association.
 	ProjectID string `json:"project_id,omitempty"`
 	Title     string `json:"title,omitempty"`
@@ -141,7 +141,7 @@ func (s *Server) handleSessionCreate(w http.ResponseWriter, r *http.Request) {
 
 	// Agent sessions always use async (bead-only) creation. The reconciler
 	// starts the agent process on the next tick. This avoids blocking the
-	// HTTP response for 10-30s while the agent boots in tmux, and lets MC
+	// HTTP response for 10-30s while the agent boots in tmux, and lets real-world apps
 	// show the session in the sidebar immediately via optimistic UI.
 	resolvedCfg, err := resolvedSessionConfigForProvider(alias, "", template, title, transport, extraMeta, resolved, command, workDir)
 	if err != nil {
@@ -401,10 +401,10 @@ func (s *Server) persistSessionMeta(store beads.Store, sessionID, kind, projectI
 		batch[k] = v
 	}
 	if kind != "" && kind != "provider" {
-		batch["mc_session_kind"] = kind
+		batch["real_world_app_session_kind"] = kind
 	}
 	if projectID != "" {
-		batch["mc_project_id"] = projectID
+		batch["real_world_app_project_id"] = projectID
 	}
 	if len(batch) > 0 {
 		if err := store.SetMetadataBatch(sessionID, batch); err != nil {

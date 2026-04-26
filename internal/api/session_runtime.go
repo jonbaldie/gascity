@@ -213,7 +213,7 @@ func (s *Server) resolveSessionRuntime(info session.Info) (*config.ResolvedProvi
 	return resolved, workDir
 }
 
-// sessionKind reads the persisted mc_session_kind from bead metadata.
+// sessionKind reads the persisted real_world_app_session_kind from bead metadata.
 func (s *Server) sessionKind(sessionID string) string {
 	store := s.state.CityBeadStore()
 	if store == nil {
@@ -223,7 +223,7 @@ func (s *Server) sessionKind(sessionID string) string {
 	if err != nil {
 		return ""
 	}
-	return b.Metadata["mc_session_kind"]
+	return b.Metadata["real_world_app_session_kind"]
 }
 
 // resolveBareProvider resolves a provider by name without an agent template.
