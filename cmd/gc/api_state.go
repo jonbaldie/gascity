@@ -53,6 +53,8 @@ type controllerState struct {
 	adapterReg    *extmsg.AdapterRegistry
 }
 
+var controllerStateInitRigDirIfReady = initDirIfReady
+
 type configMutationSnapshot struct {
 	cityPath   string
 	files      map[string][]byte
@@ -550,9 +552,51 @@ func (cs *controllerState) DeleteAgent(name string) error {
 
 // CreateRig adds a new rig to city.toml.
 func (cs *controllerState) CreateRig(r config.Rig) error {
-	return cs.mutateAndPoke(func() error {
-		return cs.editor.CreateRig(r)
-	})
+	var snapshot *configMutationSnapshot
+	if cs.cityPath != "" {
+		var err error
+		snapshot, err = captureConfigMutationSnapshot(cs.cityPath)
+		if err != nil {
+			return fmt.Errorf("snapshotting current city config: %w", err)
+		}
+	}
+	if err := cs.editor.CreateRig(r); err != nil {
+		return err
+	}
+	if err := cs.initNewRigBeads(r); err != nil {
+		if snapshot != nil {
+			if restoreErr := snapshot.restore(); restoreErr != nil {
+				return fmt.Errorf("init rig beads: %w", errors.Join(err, fmt.Errorf("restoring previous city config: %w", restoreErr)))
+			}
+		}
+		return err
+	}
+	if err := cs.refreshConfigSnapshot(); err != nil {
+		if snapshot != nil {
+			if restoreErr := snapshot.restore(); restoreErr != nil {
+				restoreFailure := fmt.Errorf("restoring previous city config: %w", restoreErr)
+				return fmt.Errorf("refreshing updated city config: %w", errors.Join(err, restoreFailure))
+			}
+		}
+		return fmt.Errorf("refreshing updated city config: %w", err)
+	}
+	if cs.configDirty != nil {
+		cs.configDirty.Store(true)
+	}
+	cs.Poke()
+	return nil
+}
+
+func (cs *controllerState) initNewRigBeads(r config.Rig) error {
+	if strings.TrimSpace(cs.cityPath) == "" || strings.TrimSpace(r.Path) == "" {
+		return nil
+	}
+
+	rigPath := resolveStoreScopeRoot(cs.cityPath, r.Path)
+	if _, err := controllerStateInitRigDirIfReady(cs.cityPath, rigPath, r.EffectivePrefix()); err != nil {
+		return fmt.Errorf("init rig %q beads: %w", r.Name, err)
+	}
+	return nil
 }
 
 // UpdateRig partially updates a rig in city.toml.

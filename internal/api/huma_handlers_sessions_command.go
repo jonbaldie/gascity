@@ -114,6 +114,7 @@ func (s *Server) humaHandleSessionCreate(ctx context.Context, input *SessionCrea
 	}
 
 	go func() {
+		defer s.recoverAsRequestFailed(reqID, RequestOperationSessionCreate)
 		mgr := s.sessionManager(store)
 		var info session.Info
 		reservationIDs := []string{alias, explicitName}
@@ -154,7 +155,7 @@ func (s *Server) humaHandleSessionCreate(ctx context.Context, input *SessionCrea
 			return err
 		})
 		if createErr != nil {
-			s.emitRequestResult(store, reqID, RequestOperationSessionCreate, RequestStatusFailed, "", "create_failed", createErr.Error())
+			s.emitSessionCreateFailed(reqID, "create_failed", createErr.Error())
 			return
 		}
 
@@ -162,7 +163,7 @@ func (s *Server) humaHandleSessionCreate(ctx context.Context, input *SessionCrea
 
 		hints := sessionCreateHints(resolved)
 		if startErr := mgr.Start(context.Background(), info.ID, command, hints); startErr != nil {
-			s.emitRequestResult(store, reqID, RequestOperationSessionCreate, RequestStatusFailed, info.ID, "start_failed", startErr.Error())
+			s.emitSessionCreateFailed(reqID, "start_failed", startErr.Error())
 			return
 		}
 
@@ -171,7 +172,9 @@ func (s *Server) humaHandleSessionCreate(ctx context.Context, input *SessionCrea
 			fmt.Fprintf(os.Stderr, "session %s: "+format+"\n", append([]any{info.ID}, args...)...)
 		})
 
-		s.emitRequestResult(store, reqID, RequestOperationSessionCreate, RequestStatusSucceeded, info.ID, "", "")
+		resp := sessionToResponse(info, s.state.Config())
+		resp.Kind = "agent"
+		s.emitSessionCreateSucceeded(reqID, resp)
 	}()
 
 	out := &SessionCreateOutput{Status: http.StatusAccepted}
@@ -181,7 +184,7 @@ func (s *Server) humaHandleSessionCreate(ctx context.Context, input *SessionCrea
 
 // humaCreateProviderSession handles the "provider" kind session creation.
 
-func (s *Server) humaCreateProviderSession(ctx context.Context, store beads.Store, body sessionCreateBody, providerName string) (*SessionCreateOutput, error) {
+func (s *Server) humaCreateProviderSession(_ context.Context, store beads.Store, body sessionCreateBody, providerName string) (*SessionCreateOutput, error) {
 	cfg := s.state.Config()
 	if cfg == nil {
 		return nil, huma.Error503ServiceUnavailable("city config not loaded yet")
@@ -253,6 +256,7 @@ func (s *Server) humaCreateProviderSession(ctx context.Context, store beads.Stor
 		return nil, huma.Error500InternalServerError(reqIDErr.Error())
 	}
 	go func() {
+		defer s.recoverAsRequestFailed(reqID, RequestOperationSessionCreate)
 		mgr := s.sessionManager(store)
 		hints := sessionCreateHints(resolved)
 		var info session.Info
@@ -278,7 +282,7 @@ func (s *Server) humaCreateProviderSession(ctx context.Context, store beads.Stor
 			return err
 		})
 		if createErr != nil {
-			s.emitRequestResult(store, reqID, RequestOperationSessionCreate, RequestStatusFailed, "", "create_failed", createErr.Error())
+			s.emitSessionCreateFailed(reqID, "create_failed", createErr.Error())
 			return
 		}
 		s.persistSessionMeta(store, info.ID, "provider", body.ProjectID, optMeta)
@@ -288,10 +292,18 @@ func (s *Server) humaCreateProviderSession(ctx context.Context, store beads.Stor
 		})
 		if msg := strings.TrimSpace(body.Message); msg != "" {
 			if _, sendErr := s.submitMessageToSession(context.Background(), store, info.ID, msg, session.SubmitIntentDefault); sendErr != nil {
-				log.Printf("session %s: initial message delivery failed: %v", info.ID, sendErr)
+				if rollbackErr := s.rollbackCreatedSession(store, info.ID); rollbackErr != nil {
+					s.emitSessionCreateFailed(reqID, "message_delivery_failed",
+						fmt.Sprintf("initial message delivery failed: %v (rollback failed: %v)", sendErr, rollbackErr))
+					return
+				}
+				s.emitSessionCreateFailed(reqID, "message_delivery_failed", fmt.Sprintf("initial message delivery failed: %v", sendErr))
+				return
 			}
 		}
-		s.emitRequestResult(store, reqID, RequestOperationSessionCreate, RequestStatusSucceeded, info.ID, "", "")
+		resp := sessionToResponse(info, s.state.Config())
+		resp.Kind = "provider"
+		s.emitSessionCreateSucceeded(reqID, resp)
 	}()
 
 	out := &SessionCreateOutput{Status: http.StatusAccepted}
@@ -387,7 +399,7 @@ func (s *Server) humaHandleSessionPatch(_ context.Context, input *SessionPatchIn
 
 // humaHandleSessionSubmit is the Huma-typed handler for POST /v0/session/{id}/submit.
 
-func (s *Server) humaHandleSessionSubmit(ctx context.Context, input *SessionSubmitInput) (*SessionSubmitOutput, error) {
+func (s *Server) humaHandleSessionSubmit(_ context.Context, input *SessionSubmitInput) (*SessionSubmitOutput, error) {
 	store := s.state.CityBeadStore()
 	if store == nil {
 		return nil, huma.Error503ServiceUnavailable("no bead store configured")
@@ -405,15 +417,17 @@ func (s *Server) humaHandleSessionSubmit(ctx context.Context, input *SessionSubm
 	message := input.Body.Message
 	sessionTarget := input.ID
 	go func() {
+		defer s.recoverAsRequestFailed(reqID, RequestOperationSessionSubmit)
 		id, err := s.resolveSessionIDMaterializingNamedWithContext(context.Background(), store, sessionTarget)
 		if err != nil {
-			s.emitRequestResult(store, reqID, RequestOperationSessionSubmit, RequestStatusFailed, sessionTarget, "resolve_failed", err.Error())
+			s.emitSessionSubmitFailed(reqID, "resolve_failed", err.Error())
 			return
 		}
-		if _, err := s.submitMessageToSession(context.Background(), store, id, message, intent); err != nil {
-			s.emitRequestResult(store, reqID, RequestOperationSessionSubmit, RequestStatusFailed, id, "submit_failed", err.Error())
+		outcome, submitErr := s.submitMessageToSession(context.Background(), store, id, message, intent)
+		if submitErr != nil {
+			s.emitSessionSubmitFailed(reqID, "submit_failed", submitErr.Error())
 		} else {
-			s.emitRequestResult(store, reqID, RequestOperationSessionSubmit, RequestStatusSucceeded, id, "", "")
+			s.emitSessionSubmitSucceeded(reqID, id, outcome.Queued, string(intent))
 		}
 	}()
 
@@ -426,7 +440,7 @@ func (s *Server) humaHandleSessionSubmit(ctx context.Context, input *SessionSubm
 
 // humaHandleSessionMessage is the Huma-typed handler for POST /v0/session/{id}/messages.
 
-func (s *Server) humaHandleSessionMessage(ctx context.Context, input *SessionMessageInput) (*SessionMessageOutput, error) {
+func (s *Server) humaHandleSessionMessage(_ context.Context, input *SessionMessageInput) (*SessionMessageOutput, error) {
 	store := s.state.CityBeadStore()
 	if store == nil {
 		return nil, huma.Error503ServiceUnavailable("no bead store configured")
@@ -439,15 +453,16 @@ func (s *Server) humaHandleSessionMessage(ctx context.Context, input *SessionMes
 	message := input.Body.Message
 	sessionTarget := input.ID
 	go func() {
+		defer s.recoverAsRequestFailed(reqID, RequestOperationSessionMessage)
 		id, err := s.resolveSessionIDMaterializingNamedWithContext(context.Background(), store, sessionTarget)
 		if err != nil {
-			s.emitRequestResult(store, reqID, RequestOperationSessionMessage, RequestStatusFailed, sessionTarget, "resolve_failed", err.Error())
+			s.emitSessionMessageFailed(reqID, "resolve_failed", err.Error())
 			return
 		}
 		if err := s.sendUserMessageToSession(context.Background(), store, id, message); err != nil {
-			s.emitRequestResult(store, reqID, RequestOperationSessionMessage, RequestStatusFailed, id, "message_failed", err.Error())
+			s.emitSessionMessageFailed(reqID, "message_failed", err.Error())
 		} else {
-			s.emitRequestResult(store, reqID, RequestOperationSessionMessage, RequestStatusSucceeded, id, "", "")
+			s.emitSessionMessageSucceeded(reqID, id)
 		}
 	}()
 

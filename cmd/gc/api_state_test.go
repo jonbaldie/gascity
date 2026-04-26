@@ -167,6 +167,54 @@ func TestControllerStateCreateRigPokesReconciler(t *testing.T) {
 	}
 }
 
+func TestControllerStateCreateRigInitializesRigBeadsBeforeConfigRefresh(t *testing.T) {
+	t.Setenv("GC_BEADS", "file")
+
+	cityDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(cityDir, "city.toml"), []byte("[workspace]\nname = \"city1\"\n"), 0o644); err != nil {
+		t.Fatalf("write city.toml: %v", err)
+	}
+
+	originalInit := controllerStateInitRigDirIfReady
+	t.Cleanup(func() { controllerStateInitRigDirIfReady = originalInit })
+
+	var gotCityPath, gotRigPath, gotPrefix string
+	controllerStateInitRigDirIfReady = func(cityPath, rigPath, prefix string) (bool, error) {
+		gotCityPath = cityPath
+		gotRigPath = rigPath
+		gotPrefix = prefix
+		cityToml, err := os.ReadFile(filepath.Join(cityPath, "city.toml"))
+		if err != nil {
+			t.Fatalf("read city.toml during rig init: %v", err)
+		}
+		if !strings.Contains(string(cityToml), "name = \"alpha\"") {
+			t.Fatalf("city.toml during rig init does not contain new rig:\n%s", string(cityToml))
+		}
+		return false, nil
+	}
+
+	cfg := &config.City{Workspace: config.Workspace{Name: "city1"}}
+	cs := newControllerState(context.Background(), cfg, runtime.NewFake(), events.NewFake(), "city1", cityDir)
+
+	rigDir := filepath.Join(cityDir, "rigs", "alpha")
+	if err := cs.CreateRig(config.Rig{Name: "alpha", Path: rigDir, Prefix: "mc"}); err != nil {
+		t.Fatalf("CreateRig: %v", err)
+	}
+
+	if gotCityPath != cityDir {
+		t.Fatalf("init cityPath = %q, want %q", gotCityPath, cityDir)
+	}
+	if gotRigPath != rigDir {
+		t.Fatalf("init rigPath = %q, want %q", gotRigPath, rigDir)
+	}
+	if gotPrefix != "mc" {
+		t.Fatalf("init prefix = %q, want mc", gotPrefix)
+	}
+	if store := cs.BeadStore("alpha"); store == nil {
+		t.Fatal("CreateRig refreshed stores before a usable rig store was available")
+	}
+}
+
 func TestControllerStateMutationRollsBackWhenRefreshFails(t *testing.T) {
 	t.Setenv("GC_BEADS", "file")
 
