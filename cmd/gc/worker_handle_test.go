@@ -1179,6 +1179,47 @@ func TestResolvedWorkerRuntimeWithConfigReplaysTemplateOverridesOnResume(t *test
 	}
 }
 
+func TestResolvedWorkerRuntimeKeepsProviderOptionDefaultsOnResume(t *testing.T) {
+	cityDir := t.TempDir()
+	spec := config.BuiltinProviders()["claude"]
+	spec.Command = "/bin/echo"
+	spec.PathCheck = "true"
+	cfg := &config.City{
+		Workspace: config.Workspace{Name: "test-city"},
+		Agents: []config.Agent{{
+			Name:     "coder",
+			Dir:      "myrig",
+			Provider: "claude",
+		}},
+		Providers: map[string]config.ProviderSpec{
+			"claude": spec,
+		},
+	}
+
+	resolved, err := resolvedWorkerRuntimeWithConfigAndMetadata(cityDir, cfg, session.Info{
+		Template:      "myrig/coder",
+		Command:       "/bin/echo",
+		WorkDir:       cityDir,
+		SessionKey:    "abc-123",
+		ResumeCommand: "/bin/echo --resume {{.SessionKey}}",
+	}, "", nil)
+	if err != nil {
+		t.Fatalf("resolvedWorkerRuntimeWithConfigAndMetadata: %v", err)
+	}
+	if resolved == nil {
+		t.Fatal("resolvedWorkerRuntimeWithConfigAndMetadata() = nil")
+	}
+	if !strings.Contains(resolved.Command, "--dangerously-skip-permissions") || !strings.Contains(resolved.Command, "--effort max") {
+		t.Fatalf("Command = %q, want spawn option_defaults", resolved.Command)
+	}
+	if !strings.Contains(resolved.Resume.ResumeCommand, "--dangerously-skip-permissions") || !strings.Contains(resolved.Resume.ResumeCommand, "--effort max") {
+		t.Fatalf("Resume.ResumeCommand = %q, want the same option_defaults as spawn", resolved.Resume.ResumeCommand)
+	}
+	if !strings.Contains(resolved.Resume.ResumeCommand, "--resume") {
+		t.Fatalf("Resume.ResumeCommand = %q, want --resume", resolved.Resume.ResumeCommand)
+	}
+}
+
 func TestResolvedWorkerRuntimeWithConfigFallsBackToStoredCommandWhenTemplateOverridesInvalid(t *testing.T) {
 	cityDir := t.TempDir()
 	cfg := &config.City{

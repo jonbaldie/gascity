@@ -39,6 +39,87 @@ func TestBuildProviderLaunchCommandAddsDefaultsAndSettings(t *testing.T) {
 	}
 }
 
+func TestBuildProviderResumeCommandKeepsBuiltinOptionDefaults(t *testing.T) {
+	spec := BuiltinProviders()["claude"]
+	rp := specToResolved("claude", &spec)
+	rp.ResumeCommand = "claude --resume {{.SessionKey}}"
+
+	launch, err := BuildProviderLaunchCommand("", rp, nil, "")
+	if err != nil {
+		t.Fatalf("BuildProviderLaunchCommand: %v", err)
+	}
+	resume, err := BuildProviderResumeCommand(rp, nil)
+	if err != nil {
+		t.Fatalf("BuildProviderResumeCommand: %v", err)
+	}
+
+	for _, flag := range []string{"--dangerously-skip-permissions", "--effort max"} {
+		if !strings.Contains(launch.Command, flag) {
+			t.Fatalf("launch command %q missing %q", launch.Command, flag)
+		}
+		if !strings.Contains(resume, flag) {
+			t.Fatalf("resume command %q missing %q that spawn applied", resume, flag)
+		}
+	}
+	if !strings.Contains(resume, "--resume") {
+		t.Fatalf("resume command %q missing --resume", resume)
+	}
+}
+
+func TestBuildProviderResumeCommandKeepsDefaultsWhenOnlyInitialMessageOverride(t *testing.T) {
+	spec := BuiltinProviders()["claude"]
+	rp := specToResolved("claude", &spec)
+	rp.ResumeCommand = "claude --resume {{.SessionKey}}"
+
+	resume, err := BuildProviderResumeCommand(rp, map[string]string{
+		"initial_message": "hello",
+	})
+	if err != nil {
+		t.Fatalf("BuildProviderResumeCommand: %v", err)
+	}
+
+	for _, flag := range []string{"--dangerously-skip-permissions", "--effort max"} {
+		if !strings.Contains(resume, flag) {
+			t.Fatalf("resume command %q missing %q when only initial_message is overridden", resume, flag)
+		}
+	}
+}
+
+func TestBuildProviderResumeCommandAppliesOptionOverrides(t *testing.T) {
+	spec := BuiltinProviders()["claude"]
+	rp := specToResolved("claude", &spec)
+	rp.ResumeCommand = "claude --resume {{.SessionKey}}"
+
+	resume, err := BuildProviderResumeCommand(rp, map[string]string{
+		"permission_mode": "plan",
+		"effort":          "low",
+	})
+	if err != nil {
+		t.Fatalf("BuildProviderResumeCommand: %v", err)
+	}
+
+	want := "claude --resume {{.SessionKey}} --permission-mode plan --effort low"
+	if resume != want {
+		t.Fatalf("resume command = %q, want %q", resume, want)
+	}
+}
+
+func TestBuildProviderResumeCommandReinjectsDefaultsIntoBareTemplate(t *testing.T) {
+	spec := BuiltinProviders()["claude"]
+	rp := specToResolved("claude", &spec)
+	rp.ResumeCommand = "claude --resume {{.SessionKey}}"
+
+	resume, err := BuildProviderResumeCommand(rp, nil)
+	if err != nil {
+		t.Fatalf("BuildProviderResumeCommand: %v", err)
+	}
+
+	want := "claude --resume {{.SessionKey}} --dangerously-skip-permissions --effort max"
+	if resume != want {
+		t.Fatalf("resume command = %q, want %q", resume, want)
+	}
+}
+
 func TestBuildProviderLaunchCommandAppliesOptionOverrides(t *testing.T) {
 	spec := BuiltinProviders()["claude"]
 	rp := specToResolved("claude", &spec)
