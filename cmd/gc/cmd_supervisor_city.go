@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -696,7 +697,7 @@ func unregisterCityFromSupervisorWithOptions(cityPath string, stdout, stderr io.
 		return true, 1
 	}
 
-	fmt.Fprintf(stdout, "Unregistered city '%s' (%s)\n", entry.EffectiveName(), entry.Path) //nolint:errcheck // best-effort stdout
+	unregisteredLine := fmt.Sprintf("Unregistered city '%s' (%s)\n", entry.EffectiveName(), entry.Path)
 
 	// If the city directory is gone, there's nothing to wait on or restore.
 	// Skip the supervisor-side probes that would otherwise spew
@@ -704,6 +705,7 @@ func unregisterCityFromSupervisorWithOptions(cityPath string, stdout, stderr io.
 	// (the unregister itself already succeeded; the supervisor's next
 	// reconcile will drop the dead city).
 	if _, statErr := os.Stat(cityPath); errors.Is(statErr, os.ErrNotExist) {
+		fmt.Fprint(stdout, unregisteredLine) //nolint:errcheck // best-effort stdout
 		if supervisorAliveHook() != 0 && reloadSupervisorHook(stdout, stderr) != 0 {
 			return true, 1
 		}
@@ -711,7 +713,21 @@ func unregisterCityFromSupervisorWithOptions(cityPath string, stdout, stderr io.
 	}
 
 	if supervisorAliveHook() != 0 {
-		if reloadSupervisorHook(stdout, stderr) != 0 {
+		var reloadErr bytes.Buffer
+		if reloadSupervisorHook(stdout, io.MultiWriter(stderr, &reloadErr)) != 0 {
+			if supervisorReloadRejectedAsBusy(reloadErr.String()) {
+				fmt.Fprintf(stderr, "%s: supervisor reconcile is already in progress; waiting for it to observe unregistration for '%s'\n", commandName, entry.EffectiveName()) //nolint:errcheck
+				if err := waitForBusyReloadUnregister(cityPath, stdout); err != nil {
+					fmt.Fprintf(stderr, "%s: %v; left '%s' unregistered so the supervisor will not restart it automatically\n", commandName, err, entry.EffectiveName()) //nolint:errcheck
+					return true, 1
+				}
+				if err := waitForSupervisorControllerStopHook(cityPath, supervisorCityStopTimeout(cityPath)); err != nil {
+					fmt.Fprintf(stderr, "%s: %v; left '%s' unregistered so the supervisor will not restart it automatically\n", commandName, err, entry.EffectiveName()) //nolint:errcheck
+					return true, 1
+				}
+				fmt.Fprint(stdout, unregisteredLine) //nolint:errcheck // best-effort stdout
+				return true, 0
+			}
 			if reErr := reg.Register(entry.Path, entry.EffectiveName()); reErr != nil {
 				fmt.Fprintf(stderr, "%s: reconcile failed and restore failed for '%s': %v\n", commandName, entry.EffectiveName(), reErr) //nolint:errcheck
 			} else {
@@ -736,7 +752,41 @@ func unregisterCityFromSupervisorWithOptions(cityPath string, stdout, stderr io.
 			return true, 1
 		}
 	}
+	fmt.Fprint(stdout, unregisteredLine) //nolint:errcheck // best-effort stdout
 	return true, 0
+}
+
+// waitForBusyReloadUnregister retries supervisor reload after a busy
+// rejection until the in-flight reconcile observes the unregistration, or
+// until the city is already down. It does not restore the registry entry.
+func waitForBusyReloadUnregister(cityPath string, stdout io.Writer) error {
+	deadline := time.Now().Add(supervisorCityStopTimeout(cityPath))
+	for {
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			return fmt.Errorf("city did not stop under supervisor")
+		}
+		var reloadErr bytes.Buffer
+		if reloadSupervisorHook(io.Discard, &reloadErr) == 0 {
+			return waitForSupervisorCityHook(cityPath, false, remaining, stdout)
+		}
+		if !supervisorReloadRejectedAsBusy(reloadErr.String()) {
+			msg := strings.TrimSpace(reloadErr.String())
+			if msg == "" {
+				msg = "reconcile failed"
+			}
+			return errors.New(msg)
+		}
+		running, status, known := supervisorCityRunningHook(cityPath)
+		if !known || (!running && (status == "" || status == "init_failed")) {
+			return nil
+		}
+		sleep := supervisorCityPollInterval
+		if sleep > remaining {
+			sleep = remaining
+		}
+		time.Sleep(sleep)
+	}
 }
 
 var waitForSupervisorControllerStopHook = waitForSupervisorControllerStop
