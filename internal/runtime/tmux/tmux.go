@@ -211,6 +211,10 @@ var (
 	// ga-bwm proved that treating an unconfirmed submit as a clean success is
 	// exactly what lets a stalled nudge go undetected for many minutes.
 	ErrNudgeSubmitUnconfirmed = errors.New("nudge: submit Enter delivered to tmux but not confirmed (busy state never observed)")
+	// ErrSubmitPaneBusy indicates a submit-eligible pane was already processing
+	// a turn, so typing would leave unsubmitted text while the session still
+	// looks healthy. Callers must not treat this as delivery success.
+	ErrSubmitPaneBusy = errors.New("submit: pane busy, refusing to type unsubmitted text")
 	// ErrServerDegraded indicates the tmux server bound to SocketName is
 	// reachable on the filesystem but unresponsive. Creating a new session
 	// in this state would let tmux's own (very short) liveness probe time
@@ -322,6 +326,11 @@ type Tmux struct {
 	// observer; tests inject a deterministic observation without opening a
 	// socket.
 	serverSocketObserver func(context.Context, string) error
+
+	// sleep is the clock used by paste debounce and submit-confirm polling.
+	// Nil means time.Sleep; tests inject a no-op so the confirm loop stays
+	// deterministic and sub-millisecond.
+	sleep func(time.Duration)
 }
 
 // pokeInfo records a gc-initiated send-keys ("poke", e.g. a wake or nudge) to a
@@ -1396,11 +1405,20 @@ func (t *Tmux) SendKeys(session, keys string) error {
 // SendKeysDebounced sends keystrokes with a configurable delay before Enter.
 // The debounceMs parameter controls how long to wait after paste before sending Enter.
 // This prevents race conditions where Enter arrives before paste is processed.
+//
+// For providers whose busy indicator is readable (see submitVerifyEligible),
+// this is the controller wake/keystroke seam: it refuses to type into an
+// already-busy pane, confirms Enter landed by observing the idle→busy
+// transition, and returns a non-silent error if submit is not confirmed.
+// Panes without a readable indicator keep best-effort single-Enter delivery.
 func (t *Tmux) SendKeysDebounced(session, keys string, debounceMs int) error {
 	// A human may have scrolled this pane into copy-mode (the ga-c4w wheel
 	// binding); exit it first so the keystrokes reach the program instead of
 	// being swallowed by copy-mode.
 	t.cancelCopyModeIfParked(session)
+	if t.submitVerifyEligible(session) {
+		return t.sendKeysDebouncedVerified(session, keys, debounceMs)
+	}
 	// Record this poke (and the genuine activity just before it) so that
 	// GetSessionActivity can later discount our own keystroke echo for an
 	// agent that never actually responds. See discountPokeActivity.
@@ -1411,11 +1429,64 @@ func (t *Tmux) SendKeysDebounced(session, keys string, debounceMs int) error {
 	}
 	// Wait for paste to be processed
 	if debounceMs > 0 {
-		time.Sleep(time.Duration(debounceMs) * time.Millisecond)
+		t.doSleep(time.Duration(debounceMs) * time.Millisecond)
 	}
 	// Send Enter separately - more reliable than appending to send-keys
 	_, err := t.run("send-keys", "-t", session, "Enter")
 	return err
+}
+
+// sendKeysDebouncedVerified is the fail-closed wake/keystroke path for
+// submit-eligible providers. It must not report success with stranded input.
+func (t *Tmux) sendKeysDebouncedVerified(session, keys string, debounceMs int) error {
+	if err := t.errIfBusySubmitTarget(session); err != nil {
+		return err
+	}
+	commitPoke := t.beginPoke(session)
+	if _, err := t.run("send-keys", "-t", session, "-l", keys); err != nil {
+		return err
+	}
+	if debounceMs > 0 {
+		t.doSleep(time.Duration(debounceMs) * time.Millisecond)
+	}
+	sendSubmit := func() error {
+		_, err := t.run("send-keys", "-t", session, "Enter")
+		return err
+	}
+	wake := func() { t.WakePaneIfDetached(session) }
+	confirmed, err := submitEnterAndConfirm(sendSubmit, wake, func() (bool, error) {
+		return t.paneBusy(session)
+	}, t.doSleep)
+	if err != nil {
+		return fmt.Errorf("failed to send submit Enter: %w", err)
+	}
+	if !confirmed {
+		return fmt.Errorf("%w: session %q", ErrNudgeSubmitUnconfirmed, session)
+	}
+	commitPoke()
+	return nil
+}
+
+func (t *Tmux) doSleep(d time.Duration) {
+	if t != nil && t.sleep != nil {
+		t.sleep(d)
+		return
+	}
+	time.Sleep(d)
+}
+
+// errIfBusySubmitTarget fails closed when a submit-eligible pane is already
+// processing a turn. Typing into that pane leaves unsubmitted text and a
+// subsequent busy poll would false-confirm the original turn as this submit.
+func (t *Tmux) errIfBusySubmitTarget(target string) error {
+	if !t.submitVerifyEligible(target) {
+		return nil
+	}
+	busy, err := t.paneBusy(target)
+	if err != nil || !busy {
+		return nil
+	}
+	return fmt.Errorf("%w: session %q", ErrSubmitPaneBusy, target)
 }
 
 // SendKeysRaw sends keystrokes without adding Enter.
@@ -2116,6 +2187,11 @@ func (t *Tmux) NudgeSession(session, message string) error {
 	target := session
 	if agentPane, err := t.FindAgentPane(session); err == nil && agentPane != "" {
 		target = agentPane
+	}
+	// Mid-turn landings must not type: a busy pane would swallow Enter and a
+	// later busy poll would false-confirm the original turn as this submit.
+	if err := t.errIfBusySubmitTarget(target); err != nil {
+		return err
 	}
 
 	// Snapshot genuine activity BEFORE the first keystroke, and stamp the poke

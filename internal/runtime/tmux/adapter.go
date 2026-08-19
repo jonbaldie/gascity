@@ -574,6 +574,10 @@ func (p *Provider) NudgeNow(name string, content []runtime.ContentBlock) error {
 		return nil
 	}
 
+	if err := p.tm.errIfBusySubmitTarget(name); err != nil {
+		return err
+	}
+
 	if used, err := p.tm.sendHiddenAttachedText(name, message); used {
 		if err != nil {
 			return err
