@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
 
 func TestDetectLegacyWorkspaceFields(t *testing.T) {

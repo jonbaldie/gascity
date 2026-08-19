@@ -7,9 +7,9 @@ import (
 	"errors"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/session"
-	"github.com/gastownhall/gascity/internal/storebinding"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/storebinding"
 )
 
 // SessionsSuite configures one bare Sessions class conformance run.

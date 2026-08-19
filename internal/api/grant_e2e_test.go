@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/citywriteauth"
+	"github.com/jonbaldie/gascity/internal/citywriteauth"
 )
 
 // realClockVerifier trusts pub under the real wall clock, matching a grant the

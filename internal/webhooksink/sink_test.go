@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/orderdispatch"
-	"github.com/gastownhall/gascity/internal/orders"
-	"github.com/gastownhall/gascity/internal/webhookmatch"
+	"github.com/jonbaldie/gascity/internal/orderdispatch"
+	"github.com/jonbaldie/gascity/internal/orders"
+	"github.com/jonbaldie/gascity/internal/webhookmatch"
 )
 
 // fakeDispatcher records the last request it was handed so tests can assert what

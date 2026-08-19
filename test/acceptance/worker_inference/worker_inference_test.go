@@ -21,18 +21,18 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/gastownhall/gascity/internal/api"
-	"github.com/gastownhall/gascity/internal/beads"
-	beadsexec "github.com/gastownhall/gascity/internal/beads/exec"
-	"github.com/gastownhall/gascity/internal/citylayout"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/configedit"
-	"github.com/gastownhall/gascity/internal/fsys"
-	sessionpkg "github.com/gastownhall/gascity/internal/session"
-	"github.com/gastownhall/gascity/internal/supervisor"
-	workerpkg "github.com/gastownhall/gascity/internal/worker"
-	"github.com/gastownhall/gascity/internal/worker/workertest"
-	helpers "github.com/gastownhall/gascity/test/acceptance/helpers"
+	"github.com/jonbaldie/gascity/internal/api"
+	"github.com/jonbaldie/gascity/internal/beads"
+	beadsexec "github.com/jonbaldie/gascity/internal/beads/exec"
+	"github.com/jonbaldie/gascity/internal/citylayout"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/configedit"
+	"github.com/jonbaldie/gascity/internal/fsys"
+	sessionpkg "github.com/jonbaldie/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/supervisor"
+	workerpkg "github.com/jonbaldie/gascity/internal/worker"
+	"github.com/jonbaldie/gascity/internal/worker/workertest"
+	helpers "github.com/jonbaldie/gascity/test/acceptance/helpers"
 )
 
 var (

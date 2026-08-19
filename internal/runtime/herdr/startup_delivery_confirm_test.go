@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
 // ── startup-delivery confirmation against the fake herdr (gas-90h) ───────────

@@ -1,8 +1,8 @@
 package api
 
 import (
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/session"
 )
 
 // cachedListStore is the optional read-model cache capability: a store that can

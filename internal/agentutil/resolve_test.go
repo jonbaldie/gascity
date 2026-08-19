@@ -3,7 +3,7 @@ package agentutil
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 func intPtr(v int) *int { return &v }

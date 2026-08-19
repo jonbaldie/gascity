@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
 
 func newFormulaEditor(t *testing.T) (*Editor, string) {

@@ -6,7 +6,7 @@ import (
 	"reflect"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
 // Session transcript wire types.

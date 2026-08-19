@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/doctor"
-	"github.com/gastownhall/gascity/internal/git"
+	"github.com/jonbaldie/gascity/internal/doctor"
+	"github.com/jonbaldie/gascity/internal/git"
 )
 
 // jsonlArchiveState mirrors the keys the jsonl-export.sh script persists in

@@ -151,7 +151,7 @@ main() {
             git push origin "$TAG"
             printf '%b✓ Pushed commit and tag to origin%b\n' "$GREEN" "$NC"
             printf '\nRelease %s initiated. GitHub Actions will build artifacts in ~5-10 minutes.\n' "$TAG"
-            printf 'Monitor: https://github.com/gastownhall/gascity/actions\n'
+            printf 'Monitor: https://github.com/jonbaldie/gascity/actions\n'
         else
             printf '\nNext steps:\n'
             [ "$AUTO_TAG" = false ] && printf '  git tag -a %s -m "Release %s"\n' "$TAG" "$TAG"

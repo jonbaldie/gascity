@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/featureflags"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/featureflags"
 )
 
 // applyFeatureFlags propagates daemon-level feature flags to the formula and

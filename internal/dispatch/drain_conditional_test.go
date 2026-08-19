@@ -8,10 +8,10 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beadmeta"
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/molecule"
-	"github.com/gastownhall/gascity/internal/rollout/gate"
+	"github.com/jonbaldie/gascity/internal/beadmeta"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/molecule"
+	"github.com/jonbaldie/gascity/internal/rollout/gate"
 )
 
 // newStampedDrainStore opens a MemStore through the beads factory so it

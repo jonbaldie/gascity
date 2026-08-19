@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	worker "github.com/gastownhall/gascity/internal/worker"
+	worker "github.com/jonbaldie/gascity/internal/worker"
 )
 
 // StructuredCorpusRoot is the directory holding real, captured provider

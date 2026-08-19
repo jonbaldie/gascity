@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/runproj"
-	"github.com/gastownhall/gascity/internal/testutil"
+	"github.com/jonbaldie/gascity/internal/runproj"
+	"github.com/jonbaldie/gascity/internal/testutil"
 )
 
 // enrichmentCacheTestServer stands up a fake supervisor that counts sessions and

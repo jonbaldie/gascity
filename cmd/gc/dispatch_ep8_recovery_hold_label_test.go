@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beadmeta"
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/beadmeta"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 // This file expresses the ga-o48vn0 round-2 acceptance criterion: crash/boot

@@ -3,7 +3,7 @@ package config
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
 
 // TestLoadWithIncludesDefaultsConditionalWrites: omitted → default "off".

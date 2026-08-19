@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
 
 // TestShippedStorageExampleCityLoads composes the storage example city that

@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads/contract"
+	"github.com/jonbaldie/gascity/internal/beads/contract"
 )
 
 func TestAuthScopeRoot(t *testing.T) {

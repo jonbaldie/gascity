@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
 // TestStartupHintsToRuntimeConfigPropagatesEveryField is the anti-omission

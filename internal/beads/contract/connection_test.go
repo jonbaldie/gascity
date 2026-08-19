@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
 
 func TestMain(m *testing.M) {

@@ -9,15 +9,15 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beadmeta"
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/beads/splittest"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/coordclass"
-	"github.com/gastownhall/gascity/internal/events"
-	"github.com/gastownhall/gascity/internal/session"
-	"github.com/gastownhall/gascity/internal/sling"
-	"github.com/gastownhall/gascity/internal/storeref"
+	"github.com/jonbaldie/gascity/internal/beadmeta"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads/splittest"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/coordclass"
+	"github.com/jonbaldie/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/sling"
+	"github.com/jonbaldie/gascity/internal/storeref"
 )
 
 // This file is the two-topology fixture the split-store conformance suite

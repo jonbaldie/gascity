@@ -1,6 +1,6 @@
 package main
 
-import "github.com/gastownhall/gascity/internal/builtinpacks"
+import "github.com/jonbaldie/gascity/internal/builtinpacks"
 
 // syntheticCacheVerifier deduplicates builtinpacks.ValidateSyntheticRepo
 // within ONE builtin readiness pass.

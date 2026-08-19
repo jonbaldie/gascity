@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/api/apierr"
-	"github.com/gastownhall/gascity/internal/events"
-	"github.com/gastownhall/gascity/internal/mail"
-	"github.com/gastownhall/gascity/internal/telemetry"
+	"github.com/jonbaldie/gascity/internal/api/apierr"
+	"github.com/jonbaldie/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/mail"
+	"github.com/jonbaldie/gascity/internal/telemetry"
 )
 
 // mailReadDeadline is shorter than the API client's 10s timeout so typed

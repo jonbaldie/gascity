@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
 func fakeFactory(t *testing.T) (Factory, *int) {

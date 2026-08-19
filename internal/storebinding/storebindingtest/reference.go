@@ -15,8 +15,8 @@ package storebindingtest
 // BrokenGraphStore proves that by declaring them anyway.
 
 import (
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/storebinding"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/storebinding"
 )
 
 // ReferenceCapability is what the Beads-over-memory reference honestly

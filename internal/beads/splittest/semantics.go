@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // Semantics selects which production backend's write-time behavior a strict

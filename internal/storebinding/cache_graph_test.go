@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // graphPureReads is the closed set of GraphStore operations that cannot change

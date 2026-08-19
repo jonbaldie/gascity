@@ -10,7 +10,7 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/gastownhall/gascity/internal/gchome"
+	"github.com/jonbaldie/gascity/internal/gchome"
 )
 
 var (

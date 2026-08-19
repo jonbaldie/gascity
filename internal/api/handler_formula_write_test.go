@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/configedit"
+	"github.com/jonbaldie/gascity/internal/configedit"
 )
 
 // fakeFormulaState adds FormulaMutator to the standard fake mutator state.

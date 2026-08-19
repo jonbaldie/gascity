@@ -11,9 +11,9 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/events"
-	"github.com/gastownhall/gascity/internal/session"
-	"github.com/gastownhall/gascity/internal/workspacesvc"
+	"github.com/jonbaldie/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/workspacesvc"
 )
 
 func writeSSEEnvelope(t *testing.T, w http.ResponseWriter, typ string, payload any) {

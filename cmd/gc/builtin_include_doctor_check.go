@@ -11,12 +11,12 @@ import (
 	"sync"
 
 	"github.com/BurntSushi/toml"
-	"github.com/gastownhall/gascity/internal/builtinpacks"
-	"github.com/gastownhall/gascity/internal/citylayout"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/doctor"
-	"github.com/gastownhall/gascity/internal/fsys"
-	"github.com/gastownhall/gascity/internal/packman"
+	"github.com/jonbaldie/gascity/internal/builtinpacks"
+	"github.com/jonbaldie/gascity/internal/citylayout"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/doctor"
+	"github.com/jonbaldie/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/packman"
 )
 
 // Builtin packs compose only through explicit [imports.<name>] entries with

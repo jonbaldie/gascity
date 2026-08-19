@@ -3,7 +3,7 @@ package beads
 import (
 	"errors"
 
-	"github.com/gastownhall/gascity/internal/beadmeta"
+	"github.com/jonbaldie/gascity/internal/beadmeta"
 )
 
 // Membership names the rule a projection uses to decide which beads belong to

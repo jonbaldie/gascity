@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
 
 // ghPublicPackTOML is a pack that contributes a public github webhook, used by

@@ -10,9 +10,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beadmeta"
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/beadmeta"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/events"
 )
 
 func TestLifecycleEventsPreserveNativeGraphIdentityAndTopology(t *testing.T) {

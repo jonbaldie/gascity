@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/webhookverify"
+	"github.com/jonbaldie/gascity/internal/webhookverify"
 )
 
 func TestWebhookDedupCache_SeenAndForget(t *testing.T) {

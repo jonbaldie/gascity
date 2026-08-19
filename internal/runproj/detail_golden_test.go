@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // detailGoldenRunID is the graph.v2 run captured as the FormulaRunDetail golden

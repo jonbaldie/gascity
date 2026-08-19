@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/api/genclient"
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/api/genclient"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/session"
 )
 
 // TestRouteMissingClassification pins the new-CLI/old-server hazard model: a 404

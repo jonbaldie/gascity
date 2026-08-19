@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/config"
 	"github.com/spf13/cobra"
 )
 

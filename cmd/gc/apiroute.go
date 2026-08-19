@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/gastownhall/gascity/internal/api"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/api"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
 
 // Indirected for tests. apiClient's branch between a standalone controller

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/session"
-	"github.com/gastownhall/gascity/internal/worker"
+	"github.com/jonbaldie/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/worker"
 )
 
 type sessionResponseCapabilityHandle struct {

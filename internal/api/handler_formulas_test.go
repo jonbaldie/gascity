@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/formulatest"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/formulatest"
 )
 
 func TestFormulaListReturnsCatalogSummaries(t *testing.T) {

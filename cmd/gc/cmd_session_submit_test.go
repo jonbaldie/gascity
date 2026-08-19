@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/session"
 )
 
 func TestEmitSessionSubmitResultFollowUpQueued(t *testing.T) {

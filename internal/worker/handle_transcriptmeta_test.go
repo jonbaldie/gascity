@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/transcriptmeta"
-	"github.com/gastownhall/gascity/pkg/eventexport"
+	"github.com/jonbaldie/gascity/internal/transcriptmeta"
+	"github.com/jonbaldie/gascity/pkg/eventexport"
 )
 
 // claudeKeyedFixture stands up a claude session whose transcript is resolvable by

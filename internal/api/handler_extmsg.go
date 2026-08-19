@@ -9,9 +9,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/gastownhall/gascity/internal/events"
-	"github.com/gastownhall/gascity/internal/extmsg"
-	"github.com/gastownhall/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/extmsg"
+	"github.com/jonbaldie/gascity/internal/session"
 )
 
 // extmsgEmitEvent builds an event emitter closure for extmsg handlers.

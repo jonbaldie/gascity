@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 func staticEnv(m map[string]string) func(string) (string, bool) {

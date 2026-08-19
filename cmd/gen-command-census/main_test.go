@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/commandcensus"
+	"github.com/jonbaldie/gascity/internal/commandcensus"
 )
 
 func TestRunGeneratorCheckDetectsDriftAndWriteConverges(t *testing.T) {

@@ -6,11 +6,11 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/agent"
-	"github.com/gastownhall/gascity/internal/agentutil"
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/shellquote"
+	"github.com/jonbaldie/gascity/internal/agent"
+	"github.com/jonbaldie/gascity/internal/agentutil"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/shellquote"
 )
 
 func controllerQueryRuntimeEnv(cityPath string, cfg *config.City, agentCfg *config.Agent) (map[string]string, error) {

@@ -47,7 +47,7 @@ jobs:
           - label: unit-core
             timeout_minutes: 20
             command: |
-              GC_FAST_UNIT=1 go test -timeout 8m $(go list ./... | grep -v '^github.com/gastownhall/gascity/cmd/gc$')
+              GC_FAST_UNIT=1 go test -timeout 8m $(go list ./... | grep -v '^github.com/jonbaldie/gascity/cmd/gc$')
           - label: cmd-gc-1-of-6
             timeout_minutes: 20
             command: GC_FAST_UNIT=1 GO_TEST_COUNT=1 GO_TEST_TIMEOUT=20m ./scripts/test-go-test-shard ./cmd/gc 1 6

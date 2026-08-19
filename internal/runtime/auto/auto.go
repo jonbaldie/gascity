@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
 // Provider routes session operations to a default or ACP backend

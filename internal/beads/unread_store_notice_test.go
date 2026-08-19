@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // The read-time half of the metadata-rewrite fail-open (ga-clsfl), and the

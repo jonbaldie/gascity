@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/testutil"
+	"github.com/jonbaldie/gascity/internal/testutil"
 )
 
 // The hang-budget helpers exist to remove a class of load-sensitive flake in

@@ -13,10 +13,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	convoycore "github.com/gastownhall/gascity/internal/convoy"
-	"github.com/gastownhall/gascity/internal/coordclass"
-	"github.com/gastownhall/gascity/internal/formulatest"
+	"github.com/jonbaldie/gascity/internal/beads"
+	convoycore "github.com/jonbaldie/gascity/internal/convoy"
+	"github.com/jonbaldie/gascity/internal/coordclass"
+	"github.com/jonbaldie/gascity/internal/formulatest"
 )
 
 func TestPrepareInvocationCreatesInputConvoyForBeadTarget(t *testing.T) {

@@ -5,8 +5,8 @@ import (
 	"io"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beadmeta"
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beadmeta"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // A worker that cleared both gc.routed_to and assignee in a failed done

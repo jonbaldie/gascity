@@ -14,9 +14,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/dispatch"
-	"github.com/gastownhall/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/dispatch"
+	"github.com/jonbaldie/gascity/internal/events"
 )
 
 // setHookRunExecutableForTest stubs the re-exec target of `gc hook run` to the

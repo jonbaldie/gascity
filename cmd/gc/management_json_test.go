@@ -12,8 +12,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/beads/contract"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads/contract"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 

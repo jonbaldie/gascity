@@ -16,9 +16,9 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/events"
-	"github.com/gastownhall/gascity/internal/runproj"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/runproj"
 )
 
 func TestRunProjectionUnavailableSanitizesPublicDetailAndLogsCause(t *testing.T) {

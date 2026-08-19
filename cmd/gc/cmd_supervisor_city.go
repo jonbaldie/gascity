@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/api"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/supervisor"
+	"github.com/jonbaldie/gascity/internal/api"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/supervisor"
 	"golang.org/x/term"
 )
 

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // fakeHealthStore is a beads.Store whose List and Count behavior the test

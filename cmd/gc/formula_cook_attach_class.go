@@ -38,8 +38,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/coordclass"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/coordclass"
 )
 
 // attachGraftClassRefusal returns the reason a graft onto attachBeadID cannot

@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 // PreStartScriptsCheck verifies that script paths referenced via

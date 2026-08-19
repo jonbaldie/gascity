@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/doctor"
+	"github.com/jonbaldie/gascity/internal/doctor"
 )
 
 func TestMCPConfigDoctorCheckReportsTemplateExpansionErrors(t *testing.T) {

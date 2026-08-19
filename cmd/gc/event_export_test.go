@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/events"
-	"github.com/gastownhall/gascity/internal/supervisor"
-	"github.com/gastownhall/gascity/internal/transcriptmeta"
+	"github.com/jonbaldie/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/supervisor"
+	"github.com/jonbaldie/gascity/internal/transcriptmeta"
 )
 
 func TestExportProvidersForCities(t *testing.T) {

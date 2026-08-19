@@ -16,7 +16,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/docgen"
+	"github.com/jonbaldie/gascity/internal/docgen"
 )
 
 func repoRoot() string {
@@ -27,7 +27,7 @@ func repoRoot() string {
 var (
 	markdownLinkRE    = regexp.MustCompile(`\[[^][]+\]\(([^)]+)\)`)
 	schemaHrefRE      = regexp.MustCompile(`href="[^"]*?/schema/([^"#?]+)"`)
-	schemaGitHubRawRE = regexp.MustCompile(`href="https://raw\.githubusercontent\.com/gastownhall/gascity/main/docs/reference/schema/([^"#?]+)"`)
+	schemaGitHubRawRE = regexp.MustCompile(`href="https://raw\.githubusercontent\.com/jonbaldie/gascity/main/docs/reference/schema/([^"#?]+)"`)
 )
 
 // docTreeDirs lists the top-level directories that are documentation trees

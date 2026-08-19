@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/events"
 )
 
 // TestEventStreamSchemaInSpec verifies that the events/stream endpoint

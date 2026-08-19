@@ -14,9 +14,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/runtime"
-	"github.com/gastownhall/gascity/internal/session"
-	"github.com/gastownhall/gascity/internal/worker"
+	"github.com/jonbaldie/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/worker"
 )
 
 // structuredTranscriptWireAllowedKeys is the allowlist of JSON keys the typed

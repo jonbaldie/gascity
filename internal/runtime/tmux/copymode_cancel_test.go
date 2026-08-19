@@ -3,7 +3,7 @@ package tmux
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
 // callHasTokens reports whether call contains every token as an exact arg

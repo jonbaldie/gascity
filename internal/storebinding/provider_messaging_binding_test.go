@@ -6,9 +6,9 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/coordclass"
-	"github.com/gastownhall/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/coordclass"
+	"github.com/jonbaldie/gascity/internal/session"
 )
 
 func TestOpenBindingDefersMessagingSessionsJoinAcrossIndependentProviders(t *testing.T) {

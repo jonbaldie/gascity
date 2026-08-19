@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
 // idleTracker checks for agents that have been idle longer than their

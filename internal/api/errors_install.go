@@ -2,7 +2,7 @@ package api
 
 import (
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/gastownhall/gascity/internal/api/apierr"
+	"github.com/jonbaldie/gascity/internal/api/apierr"
 )
 
 // validationFailedDetail is the exact detail string Huma uses for its built-in

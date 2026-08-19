@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/gitcred"
-	"github.com/gastownhall/gascity/internal/packregistry"
+	"github.com/jonbaldie/gascity/internal/gitcred"
+	"github.com/jonbaldie/gascity/internal/packregistry"
 )
 
 func TestPackReleaseHashCommandPrintsContentHash(t *testing.T) {

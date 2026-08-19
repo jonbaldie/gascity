@@ -12,8 +12,8 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/events"
-	"github.com/gastownhall/gascity/internal/testutil"
+	"github.com/jonbaldie/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/testutil"
 )
 
 // rotatableProvider is the small interface a Provider must satisfy

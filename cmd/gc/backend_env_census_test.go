@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads/contract"
+	"github.com/jonbaldie/gascity/internal/beads/contract"
 )
 
 // removedBackendVocabulary names the storage backends whose vocabulary was

@@ -211,11 +211,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beadmeta"
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/coordclass"
-	sqlitebinding "github.com/gastownhall/gascity/internal/storebinding/sqlite"
+	"github.com/jonbaldie/gascity/internal/beadmeta"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/coordclass"
+	sqlitebinding "github.com/jonbaldie/gascity/internal/storebinding/sqlite"
 )
 
 // infraMigratedMarkerName is the convergence record written at the binding

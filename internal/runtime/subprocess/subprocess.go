@@ -33,8 +33,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/runtime"
-	"github.com/gastownhall/gascity/internal/runtime/proctable"
+	"github.com/jonbaldie/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/runtime/proctable"
 )
 
 // Provider manages agent sessions as child processes.

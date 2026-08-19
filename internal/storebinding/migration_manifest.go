@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/coordclass"
+	"github.com/jonbaldie/gascity/internal/coordclass"
 )
 
 // WitnessEnvelopeDomainV1 is the domain separator for the pinned physical half

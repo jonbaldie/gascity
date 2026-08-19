@@ -6,9 +6,9 @@ import (
 	"log"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/beadmeta"
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/beadmeta"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/session"
 )
 
 // sweepDetachedHandoffOrphans restores gc.routed_to on work beads that were

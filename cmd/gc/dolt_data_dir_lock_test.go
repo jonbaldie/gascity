@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 // makeDoltDataDirWithLock creates a managed-dolt-shaped data dir with one

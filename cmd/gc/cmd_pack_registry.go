@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/deps"
-	"github.com/gastownhall/gascity/internal/gchome"
-	"github.com/gastownhall/gascity/internal/packregistry"
-	"github.com/gastownhall/gascity/internal/shellquote"
+	"github.com/jonbaldie/gascity/internal/deps"
+	"github.com/jonbaldie/gascity/internal/gchome"
+	"github.com/jonbaldie/gascity/internal/packregistry"
+	"github.com/jonbaldie/gascity/internal/shellquote"
 	"github.com/spf13/cobra"
 )
 

@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	gcruntime "github.com/gastownhall/gascity/internal/runtime"
+	gcruntime "github.com/jonbaldie/gascity/internal/runtime"
 )
 
 // mockFetcher implements StateFetcher for testing.

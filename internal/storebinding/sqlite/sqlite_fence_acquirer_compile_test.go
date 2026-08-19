@@ -3,7 +3,7 @@ package sqlite
 import (
 	"context"
 
-	"github.com/gastownhall/gascity/internal/storebinding"
+	"github.com/jonbaldie/gascity/internal/storebinding"
 )
 
 var _ storebinding.WriterFenceAcquirer = (*capturingSQLiteFenceAcquirer)(nil)

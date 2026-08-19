@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/fsys"
-	"github.com/gastownhall/gascity/internal/pathutil"
+	"github.com/jonbaldie/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/pathutil"
 )
 
 // Molecule-scoped working storage lives at:

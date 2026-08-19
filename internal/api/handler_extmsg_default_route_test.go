@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/extmsg"
-	"github.com/gastownhall/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/extmsg"
+	"github.com/jonbaldie/gascity/internal/session"
 )
 
 func TestHandleExtMsgInboundDefaultRouteBindsAndColdWakes(t *testing.T) {

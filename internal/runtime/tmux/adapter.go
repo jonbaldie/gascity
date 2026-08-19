@@ -15,11 +15,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/execgrace"
-	"github.com/gastownhall/gascity/internal/overlay"
-	"github.com/gastownhall/gascity/internal/runtime"
-	"github.com/gastownhall/gascity/internal/runtime/proctable"
-	"github.com/gastownhall/gascity/internal/shellquote"
+	"github.com/jonbaldie/gascity/internal/execgrace"
+	"github.com/jonbaldie/gascity/internal/overlay"
+	"github.com/jonbaldie/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/runtime/proctable"
+	"github.com/jonbaldie/gascity/internal/shellquote"
 )
 
 // Provider adapts [Tmux] to the [runtime.Provider] interface.

@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/gastownhall/gascity/internal/commandcensus"
+	"github.com/jonbaldie/gascity/internal/commandcensus"
 )
 
 type generatorOptions struct {

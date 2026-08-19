@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/gastownhall/gascity/internal/api"
+	"github.com/jonbaldie/gascity/internal/api"
 )
 
 // fallbackAfterFetch is a sentinel an apiFetch closure may return to force a

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	convoycore "github.com/gastownhall/gascity/internal/convoy"
+	"github.com/jonbaldie/gascity/internal/beads"
+	convoycore "github.com/jonbaldie/gascity/internal/convoy"
 	"github.com/spf13/cobra"
 )
 

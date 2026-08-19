@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/fsys"
 	"gopkg.in/yaml.v3"
 )
 

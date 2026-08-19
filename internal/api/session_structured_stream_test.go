@@ -3,7 +3,7 @@ package api
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/sessionlog"
+	"github.com/jonbaldie/gascity/internal/sessionlog"
 )
 
 func TestBuildStructuredStreamUpdateStartsWithSnapshot(t *testing.T) {

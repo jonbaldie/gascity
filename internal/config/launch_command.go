@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/citylayout"
-	"github.com/gastownhall/gascity/internal/shellquote"
+	"github.com/jonbaldie/gascity/internal/citylayout"
+	"github.com/jonbaldie/gascity/internal/shellquote"
 )
 
 // ProviderLaunchCommand is the fully composed provider command plus any

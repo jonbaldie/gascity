@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/packman"
-	"github.com/gastownhall/gascity/internal/supervisor"
+	"github.com/jonbaldie/gascity/internal/packman"
+	"github.com/jonbaldie/gascity/internal/supervisor"
 )
 
 // writePruneCacheClone creates a fake cache clone directory with the given mtime.

@@ -14,13 +14,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/beads/contract"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/coordclass"
-	"github.com/gastownhall/gascity/internal/events"
-	"github.com/gastownhall/gascity/internal/storebinding"
-	sqlitebinding "github.com/gastownhall/gascity/internal/storebinding/sqlite"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads/contract"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/coordclass"
+	"github.com/jonbaldie/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/storebinding"
+	sqlitebinding "github.com/jonbaldie/gascity/internal/storebinding/sqlite"
 )
 
 // countStorageRegistryConstructions replaces the plan's registry constructor

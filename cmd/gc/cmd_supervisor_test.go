@@ -25,15 +25,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/api"
-	"github.com/gastownhall/gascity/internal/citylayout"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/events"
-	"github.com/gastownhall/gascity/internal/processgroup/processgrouptest"
-	"github.com/gastownhall/gascity/internal/runtime"
-	"github.com/gastownhall/gascity/internal/supervisor"
-	"github.com/gastownhall/gascity/internal/testutil"
-	"github.com/gastownhall/gascity/internal/workspacesvc"
+	"github.com/jonbaldie/gascity/internal/api"
+	"github.com/jonbaldie/gascity/internal/citylayout"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/processgroup/processgrouptest"
+	"github.com/jonbaldie/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/supervisor"
+	"github.com/jonbaldie/gascity/internal/testutil"
+	"github.com/jonbaldie/gascity/internal/workspacesvc"
 )
 
 type closerSpy struct {

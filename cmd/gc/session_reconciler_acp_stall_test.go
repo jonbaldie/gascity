@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/runtime"
-	sessionacp "github.com/gastownhall/gascity/internal/runtime/acp"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/runtime"
+	sessionacp "github.com/jonbaldie/gascity/internal/runtime/acp"
 )
 
 // transportCapabilityProvider drives a fake runtime while reporting a real

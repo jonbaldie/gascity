@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // TrackingDepType is the dependency type used for convoy membership edges.

@@ -2,7 +2,7 @@
 
 package main
 
-import "github.com/gastownhall/gascity/internal/beads"
+import "github.com/jonbaldie/gascity/internal/beads"
 
 // runDoltliteReindex rebuilds the DoltLite store's SQLite secondary indexes in
 // process using the native beads SQLite driver. Built only under the

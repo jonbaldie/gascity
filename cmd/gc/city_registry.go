@@ -10,10 +10,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/api"
-	"github.com/gastownhall/gascity/internal/events"
-	"github.com/gastownhall/gascity/internal/pathutil"
-	"github.com/gastownhall/gascity/internal/supervisor"
+	"github.com/jonbaldie/gascity/internal/api"
+	"github.com/jonbaldie/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/pathutil"
+	"github.com/jonbaldie/gascity/internal/supervisor"
 )
 
 // cityView is a read-only projection of managedCity, built at snapshot time.

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/sessionlog"
+	"github.com/jonbaldie/gascity/internal/sessionlog"
 )
 
 // SupportsIDLookup reports whether the provider family exposes a stable

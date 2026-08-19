@@ -36,9 +36,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/storeref"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/storeref"
 )
 
 // censusRefStyle names the store-ref vocabulary one census arm labels its rows

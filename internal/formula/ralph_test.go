@@ -3,7 +3,7 @@ package formula
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beadmeta"
+	"github.com/jonbaldie/gascity/internal/beadmeta"
 )
 
 func TestApplyRalph_Basic(t *testing.T) {

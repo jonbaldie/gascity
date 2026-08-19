@@ -7,7 +7,7 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
 
 func TestRunDoltCleanup_HumanOutputShowsAllWireframeSections(t *testing.T) {

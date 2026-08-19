@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **This repository now identifies as `github.com/jonbaldie/gascity`.** Install
+  with `go install github.com/jonbaldie/gascity/cmd/gc@latest`. The upstream
+  Homebrew tap and GitHub release tarballs are not the install path for this
+  fork.
+
 - **`gc pack registry publish` now refuses an unscoped pack name unless you
   pass `--allow-unscoped-name`.** Registry pack names are scoped as
   `<github-owner>/<pack>`, and the registry has always reserved bare names for
@@ -874,7 +879,7 @@ community contributors. See the GitHub release page for the full narrative.
   semantics, watchdog reconciliation cadence, dirty-cache fallback reads.
 - Long tail of session lifecycle, wake-budget, and pool identity fixes.
 
-[Unreleased]: https://github.com/gastownhall/gascity/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/jonbaldie/gascity/compare/v1.4.0...HEAD
 [1.4.0]: https://github.com/gastownhall/gascity/releases/tag/v1.4.0
 [1.3.0]: https://github.com/gastownhall/gascity/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/gastownhall/gascity/compare/v1.2.0...v1.2.1

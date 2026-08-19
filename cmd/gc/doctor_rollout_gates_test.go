@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/doctor"
-	"github.com/gastownhall/gascity/internal/rollout"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/doctor"
+	"github.com/jonbaldie/gascity/internal/rollout"
 )
 
 // TestRolloutGateChecksAreAdvisoryPerGate proves the doctor section produces one

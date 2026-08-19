@@ -7,9 +7,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/doctor"
-	sessionexec "github.com/gastownhall/gascity/internal/runtime/exec"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/doctor"
+	sessionexec "github.com/jonbaldie/gascity/internal/runtime/exec"
 )
 
 // packRuntimesDoctorCheck verifies every pack-declared runtime

@@ -3,7 +3,7 @@ package api
 import (
 	"log"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // componentVersions holds the versions of the external binaries the

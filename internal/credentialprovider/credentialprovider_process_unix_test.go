@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/processgroup/processgrouptest"
-	"github.com/gastownhall/gascity/internal/testutil"
+	"github.com/jonbaldie/gascity/internal/processgroup/processgrouptest"
+	"github.com/jonbaldie/gascity/internal/testutil"
 )
 
 const integrationCredentialJSON = `{"version":"gascity.dev/credential-provider/v1","kind":"Credential","access_token":"opaque-token","authorization_scheme":"Bearer","expires_at":"2026-07-16T12:05:00Z","audience":"manifold","scopes":["manifold:pool:acme","manifold:proxy"]}`

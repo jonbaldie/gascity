@@ -9,7 +9,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/telemetry"
+	"github.com/jonbaldie/gascity/internal/telemetry"
 )
 
 // cacheLatencyWindowSize is the size of the rolling window of bd-list

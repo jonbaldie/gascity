@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
 
 // DeprecatedAttachmentFieldsCheck scans user-editable city TOML files

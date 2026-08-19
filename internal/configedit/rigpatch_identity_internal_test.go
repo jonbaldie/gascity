@@ -3,7 +3,7 @@ package configedit
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 // TestRemoveAgentPatch_RigKeyedIdentity verifies removeAgentPatch — the

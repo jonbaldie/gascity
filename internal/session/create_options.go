@@ -1,6 +1,6 @@
 package session
 
-import "github.com/gastownhall/gascity/internal/runtime"
+import "github.com/jonbaldie/gascity/internal/runtime"
 
 // CreateOptions is the single, field-named description of a session to create
 // through Manager.CreateSession. It replaces the telescoping family of

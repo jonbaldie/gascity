@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/runtime"
-	"github.com/gastownhall/gascity/internal/worker/workertest"
+	"github.com/jonbaldie/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/worker/workertest"
 )
 
 func TestParseApprovalPrompt_BashCommand(t *testing.T) {

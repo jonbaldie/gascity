@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
 // recordingWriteCloser captures the keystrokes gc injects into a hidden attach

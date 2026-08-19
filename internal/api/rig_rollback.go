@@ -17,7 +17,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // RigProvisionManifest records the resources one async git_url provision

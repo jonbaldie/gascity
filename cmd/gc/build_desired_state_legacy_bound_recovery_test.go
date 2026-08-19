@@ -8,8 +8,8 @@ import (
 	"io"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 // updateCountingStore counts Update calls so a test can assert the legacy-bound

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/events"
 )
 
 // S3 of the keyset-cursor track: the city event list speaks one order —

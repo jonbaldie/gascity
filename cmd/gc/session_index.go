@@ -8,7 +8,7 @@ import (
 	"io"
 	"sync"
 
-	"github.com/gastownhall/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/session"
 )
 
 // sessionEntry holds indexed metadata for a single session bead.

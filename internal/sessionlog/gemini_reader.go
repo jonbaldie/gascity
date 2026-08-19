@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/pathutil"
+	"github.com/jonbaldie/gascity/internal/pathutil"
 )
 
 // ReadGeminiFile reads a Gemini session JSON/JSONL file and converts it to the

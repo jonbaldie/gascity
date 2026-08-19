@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/processgroup/processgrouptest"
+	"github.com/jonbaldie/gascity/internal/processgroup/processgrouptest"
 )
 
 func TestTerminateEscalatesToSIGKILL(t *testing.T) {

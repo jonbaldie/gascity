@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/formulatest"
-	"github.com/gastownhall/gascity/internal/molecule"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/formulatest"
+	"github.com/jonbaldie/gascity/internal/molecule"
 )
 
 // newSlingDashboardTestServer is newSlingTestServer plus a dashboard base

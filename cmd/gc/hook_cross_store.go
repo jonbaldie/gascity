@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 // hookStore is one store the hook work_query runs against: a working dir and

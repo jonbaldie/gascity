@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // sessionBeadFixture builds a persisted session bead with the given id, status,

@@ -27,7 +27,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 // writeRigConfigYAML writes .beads/config.yaml with the given content.
@@ -108,7 +108,7 @@ func TestDoltLocalOnlyRemoteCheck_NoConfig_OK(t *testing.T) {
 	}
 	writeRigMetadata(t, rigPath, "testdb")
 	writeRepoStateWithRemotes(t, doltDataDir, "testdb", map[string]string{
-		"origin": "git+https://github.com/gastownhall/gascity.git",
+		"origin": "git+https://github.com/jonbaldie/gascity.git",
 	})
 
 	rig := config.Rig{Name: "testrig", Path: rigPath}
@@ -133,7 +133,7 @@ func TestDoltLocalOnlyRemoteCheck_LocalOnlyFalse_OK(t *testing.T) {
 	writeRigMetadata(t, rigPath, "testdb")
 	writeRigConfigYAML(t, rigPath, localOnlyFalseConfigYAML)
 	writeRepoStateWithRemotes(t, doltDataDir, "testdb", map[string]string{
-		"origin": "git+https://github.com/gastownhall/gascity.git",
+		"origin": "git+https://github.com/jonbaldie/gascity.git",
 	})
 
 	rig := config.Rig{Name: "testrig", Path: rigPath}
@@ -221,7 +221,7 @@ func TestDoltLocalOnlyRemoteCheck_LocalOnlyTrue_LocalBackupOnly_OK(t *testing.T)
 // working tree and re-adds it on every bd write (git+https URL scheme).
 // After the one-time CALL DOLT_REMOTE remove, the next bd update recreates:
 //
-//	origin | git+https://github.com/gastownhall/gascity.git
+//	origin | git+https://github.com/jonbaldie/gascity.git
 //
 // The guard must detect this and surface it as StatusWarning.
 func TestDoltLocalOnlyRemoteCheck_StoreWriteReEntry_GitPlusHttps_Warns(t *testing.T) {
@@ -234,7 +234,7 @@ func TestDoltLocalOnlyRemoteCheck_StoreWriteReEntry_GitPlusHttps_Warns(t *testin
 	writeRigMetadata(t, rigPath, "testdb")
 	writeRigConfigYAML(t, rigPath, localOnlyConfigYAML)
 	writeRepoStateWithRemotes(t, doltDataDir, "testdb", map[string]string{
-		"origin": "git+https://github.com/gastownhall/gascity.git",
+		"origin": "git+https://github.com/jonbaldie/gascity.git",
 	})
 
 	rig := config.Rig{Name: "testrig", Path: rigPath}
@@ -257,7 +257,7 @@ func TestDoltLocalOnlyRemoteCheck_StoreWriteReEntry_GitPlusHttps_Warns(t *testin
 // git remote as a Dolt remote (upstream cmd/bd/sync_git.go AddRemote site).
 // After a one-time cleanup, the next gc start / gc rig reattach re-adds:
 //
-//	origin | https://github.com/gastownhall/gascity.git
+//	origin | https://github.com/jonbaldie/gascity.git
 //
 // The guard must detect the plain https URL and surface it as StatusWarning.
 func TestDoltLocalOnlyRemoteCheck_InitWiringReEntry_HttpsRemote_Warns(t *testing.T) {
@@ -270,7 +270,7 @@ func TestDoltLocalOnlyRemoteCheck_InitWiringReEntry_HttpsRemote_Warns(t *testing
 	writeRigMetadata(t, rigPath, "testdb")
 	writeRigConfigYAML(t, rigPath, localOnlyConfigYAML)
 	writeRepoStateWithRemotes(t, doltDataDir, "testdb", map[string]string{
-		"origin": "https://github.com/gastownhall/gascity.git",
+		"origin": "https://github.com/jonbaldie/gascity.git",
 	})
 
 	rig := config.Rig{Name: "testrig", Path: rigPath}
@@ -297,7 +297,7 @@ func TestDoltLocalOnlyRemoteCheck_SshRemote_Warns(t *testing.T) {
 	writeRigMetadata(t, rigPath, "testdb")
 	writeRigConfigYAML(t, rigPath, localOnlyConfigYAML)
 	writeRepoStateWithRemotes(t, doltDataDir, "testdb", map[string]string{
-		"upstream": "ssh://git@github.com/gastownhall/gascity.git",
+		"upstream": "ssh://git@github.com/jonbaldie/gascity.git",
 	})
 
 	rig := config.Rig{Name: "testrig", Path: rigPath}
@@ -324,8 +324,8 @@ func TestDoltLocalOnlyRemoteCheck_MultipleOffBoxRemotes_Warns(t *testing.T) {
 	writeRigMetadata(t, rigPath, "testdb")
 	writeRigConfigYAML(t, rigPath, localOnlyConfigYAML)
 	writeRepoStateWithRemotes(t, doltDataDir, "testdb", map[string]string{
-		"origin":   "git+https://github.com/gastownhall/gascity.git",
-		"upstream": "https://github.com/gastownhall/gascity.git",
+		"origin":   "git+https://github.com/jonbaldie/gascity.git",
+		"upstream": "https://github.com/jonbaldie/gascity.git",
 	})
 
 	rig := config.Rig{Name: "testrig", Path: rigPath}
@@ -351,7 +351,7 @@ func TestDoltLocalOnlyRemoteCheck_MixedRemotes_Warns(t *testing.T) {
 	writeRigConfigYAML(t, rigPath, localOnlyConfigYAML)
 	writeRepoStateWithRemotes(t, doltDataDir, "testdb", map[string]string{
 		"testdb-backup": "file://" + filepath.Join(cityPath, ".dolt-backup", "testdb"),
-		"origin":        "git+https://github.com/gastownhall/gascity.git",
+		"origin":        "git+https://github.com/jonbaldie/gascity.git",
 	})
 
 	rig := config.Rig{Name: "testrig", Path: rigPath}
@@ -408,7 +408,7 @@ func TestDoltLocalOnlyRemoteCheck_Fix_CallsRemoveForOffBoxRemotes(t *testing.T) 
 	writeRigMetadata(t, rigPath, "testdb")
 	writeRigConfigYAML(t, rigPath, localOnlyConfigYAML)
 	writeRepoStateWithRemotes(t, doltDataDir, "testdb", map[string]string{
-		"origin":        "git+https://github.com/gastownhall/gascity.git",
+		"origin":        "git+https://github.com/jonbaldie/gascity.git",
 		"testdb-backup": "file://" + filepath.Join(cityPath, ".dolt-backup", "testdb"),
 	})
 
@@ -445,7 +445,7 @@ func TestDoltLocalOnlyRemoteCheck_Fix_PropagatesRemoveError(t *testing.T) {
 	writeRigMetadata(t, rigPath, "testdb")
 	writeRigConfigYAML(t, rigPath, localOnlyConfigYAML)
 	writeRepoStateWithRemotes(t, doltDataDir, "testdb", map[string]string{
-		"origin": "git+https://github.com/gastownhall/gascity.git",
+		"origin": "git+https://github.com/jonbaldie/gascity.git",
 	})
 
 	rig := config.Rig{Name: "testrig", Path: rigPath}
@@ -476,7 +476,7 @@ func TestDoltLocalOnlyRemoteCheck_RelativeRigPath(t *testing.T) {
 	writeRigMetadata(t, rigPath, "ga")
 	writeRigConfigYAML(t, rigPath, localOnlyConfigYAML)
 	writeRepoStateWithRemotes(t, doltDataDir, "ga", map[string]string{
-		"origin": "git+https://github.com/gastownhall/gascity.git",
+		"origin": "git+https://github.com/jonbaldie/gascity.git",
 	})
 
 	rig := config.Rig{Name: "gascity", Path: filepath.Join("rigs", "gascity")}
@@ -501,7 +501,7 @@ func TestDoltLocalOnlyRemoteCheck_DBNameFromMetadata(t *testing.T) {
 	writeRigMetadata(t, rigPath, "customdb") // pinned dolt_database != rig.Name
 	writeRigConfigYAML(t, rigPath, localOnlyConfigYAML)
 	writeRepoStateWithRemotes(t, doltDataDir, "customdb", map[string]string{
-		"origin": "git+https://github.com/gastownhall/gascity.git",
+		"origin": "git+https://github.com/jonbaldie/gascity.git",
 	})
 
 	rig := config.Rig{Name: "testrig", Path: rigPath}

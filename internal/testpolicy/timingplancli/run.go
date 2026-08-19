@@ -11,8 +11,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/testpolicy/timingplan"
-	"github.com/gastownhall/gascity/internal/testpolicy/timingsummary"
+	"github.com/jonbaldie/gascity/internal/testpolicy/timingplan"
+	"github.com/jonbaldie/gascity/internal/testpolicy/timingsummary"
 )
 
 const (

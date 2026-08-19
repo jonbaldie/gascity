@@ -10,7 +10,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
 
 // RunConformance exercises the portable namespace contract shared by real

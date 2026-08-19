@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
 // Optional capability interfaces herdr supports natively. (Relaunch,

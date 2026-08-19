@@ -9,11 +9,11 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/session"
-	workdirutil "github.com/gastownhall/gascity/internal/workdir"
-	"github.com/gastownhall/gascity/internal/worker"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/session"
+	workdirutil "github.com/jonbaldie/gascity/internal/workdir"
+	"github.com/jonbaldie/gascity/internal/worker"
 )
 
 var errTemplateTargetNotFound = errors.New("template target not found")

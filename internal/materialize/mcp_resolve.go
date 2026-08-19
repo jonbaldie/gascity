@@ -3,7 +3,7 @@ package materialize
 import (
 	"path/filepath"
 
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 // MCPPackSourcesForAgent returns the effective MCP directory stack for one

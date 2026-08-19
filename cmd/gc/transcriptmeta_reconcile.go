@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	storebindingsqlite "github.com/gastownhall/gascity/internal/storebinding/sqlite"
+	storebindingsqlite "github.com/jonbaldie/gascity/internal/storebinding/sqlite"
 )
 
 // transcriptMetaReconcilePageSize bounds each background batch's exact-path

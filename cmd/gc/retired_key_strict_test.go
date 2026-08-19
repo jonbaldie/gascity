@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 // TestRetiredKeyWarningIsNonFatalAndEmitted proves the retirement contract holds

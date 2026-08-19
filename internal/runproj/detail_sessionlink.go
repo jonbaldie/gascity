@@ -3,7 +3,7 @@ package runproj
 import (
 	"regexp"
 
-	"github.com/gastownhall/gascity/internal/beadmeta"
+	"github.com/jonbaldie/gascity/internal/beadmeta"
 )
 
 // sessionIDRe gates a value before it is fed to the supervisor session routes.

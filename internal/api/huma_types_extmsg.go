@@ -5,7 +5,7 @@ package api
 // for navigability.
 
 import (
-	"github.com/gastownhall/gascity/internal/extmsg"
+	"github.com/jonbaldie/gascity/internal/extmsg"
 )
 
 // --- ExtMsg types ---

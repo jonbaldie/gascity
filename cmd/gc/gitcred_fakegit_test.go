@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/gitcred"
+	"github.com/jonbaldie/gascity/internal/gitcred"
 )
 
 // installFakeGit puts a fake `git` executable at the front of PATH for the test.

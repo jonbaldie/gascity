@@ -11,9 +11,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/coordclass"
-	"github.com/gastownhall/gascity/internal/extmsg"
-	"github.com/gastownhall/gascity/internal/mail"
+	"github.com/jonbaldie/gascity/internal/coordclass"
+	"github.com/jonbaldie/gascity/internal/extmsg"
+	"github.com/jonbaldie/gascity/internal/mail"
 )
 
 // TestClassContractOperationsMatchTheContracts proves the operation registry is

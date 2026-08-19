@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/api/genclient"
-	"github.com/gastownhall/gascity/internal/runproj"
+	"github.com/jonbaldie/gascity/internal/api/genclient"
+	"github.com/jonbaldie/gascity/internal/runproj"
 )
 
 // TestAnchorRunProjection is the serve-level analog of the run-view guardrails

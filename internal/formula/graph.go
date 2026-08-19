@@ -3,7 +3,7 @@ package formula
 import (
 	"encoding/json"
 
-	"github.com/gastownhall/gascity/internal/beadmeta"
+	"github.com/jonbaldie/gascity/internal/beadmeta"
 )
 
 // ApplyGraphControls applies graph control metadata to steps in the formula.

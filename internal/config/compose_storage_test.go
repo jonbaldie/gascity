@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
 
 // fragmentSplitStorageCity is the authoring shape the design blesses: the

@@ -3,7 +3,7 @@ package rollout
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 // cityGates builds a City that sets both Mode gates, so independence tests can

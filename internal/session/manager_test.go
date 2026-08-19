@@ -11,12 +11,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/clock"
-	"github.com/gastownhall/gascity/internal/runtime"
-	sessionauto "github.com/gastownhall/gascity/internal/runtime/auto"
-	"github.com/gastownhall/gascity/internal/sessionlog"
-	"github.com/gastownhall/gascity/internal/testutil"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/clock"
+	"github.com/jonbaldie/gascity/internal/runtime"
+	sessionauto "github.com/jonbaldie/gascity/internal/runtime/auto"
+	"github.com/jonbaldie/gascity/internal/sessionlog"
+	"github.com/jonbaldie/gascity/internal/testutil"
 )
 
 func immediateStaleKeyDetectionWaiter(context.Context, string) error { return nil }

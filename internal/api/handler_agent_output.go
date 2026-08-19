@@ -8,9 +8,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/config"
-	workdirutil "github.com/gastownhall/gascity/internal/workdir"
-	"github.com/gastownhall/gascity/internal/worker"
+	"github.com/jonbaldie/gascity/internal/config"
+	workdirutil "github.com/jonbaldie/gascity/internal/workdir"
+	"github.com/jonbaldie/gascity/internal/worker"
 )
 
 // outputTurn is a single conversation turn in the unified output response.

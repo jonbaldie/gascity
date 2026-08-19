@@ -5,9 +5,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/doctor"
-	"github.com/gastownhall/gascity/internal/mail/beadmail"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/doctor"
+	"github.com/jonbaldie/gascity/internal/mail/beadmail"
 )
 
 // backlogDepthCheck reports the city store's claimable backlog depth by

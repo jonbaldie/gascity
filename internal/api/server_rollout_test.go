@@ -3,7 +3,7 @@ package api
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/rollout"
+	"github.com/jonbaldie/gascity/internal/rollout"
 )
 
 // rolloutProviderState is a State that also implements RolloutFlagsProvider,

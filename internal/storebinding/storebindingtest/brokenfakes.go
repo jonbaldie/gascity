@@ -18,11 +18,11 @@ import (
 	"sort"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/mail"
-	"github.com/gastownhall/gascity/internal/nudgequeue"
-	"github.com/gastownhall/gascity/internal/orders"
-	"github.com/gastownhall/gascity/internal/storebinding"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/mail"
+	"github.com/jonbaldie/gascity/internal/nudgequeue"
+	"github.com/jonbaldie/gascity/internal/orders"
+	"github.com/jonbaldie/gascity/internal/storebinding"
 )
 
 // GraphDefect names one deliberate Graph-class defect.

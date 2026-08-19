@@ -12,7 +12,7 @@ import (
 )
 
 // selfImportPath is the package this guard fences off.
-const selfImportPath = "github.com/gastownhall/gascity/internal/beads/splittest"
+const selfImportPath = "github.com/jonbaldie/gascity/internal/beads/splittest"
 
 // TestSplittestIsNotImportedByProductionCode fences the kit into test builds.
 //

@@ -3,10 +3,10 @@ package main
 import (
 	"path/filepath"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/materialize"
-	"github.com/gastownhall/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/materialize"
+	"github.com/jonbaldie/gascity/internal/session"
 )
 
 // doctorSkillStaticSinks resolves the config-derived skill sink

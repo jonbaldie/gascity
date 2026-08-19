@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/gastownhall/gascity/internal/bdflags"
+	"github.com/jonbaldie/gascity/internal/bdflags"
 )
 
 // mistypedMetadataPairRefusal reports whether a `gc bd` invocation carries

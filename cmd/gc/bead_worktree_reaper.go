@@ -9,14 +9,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beadmeta"
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/config"
-	convoycore "github.com/gastownhall/gascity/internal/convoy"
-	"github.com/gastownhall/gascity/internal/events"
-	"github.com/gastownhall/gascity/internal/git"
-	"github.com/gastownhall/gascity/internal/pathutil"
-	"github.com/gastownhall/gascity/internal/sling"
+	"github.com/jonbaldie/gascity/internal/beadmeta"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/config"
+	convoycore "github.com/jonbaldie/gascity/internal/convoy"
+	"github.com/jonbaldie/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/git"
+	"github.com/jonbaldie/gascity/internal/pathutil"
+	"github.com/jonbaldie/gascity/internal/sling"
 )
 
 // reapDecision records one worktree the reaper acted on or declined to act on,

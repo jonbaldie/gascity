@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/beads/beadstest"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads/beadstest"
 )
 
 // newRecordingNudgeStore wires a RecordingStore over a fresh MemStore behind the

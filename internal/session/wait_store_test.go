@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/beads/beadstest"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads/beadstest"
 )
 
 // waitBeadFixture builds a durable wait bead carrying the canonical type and

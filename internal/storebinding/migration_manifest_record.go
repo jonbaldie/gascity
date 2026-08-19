@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/coordclass"
+	"github.com/jonbaldie/gascity/internal/coordclass"
 )
 
 // IntentSection is the INTENT_FSYNCED field set. Every fact recovery needs

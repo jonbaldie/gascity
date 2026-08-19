@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/beadmeta"
+	"github.com/jonbaldie/gascity/internal/beadmeta"
 )
 
 // SelfClosingControlEdge is a compiled readiness edge whose blocker is the

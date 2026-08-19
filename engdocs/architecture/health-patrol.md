@@ -413,17 +413,17 @@ stubbed `ExecRunner`) with no external infrastructure dependencies. See
 
 - [Architecture glossary](glossary.md) -- authoritative definitions
   of all Gas City terms used in this document
-- [Config struct definitions](https://github.com/gastownhall/gascity/blob/main/internal/config/config.go) --
+- [Config struct definitions](https://github.com/jonbaldie/gascity/blob/main/internal/config/config.go) --
   `DaemonConfig`, `Agent`, and `PoolConfig` struct fields and defaults
-- [Runtime Provider interface](https://github.com/gastownhall/gascity/blob/main/internal/runtime/runtime.go) --
+- [Runtime Provider interface](https://github.com/jonbaldie/gascity/blob/main/internal/runtime/runtime.go) --
   the provider interface that Health Patrol queries for liveness, metadata,
   and activity
-- [Order trigger evaluation](https://github.com/gastownhall/gascity/blob/main/internal/orders/triggers.go) --
+- [Order trigger evaluation](https://github.com/jonbaldie/gascity/blob/main/internal/orders/triggers.go) --
   trigger types (cooldown, cron, condition, event, manual) and their
   check logic
-- [Event type constants](https://github.com/gastownhall/gascity/blob/main/internal/events/events.go) -- all event
+- [Event type constants](https://github.com/jonbaldie/gascity/blob/main/internal/events/events.go) -- all event
   types emitted by Health Patrol
-- [Config revision hashing](https://github.com/gastownhall/gascity/blob/main/internal/config/revision.go) --
+- [Config revision hashing](https://github.com/jonbaldie/gascity/blob/main/internal/config/revision.go) --
   SHA-256 bundle hash for config reload detection
-- [Session config fingerprinting](https://github.com/gastownhall/gascity/blob/main/internal/runtime/fingerprint.go)
+- [Session config fingerprinting](https://github.com/jonbaldie/gascity/blob/main/internal/runtime/fingerprint.go)
   -- per-agent SHA-256 hash for drift detection

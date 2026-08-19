@@ -8,11 +8,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/config"
-	sessionpkg "github.com/gastownhall/gascity/internal/session"
-	workdirutil "github.com/gastownhall/gascity/internal/workdir"
-	"github.com/gastownhall/gascity/internal/worker"
-	workertranscript "github.com/gastownhall/gascity/internal/worker/transcript"
+	"github.com/jonbaldie/gascity/internal/config"
+	sessionpkg "github.com/jonbaldie/gascity/internal/session"
+	workdirutil "github.com/jonbaldie/gascity/internal/workdir"
+	"github.com/jonbaldie/gascity/internal/worker"
+	workertranscript "github.com/jonbaldie/gascity/internal/worker/transcript"
 	"github.com/spf13/cobra"
 )
 

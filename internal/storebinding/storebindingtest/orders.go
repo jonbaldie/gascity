@@ -10,9 +10,9 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/orders"
-	"github.com/gastownhall/gascity/internal/storebinding"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/orders"
+	"github.com/jonbaldie/gascity/internal/storebinding"
 )
 
 // OrdersSuite configures one bare Orders class conformance run.

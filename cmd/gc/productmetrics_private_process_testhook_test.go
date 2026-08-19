@@ -19,8 +19,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/productmetrics"
-	"github.com/gastownhall/gascity/internal/testutil"
+	"github.com/jonbaldie/gascity/internal/productmetrics"
+	"github.com/jonbaldie/gascity/internal/testutil"
 )
 
 const (

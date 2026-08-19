@@ -4,8 +4,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/beadmeta"
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beadmeta"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // WorkflowBead is the typed projection of a workflow root or step bead: the

@@ -19,7 +19,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 func graphAdapterOver(t *testing.T, store beads.Store) GraphStore {

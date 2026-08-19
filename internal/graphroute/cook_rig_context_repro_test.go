@@ -3,9 +3,9 @@ package graphroute
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/agentutil"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/formula"
+	"github.com/jonbaldie/gascity/internal/agentutil"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/formula"
 )
 
 // rigAwareResolver mirrors the CLI's resolveAgentIdentity / cliAgentResolver:

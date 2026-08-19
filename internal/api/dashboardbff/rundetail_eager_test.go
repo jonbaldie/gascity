@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/runproj"
-	"github.com/gastownhall/gascity/internal/testutil"
+	"github.com/jonbaldie/gascity/internal/runproj"
+	"github.com/jonbaldie/gascity/internal/testutil"
 )
 
 // seedRunLog writes a minimal one-run event log under dir/.gc/events.jsonl and

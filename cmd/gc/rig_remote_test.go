@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/api"
-	"github.com/gastownhall/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/api"
+	"github.com/jonbaldie/gascity/internal/events"
 )
 
 func remoteRigTarget(url string) *remoteTarget {

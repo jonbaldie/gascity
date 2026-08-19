@@ -45,11 +45,11 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/bootstrap"
-	"github.com/gastownhall/gascity/internal/citylayout"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/fsys"
-	"github.com/gastownhall/gascity/internal/pathutil"
+	"github.com/jonbaldie/gascity/internal/bootstrap"
+	"github.com/jonbaldie/gascity/internal/citylayout"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/pathutil"
 )
 
 // vendorSinks maps an agent provider to the relative directory under the

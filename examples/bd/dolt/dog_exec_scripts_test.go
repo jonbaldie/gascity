@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/orders"
+	"github.com/jonbaldie/gascity/internal/orders"
 )
 
 func runDogScriptCommand(t *testing.T, scriptName, binDir, cityPath, dataDir string, extraEnv ...string) (string, error) {

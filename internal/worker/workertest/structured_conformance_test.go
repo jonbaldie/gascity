@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	worker "github.com/gastownhall/gascity/internal/worker"
+	worker "github.com/jonbaldie/gascity/internal/worker"
 )
 
 func TestStructuredCatalogStaysAligned(t *testing.T) {

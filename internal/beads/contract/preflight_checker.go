@@ -10,7 +10,7 @@ import (
 	"golang.org/x/mod/module"
 	"golang.org/x/mod/semver"
 
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
 
 // PreflightBDContext is the bd-reported backend state for a beads scope.

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/storebinding"
+	"github.com/jonbaldie/gascity/internal/storebinding"
 )
 
 func TestGraphInspectorFencedAdmissionRejectsSchemaDriftWithoutSourceMutation(t *testing.T) {

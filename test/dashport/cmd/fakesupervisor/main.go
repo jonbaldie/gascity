@@ -35,8 +35,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/api"
-	"github.com/gastownhall/gascity/test/dashport/corpus"
+	"github.com/jonbaldie/gascity/internal/api"
+	"github.com/jonbaldie/gascity/test/dashport/corpus"
 )
 
 func main() {

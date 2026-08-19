@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/api/apierr"
-	"github.com/gastownhall/gascity/internal/events"
-	"github.com/gastownhall/gascity/internal/extmsg"
+	"github.com/jonbaldie/gascity/internal/api/apierr"
+	"github.com/jonbaldie/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/extmsg"
 )
 
 // --- Huma helpers for extmsg ---

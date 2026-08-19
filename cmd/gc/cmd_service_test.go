@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/workspacesvc"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/workspacesvc"
 )
 
 type fakeServiceReader struct {

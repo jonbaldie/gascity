@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
-	"github.com/gastownhall/gascity/internal/git"
+	"github.com/jonbaldie/gascity/internal/git"
 )
 
 // PackContentHash returns the canonical sha256 content hash for one pack

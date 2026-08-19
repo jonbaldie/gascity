@@ -10,17 +10,17 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beadmeta"
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/beads/splittest"
-	"github.com/gastownhall/gascity/internal/config"
-	convoycore "github.com/gastownhall/gascity/internal/convoy"
-	"github.com/gastownhall/gascity/internal/coordclass"
-	"github.com/gastownhall/gascity/internal/events"
-	"github.com/gastownhall/gascity/internal/formula"
-	"github.com/gastownhall/gascity/internal/formulatest"
-	"github.com/gastownhall/gascity/internal/molecule"
-	"github.com/gastownhall/gascity/internal/orders"
+	"github.com/jonbaldie/gascity/internal/beadmeta"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads/splittest"
+	"github.com/jonbaldie/gascity/internal/config"
+	convoycore "github.com/jonbaldie/gascity/internal/convoy"
+	"github.com/jonbaldie/gascity/internal/coordclass"
+	"github.com/jonbaldie/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/formula"
+	"github.com/jonbaldie/gascity/internal/formulatest"
+	"github.com/jonbaldie/gascity/internal/molecule"
+	"github.com/jonbaldie/gascity/internal/orders"
 )
 
 // This file is the one-shot half of the graph-class birth invariant that

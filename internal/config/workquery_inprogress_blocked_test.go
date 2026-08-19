@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/shellquote"
+	"github.com/jonbaldie/gascity/internal/shellquote"
 )
 
 // Regression coverage for the crash-recovery re-serve defect: the in_progress

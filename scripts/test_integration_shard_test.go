@@ -490,7 +490,7 @@ case "$1" in
     printf '%s\0' "$@" >> "$capture_path"
     printf '\0' >> "$capture_path"
     if [[ "$is_list" == "1" ]]; then
-      printf '%s\n' TestDarwinAlpha TestDarwinBeta TestDarwinGamma 'ok  github.com/gastownhall/gascity/internal/runtime/tmux  0.001s'
+      printf '%s\n' TestDarwinAlpha TestDarwinBeta TestDarwinGamma 'ok  github.com/jonbaldie/gascity/internal/runtime/tmux  0.001s'
     fi
     ;;
   *)

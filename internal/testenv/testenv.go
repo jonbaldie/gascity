@@ -7,7 +7,7 @@
 // Every real test directory in this repo must contain an untagged
 // `testenv_import_test.go` that blank-imports this package:
 //
-//	import _ "github.com/gastownhall/gascity/internal/testenv"
+//	import _ "github.com/jonbaldie/gascity/internal/testenv"
 //
 // TestRequiresDedicatedTestenvImportFile in lint_test.go enforces that exact
 // layout, rejects stale stubs, and rejects ad hoc imports elsewhere so

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/runtime"
-	sessionpkg "github.com/gastownhall/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/runtime"
+	sessionpkg "github.com/jonbaldie/gascity/internal/session"
 )
 
 // Start ensures the worker exists and its runtime is live.

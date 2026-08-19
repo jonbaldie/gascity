@@ -7,7 +7,7 @@ import (
 	"errors"
 	"testing"
 
-	gcruntime "github.com/gastownhall/gascity/internal/runtime"
+	gcruntime "github.com/jonbaldie/gascity/internal/runtime"
 )
 
 // The ga-jnavd production shape, against a real tmux server: a city server

@@ -13,9 +13,9 @@ package storebindingtest
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/mail"
-	"github.com/gastownhall/gascity/internal/mail/mailtest"
-	"github.com/gastownhall/gascity/internal/storebinding"
+	"github.com/jonbaldie/gascity/internal/mail"
+	"github.com/jonbaldie/gascity/internal/mail/mailtest"
+	"github.com/jonbaldie/gascity/internal/storebinding"
 )
 
 // MessagingSuite configures one bare Messaging class conformance run.

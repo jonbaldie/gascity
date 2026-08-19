@@ -17,9 +17,9 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
-	"github.com/gastownhall/gascity/internal/credentialprovider"
-	"github.com/gastownhall/gascity/internal/git"
-	"github.com/gastownhall/gascity/internal/packregistry"
+	"github.com/jonbaldie/gascity/internal/credentialprovider"
+	"github.com/jonbaldie/gascity/internal/git"
+	"github.com/jonbaldie/gascity/internal/packregistry"
 	"github.com/spf13/cobra"
 )
 

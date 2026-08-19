@@ -13,13 +13,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/agentutil"
-	"github.com/gastownhall/gascity/internal/api/apierr"
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/formula"
-	"github.com/gastownhall/gascity/internal/formulatest"
-	"github.com/gastownhall/gascity/internal/molecule"
+	"github.com/jonbaldie/gascity/internal/agentutil"
+	"github.com/jonbaldie/gascity/internal/api/apierr"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/formula"
+	"github.com/jonbaldie/gascity/internal/formulatest"
+	"github.com/jonbaldie/gascity/internal/molecule"
 )
 
 type getErrStore struct {

@@ -147,8 +147,8 @@ func TestValidateRejectsInvalidContractClaims(t *testing.T) {
 func TestValidateProofRefsRequiresDirectUngatedContractFactory(t *testing.T) {
 	const imports = `import (
 	fmtalias "fmt"
-	runtimealias "github.com/gastownhall/gascity/internal/runtime"
-	contractalias "github.com/gastownhall/gascity/internal/runtime/runtimetest"
+	runtimealias "github.com/jonbaldie/gascity/internal/runtime"
+	contractalias "github.com/jonbaldie/gascity/internal/runtime/runtimetest"
 	testalias "testing"
 )
 `
@@ -939,9 +939,9 @@ func TestCompareReusableDoublesRejectsDuplicateOwnership(t *testing.T) {
 func TestDiscoverRuntimeCatalogIsBoundedToBuildRuntimeRegistry(t *testing.T) {
 	source := []byte(`package main
 import (
-	registryalias "github.com/gastownhall/gascity/internal/runtime/registry"
-	runtimealias "github.com/gastownhall/gascity/internal/runtime"
-	execalias "github.com/gastownhall/gascity/internal/runtime/exec"
+	registryalias "github.com/jonbaldie/gascity/internal/runtime/registry"
+	runtimealias "github.com/jonbaldie/gascity/internal/runtime"
+	execalias "github.com/jonbaldie/gascity/internal/runtime/exec"
 )
 func buildRuntimeRegistry() {
 	r := registryalias.New()
@@ -977,8 +977,8 @@ func runtimeRegistryForCity() {
 
 func TestDiscoverRuntimeCatalogRequiresOneReceiverlessFunction(t *testing.T) {
 	const imports = `import (
-	registryalias "github.com/gastownhall/gascity/internal/runtime/registry"
-	runtimealias "github.com/gastownhall/gascity/internal/runtime"
+	registryalias "github.com/jonbaldie/gascity/internal/runtime/registry"
+	runtimealias "github.com/jonbaldie/gascity/internal/runtime"
 )`
 	const decoy = `
 type decoy struct{}
@@ -1025,7 +1025,7 @@ func buildRuntimeRegistry() {
 
 func TestDiscoverRuntimeCatalogRejectsNonLiteralKeys(t *testing.T) {
 	source := []byte(`package main
-import registryalias "github.com/gastownhall/gascity/internal/runtime/registry"
+import registryalias "github.com/jonbaldie/gascity/internal/runtime/registry"
 func buildRuntimeRegistry() {
 	r := registryalias.New()
 	must(r.Register(providerName, func() { return newProvider(), nil }))
@@ -1040,8 +1040,8 @@ func buildRuntimeRegistry() {
 
 func TestDiscoverRuntimeCatalogRejectsShadowedImportQualifier(t *testing.T) {
 	source := []byte(`package main
-import runtimealias "github.com/gastownhall/gascity/internal/runtime"
-import registryalias "github.com/gastownhall/gascity/internal/runtime/registry"
+import runtimealias "github.com/jonbaldie/gascity/internal/runtime"
+import registryalias "github.com/jonbaldie/gascity/internal/runtime/registry"
 func buildRuntimeRegistry() {
 	r := registryalias.New()
 	must(r.Register("fake", func() {
@@ -1060,9 +1060,9 @@ func buildRuntimeRegistry() {
 func TestDiscoverRuntimeCatalogRejectsUnledgeredFallbackConstructor(t *testing.T) {
 	source := []byte(`package main
 import (
-	execalias "github.com/gastownhall/gascity/internal/runtime/exec"
-	registryalias "github.com/gastownhall/gascity/internal/runtime/registry"
-	tmuxalias "github.com/gastownhall/gascity/internal/runtime/tmux"
+	execalias "github.com/jonbaldie/gascity/internal/runtime/exec"
+	registryalias "github.com/jonbaldie/gascity/internal/runtime/registry"
+	tmuxalias "github.com/jonbaldie/gascity/internal/runtime/tmux"
 )
 func buildRuntimeRegistry() {
 	r := registryalias.New()
@@ -1082,8 +1082,8 @@ func buildRuntimeRegistry() {
 func TestDiscoverRuntimeCatalogRequiresExactlyOneFallback(t *testing.T) {
 	const prefix = `package main
 import (
-	registryalias "github.com/gastownhall/gascity/internal/runtime/registry"
-	runtimealias "github.com/gastownhall/gascity/internal/runtime"
+	registryalias "github.com/jonbaldie/gascity/internal/runtime/registry"
+	runtimealias "github.com/jonbaldie/gascity/internal/runtime"
 )
 func buildRuntimeRegistry() {
 	r := registryalias.New()
@@ -1111,8 +1111,8 @@ func buildRuntimeRegistry() {
 func TestDiscoverRuntimeCatalogRejectsSuccessfulNilProviderReturn(t *testing.T) {
 	const prefix = `package main
 import (
-	registryalias "github.com/gastownhall/gascity/internal/runtime/registry"
-	runtimealias "github.com/gastownhall/gascity/internal/runtime"
+	registryalias "github.com/jonbaldie/gascity/internal/runtime/registry"
+	runtimealias "github.com/jonbaldie/gascity/internal/runtime"
 )
 func buildRuntimeRegistry() {
 	r := registryalias.New()
@@ -1175,8 +1175,8 @@ func buildRuntimeRegistry() {
 
 func TestDiscoverRuntimeCatalogBindsRegistryAndFactoriesByObject(t *testing.T) {
 	const imports = `import (
-	registryalias "github.com/gastownhall/gascity/internal/runtime/registry"
-	runtimealias "github.com/gastownhall/gascity/internal/runtime"
+	registryalias "github.com/jonbaldie/gascity/internal/runtime/registry"
+	runtimealias "github.com/jonbaldie/gascity/internal/runtime"
 )`
 
 	t.Run("registry variable may be renamed", func(t *testing.T) {
@@ -1282,8 +1282,8 @@ func buildRuntimeRegistry() {
 func TestDiscoverRuntimeCatalogRejectsBareAndNamedProviderReturns(t *testing.T) {
 	const prefix = `package main
 import (
-	registryalias "github.com/gastownhall/gascity/internal/runtime/registry"
-	runtimealias "github.com/gastownhall/gascity/internal/runtime"
+	registryalias "github.com/jonbaldie/gascity/internal/runtime/registry"
+	runtimealias "github.com/jonbaldie/gascity/internal/runtime"
 )
 func buildRuntimeRegistry() {
 	r := registryalias.New()
@@ -1398,8 +1398,8 @@ func TestValidateSourceRefsBindsManualCompositionConstructor(t *testing.T) {
 	}
 
 	const imports = `import (
-	autoalias "github.com/gastownhall/gascity/internal/runtime/auto"
-	otheralias "github.com/gastownhall/gascity/internal/runtime/other"
+	autoalias "github.com/jonbaldie/gascity/internal/runtime/auto"
+	otheralias "github.com/jonbaldie/gascity/internal/runtime/other"
 )`
 	tests := []struct {
 		name string

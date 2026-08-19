@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 // Dolt holds an exclusive flock on each database's `.dolt/noms/LOCK` for the

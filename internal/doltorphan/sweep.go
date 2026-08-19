@@ -20,7 +20,7 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/clock"
+	"github.com/jonbaldie/gascity/internal/clock"
 )
 
 // DefaultMinAge is the age a candidate directory's mtime must clear before

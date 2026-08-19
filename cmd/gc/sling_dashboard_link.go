@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/api/dashboardbff"
-	"github.com/gastownhall/gascity/internal/sling"
+	"github.com/jonbaldie/gascity/internal/api/dashboardbff"
+	"github.com/jonbaldie/gascity/internal/sling"
 )
 
 // Link resolution runs inline after a successful sling, so every network

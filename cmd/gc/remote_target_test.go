@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/clientcontext"
+	"github.com/jonbaldie/gascity/internal/clientcontext"
 )
 
 // fileWith builds a contexts File from the given contexts, with an optional

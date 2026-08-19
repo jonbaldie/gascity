@@ -3,7 +3,7 @@ package rollout
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 // TestValueOf covers the render-only generic value accessor, including the

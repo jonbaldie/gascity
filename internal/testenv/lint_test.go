@@ -13,11 +13,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/testenv"
+	"github.com/jonbaldie/gascity/internal/testenv"
 )
 
 const (
-	importPath = "github.com/gastownhall/gascity/internal/testenv"
+	importPath = "github.com/jonbaldie/gascity/internal/testenv"
 	importFile = "testenv_import_test.go"
 )
 

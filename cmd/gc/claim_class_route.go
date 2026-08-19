@@ -125,11 +125,11 @@ import (
 	"io"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/beadmeta"
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/events"
-	"github.com/gastownhall/gascity/internal/executionevent"
-	"github.com/gastownhall/gascity/internal/storebinding"
+	"github.com/jonbaldie/gascity/internal/beadmeta"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/executionevent"
+	"github.com/jonbaldie/gascity/internal/storebinding"
 )
 
 // errClaimRouteBindingCannotClaim reports that the relocated coordination-class

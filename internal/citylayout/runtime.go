@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/pathutil"
+	"github.com/jonbaldie/gascity/internal/pathutil"
 )
 
 const (

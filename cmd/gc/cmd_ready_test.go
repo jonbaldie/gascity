@@ -15,11 +15,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/bdflags"
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/beads/splittest"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/storeref"
+	"github.com/jonbaldie/gascity/internal/bdflags"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads/splittest"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/storeref"
 	"github.com/spf13/pflag"
 )
 

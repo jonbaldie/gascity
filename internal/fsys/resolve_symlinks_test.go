@@ -8,7 +8,7 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
 
 func TestResolveSymlinks_RegularFileReturnsPathUnchanged(t *testing.T) {

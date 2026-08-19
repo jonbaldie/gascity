@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/gastownhall/gascity/internal/pathutil"
+	"github.com/jonbaldie/gascity/internal/pathutil"
 )
 
 func normalizePathForCompare(path string) string {

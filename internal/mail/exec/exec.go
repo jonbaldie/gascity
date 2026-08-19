@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/mail"
+	"github.com/jonbaldie/gascity/internal/mail"
 )
 
 const messageNotFoundMarker = "gc-mail-error:not-found"

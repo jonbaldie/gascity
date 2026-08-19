@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/gastownhall/gascity/test/dolttest"
+	"github.com/jonbaldie/gascity/test/dolttest"
 )
 
 // gastownTestRootPrefix scopes this binary's temp root so dolttest.Guard

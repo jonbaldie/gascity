@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beadmeta"
+	"github.com/jonbaldie/gascity/internal/beadmeta"
 )
 
 // TestProcessRalphCheckInfraTimeoutDoesNotBurnAttempt is the regression for the

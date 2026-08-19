@@ -1,6 +1,6 @@
 package extmsg
 
-import "github.com/gastownhall/gascity/internal/promptsafe"
+import "github.com/jonbaldie/gascity/internal/promptsafe"
 
 // SanitizeForSystemReminder strips literal <system-reminder> open and close
 // tag sequences from user-controlled text before it is interpolated into a

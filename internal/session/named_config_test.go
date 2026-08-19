@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 func TestNamedSessionContinuityEligible_ArchivedRequiresExplicitContinuity(t *testing.T) {

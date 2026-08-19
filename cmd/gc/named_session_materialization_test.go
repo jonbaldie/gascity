@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/session"
 )
 
 // Tests for Fix B: configured named-session identities launched via

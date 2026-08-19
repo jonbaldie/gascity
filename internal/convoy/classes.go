@@ -6,9 +6,9 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/coordclass"
-	"github.com/gastownhall/gascity/internal/storeref"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/coordclass"
+	"github.com/jonbaldie/gascity/internal/storeref"
 )
 
 // MemberClasses names the class handles a single convoy operation spans.

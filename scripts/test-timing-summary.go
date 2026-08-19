@@ -5,7 +5,7 @@ package main
 import (
 	"os"
 
-	"github.com/gastownhall/gascity/internal/testpolicy/timingsummary"
+	"github.com/jonbaldie/gascity/internal/testpolicy/timingsummary"
 )
 
 func main() {

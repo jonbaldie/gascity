@@ -3,9 +3,9 @@ package api
 import (
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/api/apierr"
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/api/apierr"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 // relocatedGraphStore returns the graph-class store when — and only when — the

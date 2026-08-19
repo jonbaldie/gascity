@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/pathutil"
+	"github.com/jonbaldie/gascity/internal/pathutil"
 )
 
 func readCapturedACPFile(path string, tailCompactions int, syntheticPrefix string) (*Session, error) {

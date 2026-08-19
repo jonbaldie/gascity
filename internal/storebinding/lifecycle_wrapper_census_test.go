@@ -60,7 +60,7 @@ const censusProviderOpenMethod = "Open"
 // provider-neutral, which at minimum means the package they live in cannot
 // reach the one provider by name. (Go's own import cycle rules also forbid it
 // today — this pins that the direction never inverts.)
-const censusSQLiteImportPath = "github.com/gastownhall/gascity/internal/storebinding/sqlite"
+const censusSQLiteImportPath = "github.com/jonbaldie/gascity/internal/storebinding/sqlite"
 
 // openCensusReport is one survey of a set of parsed sources.
 type openCensusReport struct {

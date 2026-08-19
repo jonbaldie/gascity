@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/pidutil"
+	"github.com/jonbaldie/gascity/internal/pidutil"
 )
 
 type standaloneBdDoltProcessMatcher func(pid int, dataDir string) bool

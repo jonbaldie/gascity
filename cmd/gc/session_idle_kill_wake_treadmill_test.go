@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	sessionpkg "github.com/gastownhall/gascity/internal/session"
+	sessionpkg "github.com/jonbaldie/gascity/internal/session"
 )
 
 // TestIdleKillLadderFightsAwakeSetExemptions is the RED proof for ga-3ox7rk:

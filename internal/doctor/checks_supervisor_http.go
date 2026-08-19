@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/supervisor"
+	"github.com/jonbaldie/gascity/internal/supervisor"
 )
 
 // httpDoer abstracts the HTTP client so tests can inject a mock.

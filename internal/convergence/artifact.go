@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/gastownhall/gascity/internal/fsys"
-	"github.com/gastownhall/gascity/internal/pathutil"
+	"github.com/jonbaldie/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/pathutil"
 )
 
 // EnsureArtifactDir creates the artifact directory for a given iteration

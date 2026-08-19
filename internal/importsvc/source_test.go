@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/git"
+	"github.com/jonbaldie/gascity/internal/git"
 )
 
 // TestLsRemoteHeadArgsHardened proves the remote HEAD probe is hardened against

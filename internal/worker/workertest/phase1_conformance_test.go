@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	worker "github.com/gastownhall/gascity/internal/worker"
+	worker "github.com/jonbaldie/gascity/internal/worker"
 )
 
 func TestPhase1CatalogProfilesStayAligned(t *testing.T) {

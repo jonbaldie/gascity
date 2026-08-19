@@ -4,7 +4,7 @@ package closeorder
 import (
 	"fmt"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // Order returns ids reordered so that, for any "blocks" edge whose blocker and

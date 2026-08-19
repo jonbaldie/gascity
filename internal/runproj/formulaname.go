@@ -4,7 +4,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/gastownhall/gascity/internal/beadmeta"
+	"github.com/jonbaldie/gascity/internal/beadmeta"
 )
 
 // resolveRunFormulaIdentityLane resolves a run group's formula name for the

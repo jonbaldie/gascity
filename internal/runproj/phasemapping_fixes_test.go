@@ -3,7 +3,7 @@ package runproj
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beadmeta"
+	"github.com/jonbaldie/gascity/internal/beadmeta"
 )
 
 // Regression tests for the 2026-07-11 run-view misclassification fixes: steps

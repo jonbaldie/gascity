@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/pathutil"
+	"github.com/jonbaldie/gascity/internal/pathutil"
 )
 
 // ReadAmpFile reads an Amp --execute --stream-json JSONL capture and converts

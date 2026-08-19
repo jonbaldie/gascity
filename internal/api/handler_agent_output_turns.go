@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/worker"
+	"github.com/jonbaldie/gascity/internal/worker"
 )
 
 // entryToTurn converts a provider transcript entry to a human-readable output turn.

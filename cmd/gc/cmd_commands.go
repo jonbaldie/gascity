@@ -12,8 +12,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/citylayout"
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/citylayout"
+	"github.com/jonbaldie/gascity/internal/config"
 	"github.com/spf13/cobra"
 )
 

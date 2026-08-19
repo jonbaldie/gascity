@@ -16,9 +16,9 @@ import (
 
 	gascitypacks "github.com/gastownhall/gascity-packs"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/fsys"
-	helpers "github.com/gastownhall/gascity/test/acceptance/helpers"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/fsys"
+	helpers "github.com/jonbaldie/gascity/test/acceptance/helpers"
 )
 
 func TestGastownIdleOpenBeadCountsStayBounded(t *testing.T) {

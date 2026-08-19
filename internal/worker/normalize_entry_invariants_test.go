@@ -3,7 +3,7 @@ package worker
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/sessionlog"
+	"github.com/jonbaldie/gascity/internal/sessionlog"
 )
 
 // TestNormalizeEntryCarriesModelStopReasonAndDerivedFlag covers three

@@ -12,7 +12,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/storebinding"
+	"github.com/jonbaldie/gascity/internal/storebinding"
 )
 
 var (

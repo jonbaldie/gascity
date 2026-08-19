@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/citylayout"
+	"github.com/jonbaldie/gascity/internal/citylayout"
 )
 
 func TestAssembleContextBasic(t *testing.T) {

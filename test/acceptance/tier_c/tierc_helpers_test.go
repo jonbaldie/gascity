@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	helpers "github.com/gastownhall/gascity/test/acceptance/helpers"
+	helpers "github.com/jonbaldie/gascity/test/acceptance/helpers"
 )
 
 func TestBdCmdSeparatesStdoutAndStderrOnError(t *testing.T) {

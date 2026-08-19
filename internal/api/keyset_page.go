@@ -4,7 +4,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/api/apierr"
+	"github.com/jonbaldie/gascity/internal/api/apierr"
 )
 
 // Generic keyset pagination over non-bead collections (mail messages,

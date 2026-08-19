@@ -3,7 +3,7 @@ package session
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // TestUsesSoftEscapeInterrupt_WrappedCodex verifies that a session bead

@@ -7,11 +7,11 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/doctor"
-	"github.com/gastownhall/gascity/internal/fsys"
-	"github.com/gastownhall/gascity/internal/packman"
-	"github.com/gastownhall/gascity/internal/remotesource"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/doctor"
+	"github.com/jonbaldie/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/packman"
+	"github.com/jonbaldie/gascity/internal/remotesource"
 )
 
 type importStateDoctorCheck struct {
@@ -377,7 +377,7 @@ func legacyPublicPackForSource(cityPath, source string) (string, bool) {
 	source = strings.TrimSpace(source)
 	if isRemoteImportSource(source) {
 		parsed := remotesource.Parse(source)
-		if normalizeGascityRepoURL(parsed.CloneURL) != "https://github.com/gastownhall/gascity" {
+		if normalizeGascityRepoURL(parsed.CloneURL) != "https://github.com/jonbaldie/gascity" {
 			return "", false
 		}
 		return legacyPublicPackSubpath(parsed.Subpath)

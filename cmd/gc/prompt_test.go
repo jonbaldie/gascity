@@ -10,9 +10,9 @@ import (
 
 	gascitypacks "github.com/gastownhall/gascity-packs"
 
-	"github.com/gastownhall/gascity/internal/builtinpacks"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/builtinpacks"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
 
 const formulaFilesystemSearchGuidance = "**Never use wide filesystem searches when a CLI command exists.**"

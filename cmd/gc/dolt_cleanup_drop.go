@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/doltauth"
+	"github.com/jonbaldie/gascity/internal/doltauth"
 )
 
 // CleanupDoltClient is the SQL surface the cleanup engine needs. The

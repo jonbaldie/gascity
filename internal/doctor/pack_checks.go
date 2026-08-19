@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/citylayout"
+	"github.com/jonbaldie/gascity/internal/citylayout"
 )
 
 // PackScriptCheck implements Check by running a script shipped with

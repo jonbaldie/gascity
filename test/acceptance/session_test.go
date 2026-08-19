@@ -14,9 +14,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/session"
-	helpers "github.com/gastownhall/gascity/test/acceptance/helpers"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/session"
+	helpers "github.com/jonbaldie/gascity/test/acceptance/helpers"
 )
 
 func TestSessionErrors(t *testing.T) {

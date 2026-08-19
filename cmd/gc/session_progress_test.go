@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/config"
-	sessionpkg "github.com/gastownhall/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/config"
+	sessionpkg "github.com/jonbaldie/gascity/internal/session"
 )
 
 // TestOpenPoolSessionCountForTemplateExcludesClosed guards the min-floor scan's

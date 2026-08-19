@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/events"
-	"github.com/gastownhall/gascity/internal/events/eventstest"
+	"github.com/jonbaldie/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/events/eventstest"
 )
 
 func TestFileRecorderConformance(t *testing.T) {

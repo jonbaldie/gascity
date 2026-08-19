@@ -12,14 +12,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/agentutil"
-	"github.com/gastownhall/gascity/internal/beadmeta"
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/execenv"
-	gitpkg "github.com/gastownhall/gascity/internal/git"
-	"github.com/gastownhall/gascity/internal/sling"
-	"github.com/gastownhall/gascity/internal/sourceworkflow"
+	"github.com/jonbaldie/gascity/internal/agentutil"
+	"github.com/jonbaldie/gascity/internal/beadmeta"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/execenv"
+	gitpkg "github.com/jonbaldie/gascity/internal/git"
+	"github.com/jonbaldie/gascity/internal/sling"
+	"github.com/jonbaldie/gascity/internal/sourceworkflow"
 )
 
 type slingBody struct {

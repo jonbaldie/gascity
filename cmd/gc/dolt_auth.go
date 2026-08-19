@@ -3,7 +3,7 @@ package main
 import (
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/doltauth"
+	"github.com/jonbaldie/gascity/internal/doltauth"
 )
 
 func applyResolvedDoltAuthEnv(env map[string]string, authScopeRoot, fallbackUser string) {

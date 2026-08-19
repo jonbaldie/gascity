@@ -7,7 +7,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/coordclass"
+	"github.com/jonbaldie/gascity/internal/coordclass"
 )
 
 func TestInspectBindingIsMutationFreeAndLeavesIncompleteIdentityIncomplete(t *testing.T) {

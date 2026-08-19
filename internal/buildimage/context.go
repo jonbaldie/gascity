@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/citylayout"
+	"github.com/jonbaldie/gascity/internal/citylayout"
 )
 
 // Options configures the build context assembly.

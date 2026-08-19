@@ -23,16 +23,16 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/agent"
-	"github.com/gastownhall/gascity/internal/citylayout"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/convergence"
-	"github.com/gastownhall/gascity/internal/execenv"
-	"github.com/gastownhall/gascity/internal/materialize"
-	"github.com/gastownhall/gascity/internal/processenv"
-	"github.com/gastownhall/gascity/internal/runtime"
-	"github.com/gastownhall/gascity/internal/session"
-	"github.com/gastownhall/gascity/internal/shellquote"
+	"github.com/jonbaldie/gascity/internal/agent"
+	"github.com/jonbaldie/gascity/internal/citylayout"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/convergence"
+	"github.com/jonbaldie/gascity/internal/execenv"
+	"github.com/jonbaldie/gascity/internal/materialize"
+	"github.com/jonbaldie/gascity/internal/processenv"
+	"github.com/jonbaldie/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/shellquote"
 )
 
 const (

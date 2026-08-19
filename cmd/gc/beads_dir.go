@@ -4,7 +4,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
 
 // beadsDirPerm is the permission bd recommends for .beads/ directories.

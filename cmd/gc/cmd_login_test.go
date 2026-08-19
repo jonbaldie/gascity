@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/cliauth"
+	"github.com/jonbaldie/gascity/internal/cliauth"
 )
 
 func meHandler(t *testing.T, wantBearer, body string) http.Handler {

@@ -11,8 +11,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/fsys"
-	"github.com/gastownhall/gascity/internal/packman"
+	"github.com/jonbaldie/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/packman"
 	"github.com/spf13/cobra"
 )
 

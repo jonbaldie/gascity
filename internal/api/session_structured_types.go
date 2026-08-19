@@ -4,8 +4,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/sessionlog"
-	"github.com/gastownhall/gascity/internal/worker"
+	"github.com/jonbaldie/gascity/internal/sessionlog"
+	"github.com/jonbaldie/gascity/internal/worker"
 )
 
 const sessionStructuredSchemaVersion = "session.structured.v1"

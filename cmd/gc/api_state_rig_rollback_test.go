@@ -8,12 +8,12 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/api"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/configedit"
-	"github.com/gastownhall/gascity/internal/git"
-	"github.com/gastownhall/gascity/internal/rig"
-	"github.com/gastownhall/gascity/internal/ssrf"
+	"github.com/jonbaldie/gascity/internal/api"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/configedit"
+	"github.com/jonbaldie/gascity/internal/git"
+	"github.com/jonbaldie/gascity/internal/rig"
+	"github.com/jonbaldie/gascity/internal/ssrf"
 )
 
 // writeRigStore creates a minimal structurally-valid .beads store under dir so

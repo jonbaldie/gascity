@@ -3,8 +3,8 @@ package packman
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/builtinpacks"
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/builtinpacks"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 // TestCacheKeyAlignment verifies that packman.RepoCacheKey and

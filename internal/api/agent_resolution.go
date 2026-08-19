@@ -3,7 +3,7 @@ package api
 import (
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 // resolveSessionTemplateAgent resolves only configured templates.

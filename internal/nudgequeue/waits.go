@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // NudgeLookupLimit bounds recovery lookups by the durable nudge ID label.

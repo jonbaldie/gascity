@@ -8,11 +8,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/agent"
-	"github.com/gastownhall/gascity/internal/beadmeta"
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/agent"
+	"github.com/jonbaldie/gascity/internal/beadmeta"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/session"
 )
 
 const testDetachedPoolProbeSpec = "tmux:gascity:soak-loop"

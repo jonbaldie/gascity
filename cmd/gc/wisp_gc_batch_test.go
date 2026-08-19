@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // batchGCStore is a gcTestStore that also advertises beads.BatchDeleter and

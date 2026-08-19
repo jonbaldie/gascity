@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
-	"github.com/gastownhall/gascity/internal/fsys"
-	"github.com/gastownhall/gascity/internal/pathutil"
+	"github.com/jonbaldie/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/pathutil"
 )
 
 // DiscoveredCommand is a convention-discovered pack command.

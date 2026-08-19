@@ -12,11 +12,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/api/genclient"
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/events"
-	"github.com/gastownhall/gascity/internal/mail"
-	"github.com/gastownhall/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/api/genclient"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/mail"
+	"github.com/jonbaldie/gascity/internal/session"
 )
 
 // mailPartialReadTestDeadline is load-tolerant (2s vs 5ms); 5ms fails under CI CPU saturation (ga-97aayp).

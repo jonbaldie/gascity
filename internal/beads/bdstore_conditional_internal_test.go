@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/rollout/gate"
+	"github.com/jonbaldie/gascity/internal/rollout/gate"
 )
 
 // TestClassifyConditionalWriteResult exhaustively exercises the pure classifier

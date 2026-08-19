@@ -3,7 +3,7 @@ package chartest_test
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/chartest"
+	"github.com/jonbaldie/gascity/internal/chartest"
 )
 
 func TestDefaultRules_CanonicalizesMintedNotStable(t *testing.T) {

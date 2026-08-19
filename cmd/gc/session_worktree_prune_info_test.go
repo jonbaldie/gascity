@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/config"
-	sessionpkg "github.com/gastownhall/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/config"
+	sessionpkg "github.com/jonbaldie/gascity/internal/session"
 )
 
 // sessionInfo returns a session.Info mirroring fx.sessionBead(), for

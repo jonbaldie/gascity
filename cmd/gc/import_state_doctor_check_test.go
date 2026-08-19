@@ -7,10 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/doctor"
-	"github.com/gastownhall/gascity/internal/fsys"
-	"github.com/gastownhall/gascity/internal/packman"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/doctor"
+	"github.com/jonbaldie/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/packman"
 )
 
 func TestImportStateDoctorCheckReportsOK(t *testing.T) {
@@ -292,7 +292,7 @@ func TestLegacyPublicPackForSourceIgnoresRemoteSubdirectorySources(t *testing.T)
 	cityDir := filepath.Join(string(filepath.Separator), "city")
 	cases := []string{
 		"https://example.com/repo.git//examples/gastown/packs/gastown",
-		"ssh://github.com/gastownhall/gascity.git//examples/gastown/packs/gastown",
+		"ssh://github.com/jonbaldie/gascity.git//examples/gastown/packs/gastown",
 		"git@example.com:org/repo.git//examples/gastown/packs/maintenance",
 		"github.com/org/repo//examples/gastown/packs/maintenance",
 		"file:///repo/examples/gastown/packs/gastown",
@@ -313,15 +313,15 @@ func TestLegacyPublicPackForSourceDetectsCanonicalRemotePublicPacks(t *testing.T
 		pack   string
 	}{
 		{
-			source: "https://github.com/gastownhall/gascity.git//examples/gastown/packs/gastown",
+			source: "https://github.com/jonbaldie/gascity.git//examples/gastown/packs/gastown",
 			pack:   "gastown",
 		},
 		{
-			source: "https://github.com/gastownhall/gascity.git//examples/gastown/packs/maintenance",
+			source: "https://github.com/jonbaldie/gascity.git//examples/gastown/packs/maintenance",
 			pack:   "maintenance",
 		},
 		{
-			source: "github.com/gastownhall/gascity//examples/gastown/packs/maintenance",
+			source: "github.com/jonbaldie/gascity//examples/gastown/packs/maintenance",
 			pack:   "maintenance",
 		},
 	}
@@ -762,7 +762,7 @@ name = "demo"
 schema = 2
 
 [imports.core]
-source = "https://github.com/gastownhall/gascity.git//internal/bootstrap/packs/core"
+source = "https://github.com/jonbaldie/gascity.git//internal/bootstrap/packs/core"
 version = "`+dummyOldPin+`"
 `)
 
@@ -801,7 +801,7 @@ name = "demo"
 schema = 2
 
 [imports.core]
-source = "https://github.com/gastownhall/gascity.git//internal/bootstrap/packs/core"
+source = "https://github.com/jonbaldie/gascity.git//internal/bootstrap/packs/core"
 version = "`+oldContentHashPin+`"
 `)
 
@@ -834,11 +834,11 @@ name = "demo"
 schema = 2
 
 [imports.core]
-source = "https://github.com/gastownhall/gascity.git//internal/bootstrap/packs/core"
+source = "https://github.com/jonbaldie/gascity.git//internal/bootstrap/packs/core"
 `)
 	if err := os.WriteFile(filepath.Join(cityDir, "packs.lock"), []byte(`schema = 1
 
-[packs."https://github.com/gastownhall/gascity.git//internal/bootstrap/packs/core"]
+[packs."https://github.com/jonbaldie/gascity.git//internal/bootstrap/packs/core"]
 version = "sha:`+oldContentHashCommit+`"
 commit = "`+oldContentHashCommit+`"
 fetched = "2026-06-11T17:08:05Z"
@@ -909,7 +909,7 @@ name = "demo"
 [[rigs]]
 name = "demo-rig"
 [rigs.imports.core]
-source = "https://github.com/gastownhall/gascity.git//internal/bootstrap/packs/core"
+source = "https://github.com/jonbaldie/gascity.git//internal/bootstrap/packs/core"
 version = "`+dummyOldPin+`"
 `)
 	writePackToml(t, cityDir, `[pack]
@@ -917,7 +917,7 @@ name = "demo"
 schema = 2
 
 [imports.core]
-source = "https://github.com/gastownhall/gascity.git//internal/bootstrap/packs/core"
+source = "https://github.com/jonbaldie/gascity.git//internal/bootstrap/packs/core"
 version = "`+dummyOldPin+`"
 `)
 
@@ -962,7 +962,7 @@ func TestImportStateDoctorCheckRepinsSupersededCityRootImport(t *testing.T) {
 name = "demo"
 
 [imports.core]
-source = "https://github.com/gastownhall/gascity.git//internal/bootstrap/packs/core"
+source = "https://github.com/jonbaldie/gascity.git//internal/bootstrap/packs/core"
 version = "`+dummyOldPin+`"
 `)
 	writePackToml(t, cityDir, `[pack]

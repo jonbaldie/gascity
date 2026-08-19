@@ -10,8 +10,8 @@ import (
 	"slices"
 
 	"github.com/BurntSushi/toml"
-	"github.com/gastownhall/gascity/internal/fsys"
-	"github.com/gastownhall/gascity/internal/gchome"
+	"github.com/jonbaldie/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/gchome"
 )
 
 // ConfigSchema is the supported registries.toml schema version.
@@ -21,7 +21,7 @@ const (
 	// DefaultRegistryName is the built-in public pack registry name.
 	DefaultRegistryName = "main"
 	// DefaultRegistrySource is the public gascity-packs registry catalog.
-	DefaultRegistrySource = "https://raw.githubusercontent.com/gastownhall/gascity-packs/main/registry.toml"
+	DefaultRegistrySource = "https://raw.githubusercontent.com/jonbaldie/gascity-packs/main/registry.toml"
 )
 
 var registryNameRE = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)

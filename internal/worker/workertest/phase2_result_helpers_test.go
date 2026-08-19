@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/runtime"
-	worker "github.com/gastownhall/gascity/internal/worker"
+	"github.com/jonbaldie/gascity/internal/runtime"
+	worker "github.com/jonbaldie/gascity/internal/worker"
 )
 
 func startupOutcomeResult(profile ProfileID, outcome string, delay time.Duration, run fakeStartupRun) Result {

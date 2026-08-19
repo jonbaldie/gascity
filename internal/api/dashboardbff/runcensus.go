@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/runproj"
+	"github.com/jonbaldie/gascity/internal/runproj"
 )
 
 func (t *cityRunTailer) runCensus(ctx context.Context) runproj.CanonicalRunCensus {

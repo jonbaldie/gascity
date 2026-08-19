@@ -18,7 +18,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/coordclass"
+	"github.com/jonbaldie/gascity/internal/coordclass"
 )
 
 const writerFenceRevalidationTimeout = 10 * time.Second

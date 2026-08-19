@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/rollout/gate"
+	"github.com/jonbaldie/gascity/internal/rollout/gate"
 )
 
 // This file holds CachingStore's ConditionalWriter forwarding. The cache

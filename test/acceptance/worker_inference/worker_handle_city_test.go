@@ -11,9 +11,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	workerpkg "github.com/gastownhall/gascity/internal/worker"
-	helpers "github.com/gastownhall/gascity/test/acceptance/helpers"
+	"github.com/jonbaldie/gascity/internal/beads"
+	workerpkg "github.com/jonbaldie/gascity/internal/worker"
+	helpers "github.com/jonbaldie/gascity/test/acceptance/helpers"
 )
 
 func TestProfileUsesHookSessionKeyPersistence(t *testing.T) {

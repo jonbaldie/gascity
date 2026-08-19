@@ -7,7 +7,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/supervisor"
+	"github.com/jonbaldie/gascity/internal/supervisor"
 )
 
 // driftRestartHistoryFile is the on-disk JSON file holding the

@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/gastownhall/gascity/internal/formula"
+	"github.com/jonbaldie/gascity/internal/formula"
 )
 
 // ResolveFormulas computes per-formula-name winners from layered formula

@@ -30,7 +30,7 @@ func TestGCNonTestFilesStayOnWorkerBoundary(t *testing.T) {
 		}
 		content := string(data)
 		for _, needle := range []string{
-			`"github.com/gastownhall/gascity/internal/sessionlog"`,
+			`"github.com/jonbaldie/gascity/internal/sessionlog"`,
 			"worker.NewSessionHandle(",
 			"worker.NewSessionCatalog(",
 			"worker.SessionHandle",

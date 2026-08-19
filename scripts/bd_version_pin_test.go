@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/deps"
+	"github.com/jonbaldie/gascity/internal/deps"
 )
 
 // TestBDVersionPins keeps every independently-edited bd version anchor in

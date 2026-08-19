@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/mail"
-	"github.com/gastownhall/gascity/internal/mail/mailtest"
+	"github.com/jonbaldie/gascity/internal/mail"
+	"github.com/jonbaldie/gascity/internal/mail/mailtest"
 )
 
 var _ mail.Provider = (*mail.Fake)(nil)

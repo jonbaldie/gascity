@@ -22,8 +22,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/nudgequeue"
-	"github.com/gastownhall/gascity/internal/storebinding"
+	"github.com/jonbaldie/gascity/internal/nudgequeue"
+	"github.com/jonbaldie/gascity/internal/storebinding"
 )
 
 const (

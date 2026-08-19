@@ -21,8 +21,8 @@ description: The shortest path for new contributors to get productive in Gas Cit
 - [Release Gate Criteria Conventions](release-gate-criteria-conventions.md)
   when signing off the "Tests pass" criterion on a `release-gates/*.md`
   deploy gate — it must cite the CI jobs `ci-required` actually gates on
-- [`CONTRIBUTING.md`](https://github.com/gastownhall/gascity/blob/main/CONTRIBUTING.md)
-- [`TESTING.md`](https://github.com/gastownhall/gascity/blob/main/TESTING.md)
+- [`CONTRIBUTING.md`](https://github.com/jonbaldie/gascity/blob/main/CONTRIBUTING.md)
+- [`TESTING.md`](https://github.com/jonbaldie/gascity/blob/main/TESTING.md)
 
 ## Expectations
 

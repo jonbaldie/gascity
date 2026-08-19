@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	helpers "github.com/gastownhall/gascity/test/acceptance/helpers"
+	helpers "github.com/jonbaldie/gascity/test/acceptance/helpers"
 )
 
 func TestDashboard_PrintsSupervisorNotice(t *testing.T) {

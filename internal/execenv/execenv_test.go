@@ -149,7 +149,7 @@ func TestProductMetricsChildEnvImportBoundary(t *testing.T) {
 }
 
 func isGasCityModuleImport(path string) bool {
-	const module = "github.com/gastownhall/gascity"
+	const module = "github.com/jonbaldie/gascity"
 	return path == module || strings.HasPrefix(path, module+"/")
 }
 
@@ -158,9 +158,9 @@ func TestProductMetricsChildEnvGasCityImportClassification(t *testing.T) {
 		path string
 		want bool
 	}{
-		{path: "github.com/gastownhall/gascity", want: true},
-		{path: "github.com/gastownhall/gascity/internal/productmetrics", want: true},
-		{path: "github.com/gastownhall/gascity-fork", want: false},
+		{path: "github.com/jonbaldie/gascity", want: true},
+		{path: "github.com/jonbaldie/gascity/internal/productmetrics", want: true},
+		{path: "github.com/jonbaldie/gascity-fork", want: false},
 		{path: "runtime", want: false},
 	}
 	for _, tc := range tests {

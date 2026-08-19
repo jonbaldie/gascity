@@ -6,11 +6,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/events"
-	"github.com/gastownhall/gascity/internal/runtime"
-	sessionpkg "github.com/gastownhall/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/runtime"
+	sessionpkg "github.com/jonbaldie/gascity/internal/session"
 )
 
 // observedStorageCloser wraps the engine closer the routes own so a test can

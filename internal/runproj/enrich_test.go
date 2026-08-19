@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // TestEnrichRunSummaryGolden pins the Go EnrichRunSummary port to the TypeScript

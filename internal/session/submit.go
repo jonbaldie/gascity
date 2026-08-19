@@ -11,15 +11,15 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/citylayout"
-	"github.com/gastownhall/gascity/internal/execenv"
-	"github.com/gastownhall/gascity/internal/fsys"
-	"github.com/gastownhall/gascity/internal/nudgepoller"
-	"github.com/gastownhall/gascity/internal/nudgequeue"
-	"github.com/gastownhall/gascity/internal/pidutil"
-	"github.com/gastownhall/gascity/internal/runtime"
-	"github.com/gastownhall/gascity/internal/sessionlog"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/citylayout"
+	"github.com/jonbaldie/gascity/internal/execenv"
+	"github.com/jonbaldie/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/nudgepoller"
+	"github.com/jonbaldie/gascity/internal/nudgequeue"
+	"github.com/jonbaldie/gascity/internal/pidutil"
+	"github.com/jonbaldie/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/sessionlog"
 )
 
 const (

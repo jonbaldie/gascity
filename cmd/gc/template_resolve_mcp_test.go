@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
 
 func TestResolveTemplateMCPIntegration(t *testing.T) {

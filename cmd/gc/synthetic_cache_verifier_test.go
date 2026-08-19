@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/builtinpacks"
-	"github.com/gastownhall/gascity/internal/packman"
+	"github.com/jonbaldie/gascity/internal/builtinpacks"
+	"github.com/jonbaldie/gascity/internal/packman"
 )
 
 // TestReadinessHelpersValidateTheSharedCacheOncePerPass pins the contract the

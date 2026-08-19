@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // turnBoundRoutedWork is one open, routed, claimable candidate: the shape every

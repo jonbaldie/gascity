@@ -17,8 +17,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/testutil"
-	helpers "github.com/gastownhall/gascity/test/acceptance/helpers"
+	"github.com/jonbaldie/gascity/internal/testutil"
+	helpers "github.com/jonbaldie/gascity/test/acceptance/helpers"
 )
 
 // TestHumaBinary_SupervisorBootsAndServesSpec builds `gc`, starts the

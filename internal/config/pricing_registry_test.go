@@ -3,7 +3,7 @@ package config
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/pricing"
+	"github.com/jonbaldie/gascity/internal/pricing"
 )
 
 func TestPricingRegistryNilConfig(t *testing.T) {

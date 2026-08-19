@@ -13,7 +13,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/gchome"
+	"github.com/jonbaldie/gascity/internal/gchome"
 )
 
 func TestCompleteVerifiedTTYNoticeCommitsIdentityAtomicallyAndExcludesFirstInvocation(t *testing.T) {

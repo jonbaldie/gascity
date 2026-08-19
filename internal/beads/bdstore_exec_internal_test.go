@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/processgroup/processgrouptest"
+	"github.com/jonbaldie/gascity/internal/processgroup/processgrouptest"
 	otellog "go.opentelemetry.io/otel/log"
 	otellogglobal "go.opentelemetry.io/otel/log/global"
 	sdklog "go.opentelemetry.io/otel/sdk/log"

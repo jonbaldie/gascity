@@ -273,5 +273,5 @@ Capabilities activate based on config section presence:
   across the architecture docs
 - [Primitive Test](../contributors/primitive-test.md) — the three necessary
   conditions for adding a new primitive
-- [CLAUDE.md](https://github.com/gastownhall/gascity/blob/main/CLAUDE.md) — project-level design principles and
+- [CLAUDE.md](https://github.com/jonbaldie/gascity/blob/main/CLAUDE.md) — project-level design principles and
   code conventions

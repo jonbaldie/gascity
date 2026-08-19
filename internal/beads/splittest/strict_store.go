@@ -96,8 +96,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/storeref"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/storeref"
 )
 
 // StrictStore wraps a LEAF beads.Store and answers a residence-invariant

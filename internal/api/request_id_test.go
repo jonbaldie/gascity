@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/cityinit"
-	"github.com/gastownhall/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/cityinit"
+	"github.com/jonbaldie/gascity/internal/events"
 )
 
 func TestRequestIDFromPayloadCoversAsyncPayloads(t *testing.T) {

@@ -29,12 +29,12 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/configedit"
-	"github.com/gastownhall/gascity/internal/fsys"
-	helpers "github.com/gastownhall/gascity/test/acceptance/helpers"
-	"github.com/gastownhall/gascity/test/dolttest"
-	"github.com/gastownhall/gascity/test/tmuxtest"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/configedit"
+	"github.com/jonbaldie/gascity/internal/fsys"
+	helpers "github.com/jonbaldie/gascity/test/acceptance/helpers"
+	"github.com/jonbaldie/gascity/test/dolttest"
+	"github.com/jonbaldie/gascity/test/tmuxtest"
 )
 
 var (

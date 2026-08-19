@@ -14,11 +14,11 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/doltorphan"
-	"github.com/gastownhall/gascity/internal/pathutil"
-	"github.com/gastownhall/gascity/internal/testutil"
-	"github.com/gastownhall/gascity/test/tmuxtest"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/doltorphan"
+	"github.com/jonbaldie/gascity/internal/pathutil"
+	"github.com/jonbaldie/gascity/internal/testutil"
+	"github.com/jonbaldie/gascity/test/tmuxtest"
 )
 
 // doltLeakGuardGraceInitialInterval and doltLeakGuardGraceMaxElapsedTime

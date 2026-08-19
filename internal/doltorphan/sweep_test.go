@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/clock"
+	"github.com/jonbaldie/gascity/internal/clock"
 )
 
 func mkStoreDir(t *testing.T, root, name string, markerDepth int, mtime time.Time) string {

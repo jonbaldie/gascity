@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads/contract"
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/beads/contract"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
 
 func newBeadsPreflightChecker(cityPath, provider string) contract.PreflightChecker {

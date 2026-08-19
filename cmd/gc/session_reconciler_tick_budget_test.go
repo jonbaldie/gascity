@@ -5,7 +5,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // getCountingStore counts store.Get calls, delegating everything else. It guards

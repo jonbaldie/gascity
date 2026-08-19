@@ -8,17 +8,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/agentutil"
-	"github.com/gastownhall/gascity/internal/beadmeta"
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/config"
-	convoycore "github.com/gastownhall/gascity/internal/convoy"
-	"github.com/gastownhall/gascity/internal/formula"
-	"github.com/gastownhall/gascity/internal/graphroute"
-	"github.com/gastownhall/gascity/internal/graphv2"
-	"github.com/gastownhall/gascity/internal/molecule"
-	"github.com/gastownhall/gascity/internal/sourceworkflow"
-	"github.com/gastownhall/gascity/internal/telemetry"
+	"github.com/jonbaldie/gascity/internal/agentutil"
+	"github.com/jonbaldie/gascity/internal/beadmeta"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/config"
+	convoycore "github.com/jonbaldie/gascity/internal/convoy"
+	"github.com/jonbaldie/gascity/internal/formula"
+	"github.com/jonbaldie/gascity/internal/graphroute"
+	"github.com/jonbaldie/gascity/internal/graphv2"
+	"github.com/jonbaldie/gascity/internal/molecule"
+	"github.com/jonbaldie/gascity/internal/sourceworkflow"
+	"github.com/jonbaldie/gascity/internal/telemetry"
 )
 
 const (

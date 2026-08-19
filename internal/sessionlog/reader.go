@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/pathutil"
+	"github.com/jonbaldie/gascity/internal/pathutil"
 )
 
 // Session is the resolved view of a Claude JSONL session file.

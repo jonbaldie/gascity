@@ -21,7 +21,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/gastownhall/gascity/internal/coordclass"
+	"github.com/jonbaldie/gascity/internal/coordclass"
 )
 
 // ErrInvalidHealthReport reports a status view that could not be built from the

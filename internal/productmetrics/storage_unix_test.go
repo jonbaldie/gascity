@@ -19,8 +19,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/gchome"
-	"github.com/gastownhall/gascity/internal/testutil"
+	"github.com/jonbaldie/gascity/internal/gchome"
+	"github.com/jonbaldie/gascity/internal/testutil"
 	"golang.org/x/sys/unix"
 )
 

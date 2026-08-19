@@ -3,9 +3,9 @@ package sling
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
 // orderClaimedPoolHandoffSetup builds a sling against a worker pool for a bead

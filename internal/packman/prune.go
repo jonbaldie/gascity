@@ -8,7 +8,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 // PruneEntry describes a single clone directory in the global pack cache and

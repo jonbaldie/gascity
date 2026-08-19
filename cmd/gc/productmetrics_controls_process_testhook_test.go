@@ -21,8 +21,8 @@ import (
 	"testing"
 
 	"github.com/BurntSushi/toml"
-	"github.com/gastownhall/gascity/internal/productmetrics"
-	"github.com/gastownhall/gascity/internal/testutil"
+	"github.com/jonbaldie/gascity/internal/productmetrics"
+	"github.com/jonbaldie/gascity/internal/testutil"
 )
 
 func TestProductMetricsTaggedBinaryProcessContracts(t *testing.T) {

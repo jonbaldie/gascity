@@ -8,7 +8,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/gastownhall/gascity/internal/runtime/rppcheck"
+	"github.com/jonbaldie/gascity/internal/runtime/rppcheck"
 	"github.com/spf13/cobra"
 )
 

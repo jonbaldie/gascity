@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/events"
 )
 
 // InboundResult captures the outcome of processing an inbound message.

@@ -1,6 +1,6 @@
 package api
 
-import "github.com/gastownhall/gascity/internal/events"
+import "github.com/jonbaldie/gascity/internal/events"
 
 // Webhook rejection reason enum. These are the stable strings carried on
 // WebhookRejectedPayload.Reason so operators can alert/aggregate on a rejection

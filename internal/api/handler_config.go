@@ -1,8 +1,8 @@
 package api
 
 import (
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/configedit"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/configedit"
 )
 
 // configResponse is the JSON representation of the city configuration.

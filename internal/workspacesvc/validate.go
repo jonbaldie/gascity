@@ -3,7 +3,7 @@ package workspacesvc
 import (
 	"fmt"
 
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 // ValidateRuntimeSupport rejects service configs that the current controller

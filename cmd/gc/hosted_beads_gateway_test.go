@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/execenv"
+	"github.com/jonbaldie/gascity/internal/execenv"
 )
 
 // hostedEnvEntriesToMap collapses KEY=VALUE entries into a map for assertions

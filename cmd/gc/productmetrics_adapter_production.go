@@ -2,7 +2,7 @@
 
 package main
 
-import "github.com/gastownhall/gascity/internal/productmetrics"
+import "github.com/jonbaldie/gascity/internal/productmetrics"
 
 func configuredPrivateProductMetricsRunner() privateProductMetricsRunFunc {
 	return runProductionProductMetricsChild

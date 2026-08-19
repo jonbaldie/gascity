@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/gastownhall/gascity/internal/bootstrap"
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/bootstrap"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 // ImplicitImportCacheCheck verifies that bootstrap-managed implicit imports

@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/pidutil"
+	"github.com/jonbaldie/gascity/internal/pidutil"
 )
 
 // Orphaned service processes are survivors of a previous supervisor hard

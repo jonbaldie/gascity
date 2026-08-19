@@ -1,6 +1,6 @@
 package warmup
 
-import "github.com/gastownhall/gascity/internal/doctor"
+import "github.com/jonbaldie/gascity/internal/doctor"
 
 // CustomWarmupMail is an optional interface implemented by warm-up-
 // eligible doctor checks that need to override the runner's default

@@ -5,7 +5,7 @@ import (
 	"reflect"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/gastownhall/gascity/internal/worker"
+	"github.com/jonbaldie/gascity/internal/worker"
 )
 
 type structuredSchemaVariant struct {

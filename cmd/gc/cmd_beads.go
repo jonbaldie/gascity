@@ -6,8 +6,8 @@ import (
 	"io"
 	"sort"
 
-	"github.com/gastownhall/gascity/internal/api"
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/api"
+	"github.com/jonbaldie/gascity/internal/beads"
 	"github.com/spf13/cobra"
 )
 

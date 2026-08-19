@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-const moduleImportPath = "github.com/gastownhall/gascity"
+const moduleImportPath = "github.com/jonbaldie/gascity"
 
 // SymbolRef identifies a Go declaration by import path and declared name.
 type SymbolRef struct {

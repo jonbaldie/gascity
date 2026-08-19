@@ -6,7 +6,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/pathutil"
+	"github.com/jonbaldie/gascity/internal/pathutil"
 )
 
 // CanonicalPath returns the production path-normalized form used for

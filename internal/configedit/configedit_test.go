@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/configedit"
-	"github.com/gastownhall/gascity/internal/fsys"
-	"github.com/gastownhall/gascity/internal/pathutil"
-	"github.com/gastownhall/gascity/internal/suspensionstate"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/configedit"
+	"github.com/jonbaldie/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/pathutil"
+	"github.com/jonbaldie/gascity/internal/suspensionstate"
 )
 
 type failRenameFS struct {

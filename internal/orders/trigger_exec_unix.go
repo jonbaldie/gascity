@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/processgroup"
+	"github.com/jonbaldie/gascity/internal/processgroup"
 )
 
 var conditionProcessGroupOptions processgroup.Options

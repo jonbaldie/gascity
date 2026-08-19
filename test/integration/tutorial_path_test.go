@@ -19,7 +19,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 // bdDoltInRig runs the bd binary in rigDir using the managed Dolt endpoint

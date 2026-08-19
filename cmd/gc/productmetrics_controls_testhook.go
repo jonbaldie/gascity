@@ -5,7 +5,7 @@ package main
 import (
 	"errors"
 
-	"github.com/gastownhall/gascity/internal/productmetrics"
+	"github.com/jonbaldie/gascity/internal/productmetrics"
 	"github.com/spf13/cobra"
 )
 

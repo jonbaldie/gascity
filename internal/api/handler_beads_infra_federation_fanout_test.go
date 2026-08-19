@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/beads/splittest"
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads/splittest"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 // Fan-out properties of the split-city bead list: page bounding, cross-leg id

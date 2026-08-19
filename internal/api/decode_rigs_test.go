@@ -3,7 +3,7 @@ package api
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/api/genclient"
+	"github.com/jonbaldie/gascity/internal/api/genclient"
 )
 
 func TestRigsFromGenList_Valid(t *testing.T) {

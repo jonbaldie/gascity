@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // TestSummaryDetailPhaseStageConsistency proves the ADR invariant structurally:

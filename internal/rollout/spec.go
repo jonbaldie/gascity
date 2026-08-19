@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 // Category classifies why a gate exists. It is a CLOSED enum with no

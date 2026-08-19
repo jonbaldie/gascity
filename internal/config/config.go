@@ -13,12 +13,12 @@ import (
 	"unicode"
 
 	"github.com/BurntSushi/toml"
-	"github.com/gastownhall/gascity/internal/citylayout"
-	"github.com/gastownhall/gascity/internal/fsys"
-	"github.com/gastownhall/gascity/internal/orders"
-	"github.com/gastownhall/gascity/internal/pricing"
-	"github.com/gastownhall/gascity/internal/remotesource"
-	"github.com/gastownhall/gascity/internal/rollout/gate"
+	"github.com/jonbaldie/gascity/internal/citylayout"
+	"github.com/jonbaldie/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/orders"
+	"github.com/jonbaldie/gascity/internal/pricing"
+	"github.com/jonbaldie/gascity/internal/remotesource"
+	"github.com/jonbaldie/gascity/internal/rollout/gate"
 )
 
 // validAgentName matches names safe for use in session identifiers.

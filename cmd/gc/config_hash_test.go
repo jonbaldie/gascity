@@ -3,8 +3,8 @@ package main
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/agent"
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/agent"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
 func TestConfigHash_Canonical(t *testing.T) {

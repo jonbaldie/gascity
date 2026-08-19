@@ -23,7 +23,7 @@ import (
 	"strings"
 	"testing"
 
-	helpers "github.com/gastownhall/gascity/test/acceptance/helpers"
+	helpers "github.com/jonbaldie/gascity/test/acceptance/helpers"
 )
 
 // runBD executes a bd command in dir with BEADS_DIR set to dir/.beads.

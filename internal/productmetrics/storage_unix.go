@@ -14,7 +14,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/gastownhall/gascity/internal/gchome"
+	"github.com/jonbaldie/gascity/internal/gchome"
 	"golang.org/x/sys/unix"
 )
 

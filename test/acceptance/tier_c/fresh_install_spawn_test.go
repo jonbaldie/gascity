@@ -17,7 +17,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	helpers "github.com/gastownhall/gascity/test/acceptance/helpers"
+	helpers "github.com/jonbaldie/gascity/test/acceptance/helpers"
 )
 
 var (

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
 
 // FileSnapshot captures a file's contents (or its absence) so a failed

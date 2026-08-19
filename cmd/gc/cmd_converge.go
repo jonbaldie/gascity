@@ -8,8 +8,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/convergence"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/convergence"
 	"github.com/spf13/cobra"
 )
 

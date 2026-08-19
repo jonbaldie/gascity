@@ -1,6 +1,6 @@
 package config
 
-import "github.com/gastownhall/gascity/internal/pricing"
+import "github.com/jonbaldie/gascity/internal/pricing"
 
 // PricingRegistry composes the invocation-cost pricing registry from the
 // config's pricing layers (shipped defaults -> pack -> city). Composed loads

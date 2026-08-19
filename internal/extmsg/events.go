@@ -1,6 +1,6 @@
 package extmsg
 
-import "github.com/gastownhall/gascity/internal/events"
+import "github.com/jonbaldie/gascity/internal/events"
 
 // Extmsg event payloads. Each type implements events.Payload so it
 // flows through the bus's central registry and emerges on the typed

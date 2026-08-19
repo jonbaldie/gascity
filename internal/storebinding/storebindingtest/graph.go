@@ -18,8 +18,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/storebinding"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/storebinding"
 )
 
 // GraphSuite configures one bare Graph class conformance run.

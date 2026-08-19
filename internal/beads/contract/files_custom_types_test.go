@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
 
 // These tests pin the canonical `types.custom` contract that EnsureCanonicalConfig

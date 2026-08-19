@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beadmeta"
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beadmeta"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // recentChangesCap caps the recentChanges list. Port of TS RECENT_CHANGES_CAP.

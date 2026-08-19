@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/convoy"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/convoy"
 )
 
 // ConvoyFields is an alias for the shared convoy type.

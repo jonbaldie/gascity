@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // This file extends the session-class domain wrapper (Store) with the durable

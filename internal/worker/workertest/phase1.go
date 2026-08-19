@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/pricing"
-	worker "github.com/gastownhall/gascity/internal/worker"
+	"github.com/jonbaldie/gascity/internal/pricing"
+	worker "github.com/jonbaldie/gascity/internal/worker"
 )
 
 // NormalizedMessage is the reduced transcript shape asserted by phase-1 tests.

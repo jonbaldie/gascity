@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // hasLabel checks if a bead has a specific label.

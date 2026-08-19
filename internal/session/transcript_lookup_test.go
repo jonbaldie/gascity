@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/sessionlog"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/sessionlog"
 )
 
 // writeCodexRolloutForAnchor writes a minimal Codex rollout transcript whose

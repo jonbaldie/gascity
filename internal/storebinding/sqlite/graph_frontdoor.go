@@ -32,8 +32,8 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/storebinding"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/storebinding"
 )
 
 // graphIDPrefix is the reserved namespace only the Graph class mints. It is

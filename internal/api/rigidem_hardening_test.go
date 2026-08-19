@@ -11,7 +11,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // TestValidateRigNamePathContainment proves the tightened name guard: a path

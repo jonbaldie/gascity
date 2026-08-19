@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
 // newTestProvider builds a Provider suitable for pre_start tests. runPreStart

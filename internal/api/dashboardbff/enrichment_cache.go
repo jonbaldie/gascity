@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/runproj"
+	"github.com/jonbaldie/gascity/internal/runproj"
 )
 
 // The two per-request loopback reads the run-detail path layers on top of the

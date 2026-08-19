@@ -10,10 +10,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/api"
-	"github.com/gastownhall/gascity/internal/api/dashboardbff"
-	"github.com/gastownhall/gascity/internal/api/dashboardspa"
-	"github.com/gastownhall/gascity/internal/supervisor"
+	"github.com/jonbaldie/gascity/internal/api"
+	"github.com/jonbaldie/gascity/internal/api/dashboardbff"
+	"github.com/jonbaldie/gascity/internal/api/dashboardspa"
+	"github.com/jonbaldie/gascity/internal/supervisor"
 )
 
 // Keep the production plane's optional warm-row capabilities compile-time bound

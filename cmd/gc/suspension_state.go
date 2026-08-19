@@ -1,9 +1,9 @@
 package main
 
 import (
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/fsys"
-	"github.com/gastownhall/gascity/internal/suspensionstate"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/suspensionstate"
 )
 
 // loadSuspensionState reads .gc/runtime/suspension-state.json. A

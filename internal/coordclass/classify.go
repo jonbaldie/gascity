@@ -3,8 +3,8 @@ package coordclass
 import (
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/beadmeta"
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beadmeta"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // Contract strings matched by [Classify]. Each mirrors a canonical definition

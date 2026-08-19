@@ -3,7 +3,7 @@ package runproj
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beadmeta"
+	"github.com/jonbaldie/gascity/internal/beadmeta"
 )
 
 // TestRunSessionLinkForNormalization ports session-link.test.ts: regression

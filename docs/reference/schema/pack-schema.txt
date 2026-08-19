@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/gastownhall/gascity/internal/config/pack-config",
+  "$id": "https://github.com/jonbaldie/gascity/internal/config/pack-config",
   "$ref": "#/$defs/PackConfig",
   "$defs": {
     "Agent": {

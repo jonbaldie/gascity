@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/clientcontext"
+	"github.com/jonbaldie/gascity/internal/clientcontext"
 )
 
 func newTestContext(name, url, city string) clientcontext.Context {

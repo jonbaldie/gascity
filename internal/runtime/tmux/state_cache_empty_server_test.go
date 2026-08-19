@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	gcruntime "github.com/gastownhall/gascity/internal/runtime"
+	gcruntime "github.com/jonbaldie/gascity/internal/runtime"
 )
 
 // An alive tmux server holding zero sessions is a normal steady state for every

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/coordclass"
+	"github.com/jonbaldie/gascity/internal/coordclass"
 )
 
 type cancellationAwareFence struct {

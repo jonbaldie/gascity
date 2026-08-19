@@ -3,7 +3,7 @@ package main
 import (
 	"strconv"
 
-	"github.com/gastownhall/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/session"
 )
 
 // sessionIdentityInputs are the durable facts that determine a session bead's

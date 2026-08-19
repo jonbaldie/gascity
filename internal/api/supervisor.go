@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/gastownhall/gascity/internal/cityinit"
-	"github.com/gastownhall/gascity/internal/citywriteauth"
-	"github.com/gastownhall/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/cityinit"
+	"github.com/jonbaldie/gascity/internal/citywriteauth"
+	"github.com/jonbaldie/gascity/internal/events"
 )
 
 // CityInfo describes a managed city for the /v0/cities endpoint.

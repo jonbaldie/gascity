@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/orders"
+	"github.com/jonbaldie/gascity/internal/orders"
 )
 
 // readOrder parses an order TOML from the embedded pack FS and restores the

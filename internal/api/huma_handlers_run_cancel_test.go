@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // closeFailStore delegates every read to an embedded store but fails CloseAll,

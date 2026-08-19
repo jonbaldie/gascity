@@ -14,8 +14,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/searchpath"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/searchpath"
 	"gopkg.in/yaml.v3"
 )
 

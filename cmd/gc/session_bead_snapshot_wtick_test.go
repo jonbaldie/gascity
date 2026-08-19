@@ -3,9 +3,9 @@ package main
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	sessionpkg "github.com/gastownhall/gascity/internal/session"
-	"github.com/gastownhall/gascity/internal/session/sessiontest"
+	"github.com/jonbaldie/gascity/internal/beads"
+	sessionpkg "github.com/jonbaldie/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/session/sessiontest"
 )
 
 // wtickSnapshotBead builds an open session bead carrying a session_name and an

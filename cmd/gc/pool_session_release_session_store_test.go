@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // seedReleaseFixture builds the two-class fixture the tests below share: a

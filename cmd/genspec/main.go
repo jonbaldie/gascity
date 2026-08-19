@@ -33,7 +33,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/api"
+	"github.com/jonbaldie/gascity/internal/api"
 )
 
 func main() {

@@ -149,5 +149,5 @@ the work bead.
 ## See Also
 
 - [`engdocs/design/convoy-first-formulas-and-drain-v0.md`](design/convoy-first-formulas-and-drain-v0.md) — design spec for drain v0
-- [`internal/formula/types.go`](https://github.com/gastownhall/gascity/blob/main/internal/formula/types.go) — `DrainSpec` and `DrainItemSpec` struct definitions
-- [`internal/dispatch/fanout.go`](https://github.com/gastownhall/gascity/blob/main/internal/dispatch/fanout.go) — `gc.output_json` / `gc.fanout_state` runtime (legacy)
+- [`internal/formula/types.go`](https://github.com/jonbaldie/gascity/blob/main/internal/formula/types.go) — `DrainSpec` and `DrainItemSpec` struct definitions
+- [`internal/dispatch/fanout.go`](https://github.com/jonbaldie/gascity/blob/main/internal/dispatch/fanout.go) — `gc.output_json` / `gc.fanout_state` runtime (legacy)

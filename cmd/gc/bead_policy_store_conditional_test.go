@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/rollout/gate"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/rollout/gate"
 )
 
 // TestBeadPolicyStoreResolvesConditionalWritesThroughWrapper pins the stage-3

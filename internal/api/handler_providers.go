@@ -1,7 +1,7 @@
 package api
 
 import (
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 // providerResponse is the admin DTO for a provider. The browser-safe DTO

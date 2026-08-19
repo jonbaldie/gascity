@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/fsys"
-	"github.com/gastownhall/gascity/internal/shellquote"
-	workertest "github.com/gastownhall/gascity/internal/worker/workertest"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/shellquote"
+	workertest "github.com/jonbaldie/gascity/internal/worker/workertest"
 )
 
 type phase2ProviderCase struct {

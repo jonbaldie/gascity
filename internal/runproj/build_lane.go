@@ -1,6 +1,6 @@
 package runproj
 
-import "github.com/gastownhall/gascity/internal/beads"
+import "github.com/jonbaldie/gascity/internal/beads"
 
 // BuildRunLane builds the run lane for the single run rooted at rootID, off the
 // same fold BuildRunSummary consumes. It exists so a caller can resolve ONE run

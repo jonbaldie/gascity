@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/materialize"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/materialize"
 )
 
 func TestIsStage2EligibleSession(t *testing.T) {

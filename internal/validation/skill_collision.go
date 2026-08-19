@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 // supportedSkillVendors lists the providers whose skill sinks the

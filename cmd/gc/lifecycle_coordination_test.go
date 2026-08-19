@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 // writeSpyScript creates a shell script that logs operations to a file and

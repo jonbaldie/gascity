@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/pathutil"
+	"github.com/jonbaldie/gascity/internal/pathutil"
 )
 
 // ReadCopilotFile reads a GitHub Copilot CLI session-state events.jsonl file

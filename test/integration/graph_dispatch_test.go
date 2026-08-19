@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/citylayout"
-	"github.com/gastownhall/gascity/test/tmuxtest"
+	"github.com/jonbaldie/gascity/internal/citylayout"
+	"github.com/jonbaldie/gascity/test/tmuxtest"
 )
 
 type graphBead struct {

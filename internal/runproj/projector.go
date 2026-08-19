@@ -1,8 +1,8 @@
 package runproj
 
 import (
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/events"
 )
 
 // Projector folds bead lifecycle events into the latest snapshot per id while

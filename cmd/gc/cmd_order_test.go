@@ -18,15 +18,15 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
-	"github.com/gastownhall/gascity/internal/api"
-	"github.com/gastownhall/gascity/internal/beadmeta"
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/citylayout"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/events"
-	"github.com/gastownhall/gascity/internal/formulatest"
-	"github.com/gastownhall/gascity/internal/molecule"
-	"github.com/gastownhall/gascity/internal/orders"
+	"github.com/jonbaldie/gascity/internal/api"
+	"github.com/jonbaldie/gascity/internal/beadmeta"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/citylayout"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/formulatest"
+	"github.com/jonbaldie/gascity/internal/molecule"
+	"github.com/jonbaldie/gascity/internal/orders"
 )
 
 func readFileString(t *testing.T, path string) string {

@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // TestRigScopedPoolDefaultsCoverFieldScenario_4189 is a combined regression

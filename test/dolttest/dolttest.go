@@ -18,7 +18,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/doltorphan"
+	"github.com/jonbaldie/gascity/internal/doltorphan"
 )
 
 // reap sends SIGTERM, then SIGKILL to survivors, to every `dolt sql-server`

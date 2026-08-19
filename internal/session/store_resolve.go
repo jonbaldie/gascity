@@ -1,6 +1,6 @@
 package session
 
-import "github.com/gastownhall/gascity/internal/beads"
+import "github.com/jonbaldie/gascity/internal/beads"
 
 // This file puts user-identifier RESOLUTION on the session front door.
 //

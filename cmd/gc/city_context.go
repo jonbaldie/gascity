@@ -4,7 +4,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/supervisor"
+	"github.com/jonbaldie/gascity/internal/supervisor"
 )
 
 func resolveExplicitCityPathEnv() (string, bool) {

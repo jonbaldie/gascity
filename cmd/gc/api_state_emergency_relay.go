@@ -4,7 +4,7 @@ import (
 	"context"
 	"log"
 
-	"github.com/gastownhall/gascity/internal/emergency"
+	"github.com/jonbaldie/gascity/internal/emergency"
 )
 
 // startEmergencyEventRelay launches a goroutine that drains emergencyCh and

@@ -143,7 +143,7 @@ func TestValidateReviewedHermeticBodiesRejectsDirectKnownResources(t *testing.T)
 		{name: "net listen config packet", imports: `"net"`, body: `_, _ = (net.ListenConfig{}).ListenPacket(t.Context(), "udp", "127.0.0.1:0")`, resource: ResourceNetListenConfig},
 		{name: "net packet listen", imports: `"net"`, body: `_, _ = net.ListenUDP("udp", nil)`, resource: ResourceNetListenPacket},
 		{name: "syscall listen", imports: `"syscall"`, body: `_ = syscall.Listen(0, 0)`, resource: ResourceSyscallListen},
-		{name: "tmux", imports: `tmuxtest "github.com/gastownhall/gascity/test/tmuxtest"`, body: `_ = tmuxtest.NewGuard(t)`, resource: ResourceTmux},
+		{name: "tmux", imports: `tmuxtest "github.com/jonbaldie/gascity/test/tmuxtest"`, body: `_ = tmuxtest.NewGuard(t)`, resource: ResourceTmux},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

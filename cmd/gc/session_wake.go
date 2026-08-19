@@ -11,13 +11,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/clock"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/runtime"
-	sessions "github.com/gastownhall/gascity/internal/session"
-	"github.com/gastownhall/gascity/internal/telemetry"
-	"github.com/gastownhall/gascity/internal/worker"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/clock"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/runtime"
+	sessions "github.com/jonbaldie/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/telemetry"
+	"github.com/jonbaldie/gascity/internal/worker"
 )
 
 // errTokenMismatch indicates the running session's instance token

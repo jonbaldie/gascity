@@ -6,8 +6,8 @@ import (
 	"encoding/hex"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/pathutil"
-	"github.com/gastownhall/gascity/internal/pidutil"
+	"github.com/jonbaldie/gascity/internal/pathutil"
+	"github.com/jonbaldie/gascity/internal/pidutil"
 )
 
 const (

@@ -3,7 +3,7 @@ package rollout
 import (
 	"context"
 
-	"github.com/gastownhall/gascity/internal/rollout/gate"
+	"github.com/jonbaldie/gascity/internal/rollout/gate"
 )
 
 // Capability reports whether the runtime can execute a gate's new path; the

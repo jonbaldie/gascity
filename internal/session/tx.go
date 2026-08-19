@@ -1,6 +1,6 @@
 package session
 
-import "github.com/gastownhall/gascity/internal/beads"
+import "github.com/jonbaldie/gascity/internal/beads"
 
 // The TRANSACTIONAL half of the session-class front door.
 //

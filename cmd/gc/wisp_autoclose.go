@@ -5,11 +5,11 @@ import (
 	"io"
 	"os"
 
-	"github.com/gastownhall/gascity/internal/beadmeta"
-	"github.com/gastownhall/gascity/internal/beads"
-	convoycore "github.com/gastownhall/gascity/internal/convoy"
-	"github.com/gastownhall/gascity/internal/sling"
-	"github.com/gastownhall/gascity/internal/sourceworkflow"
+	"github.com/jonbaldie/gascity/internal/beadmeta"
+	"github.com/jonbaldie/gascity/internal/beads"
+	convoycore "github.com/jonbaldie/gascity/internal/convoy"
+	"github.com/jonbaldie/gascity/internal/sling"
+	"github.com/jonbaldie/gascity/internal/sourceworkflow"
 	"github.com/spf13/cobra"
 )
 

@@ -15,7 +15,7 @@ import (
 	"testing"
 
 	"github.com/BurntSushi/toml"
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
 
 // tomlDecode wraps toml.Decode for test use.

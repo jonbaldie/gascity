@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/testutil"
+	"github.com/jonbaldie/gascity/internal/testutil"
 )
 
 // hangBudget is the single wall-clock ceiling shared by every test-side wait in

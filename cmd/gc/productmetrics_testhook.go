@@ -16,8 +16,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/gchome"
-	"github.com/gastownhall/gascity/internal/productmetrics"
+	"github.com/jonbaldie/gascity/internal/gchome"
+	"github.com/jonbaldie/gascity/internal/productmetrics"
 )
 
 const (

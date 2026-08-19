@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/beads/contract"
+	"github.com/jonbaldie/gascity/internal/beads/contract"
 )
 
 // Resolved holds the effective Dolt auth values for a scope.

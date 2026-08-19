@@ -3,7 +3,7 @@ package runproj
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 func runRoot(id, formula string) beads.Bead {

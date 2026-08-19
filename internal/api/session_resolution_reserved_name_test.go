@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/session"
 )
 
 // Regression tests for ga-4of1nc: a configured named-session identity with no

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/api/apierr"
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/api/apierr"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // FormulaListBody is the response body for GET /v0/formulas.

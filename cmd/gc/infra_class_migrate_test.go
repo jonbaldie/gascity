@@ -12,11 +12,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/mail"
-	"github.com/gastownhall/gascity/internal/storebinding"
-	sqlitebinding "github.com/gastownhall/gascity/internal/storebinding/sqlite"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/mail"
+	"github.com/jonbaldie/gascity/internal/storebinding"
+	sqlitebinding "github.com/jonbaldie/gascity/internal/storebinding/sqlite"
 )
 
 // infraSplitConfig returns a city whose five infra classes share one SQLite

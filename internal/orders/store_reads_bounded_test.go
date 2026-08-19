@@ -3,7 +3,7 @@ package orders
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // TestLastRunIsBoundedToNewestRun is the regression guard for the read the

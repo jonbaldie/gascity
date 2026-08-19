@@ -11,11 +11,11 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
-	"github.com/gastownhall/gascity/internal/builtinpacks"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/fsys"
-	gitutil "github.com/gastownhall/gascity/internal/git"
-	"github.com/gastownhall/gascity/internal/remotesource"
+	"github.com/jonbaldie/gascity/internal/builtinpacks"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/fsys"
+	gitutil "github.com/jonbaldie/gascity/internal/git"
+	"github.com/jonbaldie/gascity/internal/remotesource"
 )
 
 // InstallMode controls whether lock resolution is strict or may refresh.

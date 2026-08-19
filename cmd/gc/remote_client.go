@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/api"
-	"github.com/gastownhall/gascity/internal/citywriteauth"
-	"github.com/gastownhall/gascity/internal/clientauth"
-	"github.com/gastownhall/gascity/internal/clientgrant"
+	"github.com/jonbaldie/gascity/internal/api"
+	"github.com/jonbaldie/gascity/internal/citywriteauth"
+	"github.com/jonbaldie/gascity/internal/clientauth"
+	"github.com/jonbaldie/gascity/internal/clientgrant"
 )
 
 // remoteClientOptions builds the transport options (TLS + bearer) shared by

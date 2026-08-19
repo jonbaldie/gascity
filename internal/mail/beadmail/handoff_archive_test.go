@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/mail"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/mail"
 )
 
 // sendInjectableAutoHandoff creates an unread auto-handoff message bead carrying

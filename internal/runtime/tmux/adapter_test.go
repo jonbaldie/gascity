@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/runtime"
-	"github.com/gastownhall/gascity/internal/runtime/runtimetest"
-	"github.com/gastownhall/gascity/internal/shellquote"
+	"github.com/jonbaldie/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/runtime/runtimetest"
+	"github.com/jonbaldie/gascity/internal/shellquote"
 )
 
 // Compile-time check.

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	sessionpkg "github.com/gastownhall/gascity/internal/session"
+	sessionpkg "github.com/jonbaldie/gascity/internal/session"
 )
 
 // The pending-create rollback tests in session_lifecycle_chaos_test.go all drive

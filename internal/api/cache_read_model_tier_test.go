@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/session"
 )
 
 // readModelCountingStore counts store.List calls while delegating everything else to

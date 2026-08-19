@@ -3,8 +3,8 @@ package herdr
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/runtime"
-	"github.com/gastownhall/gascity/internal/shellquote"
+	"github.com/jonbaldie/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/shellquote"
 )
 
 // TestStartupDeliveryText pins the first-turn delivery decision that keeps named

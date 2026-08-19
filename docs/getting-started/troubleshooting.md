@@ -59,11 +59,11 @@ Builtin packs compose only through explicit pinned `[imports]` in
 
 ```toml
 [imports.core]
-source = "https://github.com/gastownhall/gascity.git//internal/bootstrap/packs/core"
+source = "https://github.com/jonbaldie/gascity.git//internal/bootstrap/packs/core"
 version = "sha:<pinned commit>"
 
 [imports.bd]
-source = "https://github.com/gastownhall/gascity.git//examples/bd"
+source = "https://github.com/jonbaldie/gascity.git//examples/bd"
 version = "sha:<pinned commit>"
 ```
 
@@ -687,7 +687,7 @@ make build
 ./bin/gc version
 ```
 
-See [CONTRIBUTING.md](https://github.com/gastownhall/gascity/blob/main/CONTRIBUTING.md)
+See [CONTRIBUTING.md](https://github.com/jonbaldie/gascity/blob/main/CONTRIBUTING.md)
 for the full contributor setup.
 
 ## Slung Beads Not Reaching Agents (managed-city mode)

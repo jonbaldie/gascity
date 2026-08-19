@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	workerfake "github.com/gastownhall/gascity/internal/worker/fake"
+	workerfake "github.com/jonbaldie/gascity/internal/worker/fake"
 )
 
 type fakeStartupRun struct {

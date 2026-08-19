@@ -1,6 +1,6 @@
 package api
 
-import "github.com/gastownhall/gascity/internal/beads"
+import "github.com/jonbaldie/gascity/internal/beads"
 
 // Per-domain Huma input/output types for the patches handler
 // group. Split out of the original huma_types.go; mirrors the layout

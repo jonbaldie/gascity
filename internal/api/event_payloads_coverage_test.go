@@ -4,7 +4,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/events"
 )
 
 // TestEveryKnownEventTypeHasRegisteredPayload enforces Principle 7's

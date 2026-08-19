@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/gastownhall/gascity/internal/configedit"
+	"github.com/jonbaldie/gascity/internal/configedit"
 )
 
 // --- Shared input mixins ---

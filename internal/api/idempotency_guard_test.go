@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/api"
+	"github.com/jonbaldie/gascity/internal/api"
 )
 
 // requireIdempotency lists the create operations that MUST accept an

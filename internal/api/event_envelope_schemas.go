@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/gastownhall/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/events"
 )
 
 type typedEventStreamEnvelopeSchema struct{}

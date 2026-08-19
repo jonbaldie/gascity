@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 var errTestStoreTimeout = errors.New("store timed out")

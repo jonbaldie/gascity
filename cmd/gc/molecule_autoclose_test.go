@@ -6,11 +6,11 @@ import (
 	"strings"
 	"testing"
 
-	gcapi "github.com/gastownhall/gascity/internal/api"
-	"github.com/gastownhall/gascity/internal/beadmeta"
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/events"
-	"github.com/gastownhall/gascity/internal/sourceworkflow"
+	gcapi "github.com/jonbaldie/gascity/internal/api"
+	"github.com/jonbaldie/gascity/internal/beadmeta"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/sourceworkflow"
 )
 
 // TestMoleculeAutocloseClosesRootWhenAllStepsClosed is the headline

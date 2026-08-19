@@ -6,7 +6,7 @@ package api
 // These types drive the OpenAPI spec for all /v0/session* endpoints.
 
 import (
-	"github.com/gastownhall/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/session"
 )
 
 // SessionListInput is the Huma input for GET /v0/city/{cityName}/sessions.

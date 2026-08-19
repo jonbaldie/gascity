@@ -7,10 +7,10 @@ import (
 	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/gastownhall/gascity/internal/api/apierr"
-	"github.com/gastownhall/gascity/internal/fsys"
-	"github.com/gastownhall/gascity/internal/gitcred"
-	"github.com/gastownhall/gascity/internal/importsvc"
+	"github.com/jonbaldie/gascity/internal/api/apierr"
+	"github.com/jonbaldie/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/gitcred"
+	"github.com/jonbaldie/gascity/internal/importsvc"
 )
 
 // Seams over importsvc so handler tests can drive list/add/remove without a real

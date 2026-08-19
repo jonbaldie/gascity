@@ -3,7 +3,7 @@ package k8s
 import (
 	"context"
 
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
 // This file makes the k8s provider satisfy the de-conflated typed seams

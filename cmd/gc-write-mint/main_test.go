@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/citywriteauth"
-	"github.com/gastownhall/gascity/internal/clientgrant"
+	"github.com/jonbaldie/gascity/internal/citywriteauth"
+	"github.com/jonbaldie/gascity/internal/clientgrant"
 )
 
 // testKey returns a deterministic ed25519 keypair so signatures are reproducible.

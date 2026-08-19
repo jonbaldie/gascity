@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/gitcred"
+	"github.com/jonbaldie/gascity/internal/gitcred"
 	"github.com/spf13/cobra"
 )
 

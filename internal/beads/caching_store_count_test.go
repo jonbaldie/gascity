@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // countingBackingStore is a Store + Counter fake that records Count calls.

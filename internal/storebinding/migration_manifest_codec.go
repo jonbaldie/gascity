@@ -3,7 +3,7 @@ package storebinding
 import (
 	"fmt"
 
-	"github.com/gastownhall/gascity/internal/coordclass"
+	"github.com/jonbaldie/gascity/internal/coordclass"
 )
 
 // The durable manifest form is explicit. ClassSet and WorkScope keep their

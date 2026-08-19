@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // getWaitInspect drives the real GET /v0/city/{cityName}/wait/{id} handler

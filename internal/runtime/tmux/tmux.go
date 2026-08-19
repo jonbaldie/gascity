@@ -19,10 +19,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/processenv"
-	"github.com/gastownhall/gascity/internal/runtime"
-	"github.com/gastownhall/gascity/internal/sessionlog"
-	"github.com/gastownhall/gascity/internal/shellquote"
+	"github.com/jonbaldie/gascity/internal/processenv"
+	"github.com/jonbaldie/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/sessionlog"
+	"github.com/jonbaldie/gascity/internal/shellquote"
 )
 
 // Provenance: This file was copied from github.com/steveyegge/gastown

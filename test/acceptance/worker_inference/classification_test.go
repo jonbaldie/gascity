@@ -16,9 +16,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	workerpkg "github.com/gastownhall/gascity/internal/worker"
-	"github.com/gastownhall/gascity/internal/worker/workertest"
-	helpers "github.com/gastownhall/gascity/test/acceptance/helpers"
+	workerpkg "github.com/jonbaldie/gascity/internal/worker"
+	"github.com/jonbaldie/gascity/internal/worker/workertest"
+	helpers "github.com/jonbaldie/gascity/test/acceptance/helpers"
 )
 
 func TestValidateClaudeCredentialsExpired(t *testing.T) {

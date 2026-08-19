@@ -7,7 +7,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // bdExit stands in for the *exec.ExitError the bd runner wraps. bdExitCode

@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/api"
-	"github.com/gastownhall/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/api"
+	"github.com/jonbaldie/gascity/internal/events"
 )
 
 // classifyWorkQueryFailure inspects a work-query runner error and reports the

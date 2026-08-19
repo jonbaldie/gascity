@@ -18,12 +18,12 @@ import (
 	"testing"
 	"time"
 
-	bdpack "github.com/gastownhall/gascity/examples/bd"
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/beads/contract"
-	"github.com/gastownhall/gascity/internal/citylayout"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/fsys"
+	bdpack "github.com/jonbaldie/gascity/examples/bd"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads/contract"
+	"github.com/jonbaldie/gascity/internal/citylayout"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/fsys"
 	"gopkg.in/yaml.v3"
 )
 

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/testpolicy/timingsummary"
+	"github.com/jonbaldie/gascity/internal/testpolicy/timingsummary"
 )
 
 func TestPlanInventoryIsAuthoritative(t *testing.T) {

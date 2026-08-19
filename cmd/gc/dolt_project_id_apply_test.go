@@ -12,10 +12,10 @@ import (
 	"strings"
 	"testing"
 
-	gcapi "github.com/gastownhall/gascity/internal/api"
-	"github.com/gastownhall/gascity/internal/beads/contract"
-	"github.com/gastownhall/gascity/internal/events"
-	"github.com/gastownhall/gascity/internal/fsys"
+	gcapi "github.com/jonbaldie/gascity/internal/api"
+	"github.com/jonbaldie/gascity/internal/beads/contract"
+	"github.com/jonbaldie/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
 
 type projectIdentityL3Double struct {

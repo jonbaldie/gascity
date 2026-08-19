@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beadmeta"
+	"github.com/jonbaldie/gascity/internal/beadmeta"
 )
 
 // infoKeySpec is one metadata key's codec: how a raw metadata value becomes

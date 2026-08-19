@@ -33,7 +33,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // ScopeRigContext returns the rig identity encoded by a canonical workflow

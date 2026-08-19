@@ -18,10 +18,10 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/fsys"
-	"github.com/gastownhall/gascity/internal/pathutil"
-	"github.com/gastownhall/gascity/test/tmuxtest"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/pathutil"
+	"github.com/jonbaldie/gascity/test/tmuxtest"
 )
 
 // canonicalTempDir returns a per-test temp directory with its path

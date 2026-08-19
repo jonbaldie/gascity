@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/api/genclient"
+	"github.com/jonbaldie/gascity/internal/api/genclient"
 )
 
 func TestBeadsFromGenList_Valid(t *testing.T) {

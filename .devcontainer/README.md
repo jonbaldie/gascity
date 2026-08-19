@@ -1,6 +1,6 @@
 # Devcontainer for gascity
 
-This devcontainer reproduces a development environment for [gastownhall/gascity](https://github.com/gastownhall/gascity) per the [official installation guide](https://github.com/gastownhall/gascity/blob/main/docs/getting-started/installation.md).
+This devcontainer reproduces a development environment for [jonbaldie/gascity](https://github.com/jonbaldie/gascity) per the [official installation guide](https://github.com/jonbaldie/gascity/blob/main/docs/getting-started/installation.md).
 
 ## What it installs
 
@@ -29,10 +29,10 @@ Versions come from `deps.env` so bumping is one file change.
 
 ## Why source build, not Homebrew
 
-The [installation guide](https://github.com/gastownhall/gascity/blob/main/docs/getting-started/installation.md) recommends Homebrew for daily use. The devcontainer uses the source-build path because:
+The [installation guide](https://github.com/jonbaldie/gascity/blob/main/docs/getting-started/installation.md) recommends `go install github.com/jonbaldie/gascity/cmd/gc@latest` for daily use. The devcontainer uses the source-build path because:
 
 1. The devcontainer is for contributors and reviewers — `make install` from source is the path documented in "Build from source" and "Contributor setup"
-2. Homebrew is not available in the base `devcontainers/go` Ubuntu image
+2. The container already has the checkout, so it builds the current commit
 3. Source build matches what CI does in `.github/actions/setup-gascity-ubuntu/`
 
 ## Dolt data persistence
@@ -58,7 +58,7 @@ Or in VS Code: `Ctrl+Shift+P` → "Dev Containers: Reopen in Container".
 
 ## After `gc init`
 
-Follow the [Quickstart](https://github.com/gastownhall/gascity/blob/main/docs/getting-started/quickstart.md):
+Follow the [Quickstart](https://github.com/jonbaldie/gascity/blob/main/docs/getting-started/quickstart.md):
 
 ```bash
 gc init ~/gc-cities/my-city
@@ -74,4 +74,4 @@ Initialize cities under `~/gc-cities/` so their managed Dolt data persists acros
 
 ## Note on `gc` and Oh My Zsh
 
-If your shell aliases `gc` to `git commit --verbose`, use `command gc ...` to bypass it. The base image here uses bash by default so this is not a problem, but if you opt into Oh My Zsh you'll need the workaround from the [troubleshooting guide](https://github.com/gastownhall/gascity/blob/main/docs/getting-started/troubleshooting.md#oh-my-zsh-git-plugin-hides-gc).
+If your shell aliases `gc` to `git commit --verbose`, use `command gc ...` to bypass it. The base image here uses bash by default so this is not a problem, but if you opt into Oh My Zsh you'll need the workaround from the [troubleshooting guide](https://github.com/jonbaldie/gascity/blob/main/docs/getting-started/troubleshooting.md#oh-my-zsh-git-plugin-hides-gc).

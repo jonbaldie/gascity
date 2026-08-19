@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/fsys"
-	"github.com/gastownhall/gascity/internal/promptmeta"
+	"github.com/jonbaldie/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/promptmeta"
 )
 
 func TestRenderPromptWithMeta_NoFrontMatter(t *testing.T) {

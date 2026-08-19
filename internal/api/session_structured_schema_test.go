@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/worker"
+	"github.com/jonbaldie/gascity/internal/worker"
 )
 
 func TestSessionTranscriptRuntimeContainerDoesNotCustomizeJSON(t *testing.T) {

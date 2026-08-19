@@ -3,7 +3,7 @@ package storebinding
 import (
 	"io"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // EngineOpener is the serving hook a binding-backed bead engine exposes.

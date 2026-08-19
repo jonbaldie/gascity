@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"reflect"
 
-	worker "github.com/gastownhall/gascity/internal/worker"
+	worker "github.com/jonbaldie/gascity/internal/worker"
 )
 
 // structuredBlocks flattens the blocks of every entry in a normalized history.

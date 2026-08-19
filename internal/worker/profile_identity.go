@@ -1,6 +1,6 @@
 package worker
 
-import workerbuiltin "github.com/gastownhall/gascity/internal/worker/builtin"
+import workerbuiltin "github.com/jonbaldie/gascity/internal/worker/builtin"
 
 // ProfileIdentity captures the explicit production identity for a canonical
 // worker profile.

@@ -3,7 +3,7 @@ package exec //nolint:revive // internal package, always imported with alias
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // TestStoreIDPrefixFromEnv verifies the exec store exposes its scope prefix from

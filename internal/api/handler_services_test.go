@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/workspacesvc"
+	"github.com/jonbaldie/gascity/internal/workspacesvc"
 )
 
 type fakeServiceRegistry struct {

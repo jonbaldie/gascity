@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/testutil"
+	"github.com/jonbaldie/gascity/internal/testutil"
 )
 
 // TestFSSourceMatchesLegacyBehavior asserts FSSource is a faithful

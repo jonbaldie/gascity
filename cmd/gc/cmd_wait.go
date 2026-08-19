@@ -13,14 +13,14 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/api"
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/fsys"
-	"github.com/gastownhall/gascity/internal/nudgequeue"
-	"github.com/gastownhall/gascity/internal/runtime"
-	sessionpkg "github.com/gastownhall/gascity/internal/session"
-	"github.com/gastownhall/gascity/internal/storeref"
+	"github.com/jonbaldie/gascity/internal/api"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/nudgequeue"
+	"github.com/jonbaldie/gascity/internal/runtime"
+	sessionpkg "github.com/jonbaldie/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/storeref"
 	"github.com/spf13/cobra"
 )
 

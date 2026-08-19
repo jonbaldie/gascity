@@ -1,6 +1,6 @@
 package main
 
-import "github.com/gastownhall/gascity/internal/config"
+import "github.com/jonbaldie/gascity/internal/config"
 
 // splitStrictConfigWarnings separates warnings that should remain fatal in
 // strict mode from compatibility/migration guidance that should stay warnings.

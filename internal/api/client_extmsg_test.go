@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/extmsg"
+	"github.com/jonbaldie/gascity/internal/extmsg"
 )
 
 func TestClientBindExtMsgConversationHandoff(t *testing.T) {

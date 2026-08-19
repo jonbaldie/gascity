@@ -10,10 +10,10 @@ import (
 	"sync"
 
 	"github.com/BurntSushi/toml"
-	"github.com/gastownhall/gascity/internal/builtinpacks"
-	"github.com/gastownhall/gascity/internal/citylayout"
-	gitutil "github.com/gastownhall/gascity/internal/git"
-	"github.com/gastownhall/gascity/internal/remotesource"
+	"github.com/jonbaldie/gascity/internal/builtinpacks"
+	"github.com/jonbaldie/gascity/internal/citylayout"
+	gitutil "github.com/jonbaldie/gascity/internal/git"
+	"github.com/jonbaldie/gascity/internal/remotesource"
 )
 
 var runRepoCacheGit = defaultRunRepoCacheGit

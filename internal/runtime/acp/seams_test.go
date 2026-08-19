@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
 // TestSeamsAcpLifecycle drives the acp provider through the typed seams against

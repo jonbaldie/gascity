@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/fsys"
-	"github.com/gastownhall/gascity/internal/importsvc"
-	"github.com/gastownhall/gascity/internal/ssrf"
+	"github.com/jonbaldie/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/importsvc"
+	"github.com/jonbaldie/gascity/internal/ssrf"
 )
 
 func TestValidateHTTPPackSource_AllowsPublicRemotes(t *testing.T) {

@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/coordclass"
+	"github.com/jonbaldie/gascity/internal/coordclass"
 )
 
 // AttemptRecord is the phase-typed durable saga record. intent derivation owns its shape and

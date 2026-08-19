@@ -4,9 +4,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beadmeta"
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/executionevent"
+	"github.com/jonbaldie/gascity/internal/beadmeta"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/executionevent"
 )
 
 // nonResidentBeadStore hides one bead from Get while serving everything else,

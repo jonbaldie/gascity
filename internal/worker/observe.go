@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	sessionpkg "github.com/gastownhall/gascity/internal/session"
+	sessionpkg "github.com/jonbaldie/gascity/internal/session"
 )
 
 // LiveObservation is the worker-owned runtime observation surface used by API

@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/citylayout"
-	"github.com/gastownhall/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/citylayout"
+	"github.com/jonbaldie/gascity/internal/events"
 )
 
 func TestParseDurationWithDays(t *testing.T) {

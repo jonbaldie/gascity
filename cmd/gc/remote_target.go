@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/clientcontext"
-	"github.com/gastownhall/gascity/internal/supervisor"
+	"github.com/jonbaldie/gascity/internal/clientcontext"
+	"github.com/jonbaldie/gascity/internal/supervisor"
 )
 
 // Persistent flags that select a REMOTE city over the HTTP+SSE control

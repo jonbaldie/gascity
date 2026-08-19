@@ -5,8 +5,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/doctor"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/doctor"
 )
 
 // retiredHoldLabels are hold/blocked labels retired by the canonical hold

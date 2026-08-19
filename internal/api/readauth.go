@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/citywriteauth"
+	"github.com/jonbaldie/gascity/internal/citywriteauth"
 )
 
 // Read-auth gates per-city reads on a signed, single-use, request-bound grant

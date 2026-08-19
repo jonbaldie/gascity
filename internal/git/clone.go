@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/gitcred"
+	"github.com/jonbaldie/gascity/internal/gitcred"
 )
 
 // Clone scheme-allowlist sentinels. Each is errors.Is-matchable so a caller

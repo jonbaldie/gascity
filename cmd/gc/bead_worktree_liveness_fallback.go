@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/pathutil"
+	"github.com/jonbaldie/gascity/internal/pathutil"
 )
 
 // Liveness scan sources, recorded on liveWorktreeState so an operator can tell

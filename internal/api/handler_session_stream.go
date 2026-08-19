@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2/sse"
-	"github.com/gastownhall/gascity/internal/runtime"
-	"github.com/gastownhall/gascity/internal/session"
-	"github.com/gastownhall/gascity/internal/sessionlog"
-	"github.com/gastownhall/gascity/internal/worker"
+	"github.com/jonbaldie/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/sessionlog"
+	"github.com/jonbaldie/gascity/internal/worker"
 )
 
 // SessionStreamMessageEvent carries normalized conversation turns on the

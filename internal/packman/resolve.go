@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/gitcred"
+	"github.com/jonbaldie/gascity/internal/gitcred"
 )
 
 // ErrNoSemverTags reports that a source has no semver tags to resolve.

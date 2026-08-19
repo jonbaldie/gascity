@@ -379,7 +379,7 @@ func TestResidencyResolverBoundaryControls(t *testing.T) {
 	root := t.TempDir()
 	writeResidencyFixture(t, root, "cmd/gc/pinned.go", `package main
 
-import "github.com/gastownhall/gascity/internal/beads"
+import "github.com/jonbaldie/gascity/internal/beads"
 
 func pinned() []beads.Store { return nil }
 `)
@@ -402,7 +402,7 @@ func pinned() []beads.Store { return nil }
 	t.Run("new signature fails", func(t *testing.T) {
 		writeResidencyFixture(t, root, "cmd/gc/eleventh.go", `package main
 
-import "github.com/gastownhall/gascity/internal/beads"
+import "github.com/jonbaldie/gascity/internal/beads"
 
 func eleventh() map[string]beads.Store { return nil }
 `)
@@ -415,7 +415,7 @@ func eleventh() map[string]beads.Store { return nil }
 	t.Run("marker suppresses", func(t *testing.T) {
 		writeResidencyFixture(t, root, "cmd/gc/eleventh.go", `package main
 
-import "github.com/gastownhall/gascity/internal/beads"
+import "github.com/jonbaldie/gascity/internal/beads"
 
 // eleventh enumerates by definition.
 // `+residencyAllowMarker+` migration tooling

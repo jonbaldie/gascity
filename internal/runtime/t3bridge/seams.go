@@ -3,7 +3,7 @@ package t3bridge
 import (
 	"context"
 
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
 // This file makes the t3bridge provider satisfy the de-conflated typed seams

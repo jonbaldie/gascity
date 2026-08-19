@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
 
 func TestCleanupReportJSONShape(t *testing.T) {

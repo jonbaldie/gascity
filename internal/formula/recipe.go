@@ -3,7 +3,7 @@ package formula
 import (
 	"sort"
 
-	"github.com/gastownhall/gascity/internal/beadmeta"
+	"github.com/jonbaldie/gascity/internal/beadmeta"
 )
 
 // Recipe is the output of formula compilation. It contains a flattened,

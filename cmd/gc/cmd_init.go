@@ -14,14 +14,14 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
-	"github.com/gastownhall/gascity/internal/api"
-	"github.com/gastownhall/gascity/internal/cityinit"
-	"github.com/gastownhall/gascity/internal/citylayout"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/fsys"
-	"github.com/gastownhall/gascity/internal/hooks"
-	"github.com/gastownhall/gascity/internal/overlay"
-	"github.com/gastownhall/gascity/internal/pricing"
+	"github.com/jonbaldie/gascity/internal/api"
+	"github.com/jonbaldie/gascity/internal/cityinit"
+	"github.com/jonbaldie/gascity/internal/citylayout"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/hooks"
+	"github.com/jonbaldie/gascity/internal/overlay"
+	"github.com/jonbaldie/gascity/internal/pricing"
 	"github.com/spf13/cobra"
 )
 

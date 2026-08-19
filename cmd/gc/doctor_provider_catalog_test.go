@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/api"
-	"github.com/gastownhall/gascity/internal/doctor"
+	"github.com/jonbaldie/gascity/internal/api"
+	"github.com/jonbaldie/gascity/internal/doctor"
 )
 
 func TestProviderCatalogDoctorFixAddsMissingBuiltinAlias(t *testing.T) {

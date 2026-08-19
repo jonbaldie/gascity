@@ -6,13 +6,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/agent"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/fsys"
-	gitpkg "github.com/gastownhall/gascity/internal/git"
-	"github.com/gastownhall/gascity/internal/runtime"
-	"github.com/gastownhall/gascity/internal/suspensionstate"
-	workdirutil "github.com/gastownhall/gascity/internal/workdir"
+	"github.com/jonbaldie/gascity/internal/agent"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/fsys"
+	gitpkg "github.com/jonbaldie/gascity/internal/git"
+	"github.com/jonbaldie/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/suspensionstate"
+	workdirutil "github.com/jonbaldie/gascity/internal/workdir"
 )
 
 type rigResponse struct {

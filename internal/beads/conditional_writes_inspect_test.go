@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/rollout/gate"
+	"github.com/jonbaldie/gascity/internal/rollout/gate"
 )
 
 // TestInspectConditionalWritesIsSideEffectFree pins the inspector's core

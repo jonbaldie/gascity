@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/api"
+	"github.com/jonbaldie/gascity/internal/api"
 )
 
 // writeCityTOMLForRoute writes a minimal city.toml into dir and returns dir.

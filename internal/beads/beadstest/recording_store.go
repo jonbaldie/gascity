@@ -3,7 +3,7 @@ package beadstest
 import (
 	"sync"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // RecordedCall is a single mutating Store call captured by RecordingStore.

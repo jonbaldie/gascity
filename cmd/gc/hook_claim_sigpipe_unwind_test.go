@@ -12,7 +12,7 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // This file pins F-C against the PRODUCTION writer, not an injected one.

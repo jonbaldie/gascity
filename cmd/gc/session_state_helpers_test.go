@@ -3,8 +3,8 @@ package main
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	sessionpkg "github.com/gastownhall/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/beads"
+	sessionpkg "github.com/jonbaldie/gascity/internal/session"
 )
 
 // TestPoolSessionIsLiveInfo_Matrix exercises the liveness predicate used by the

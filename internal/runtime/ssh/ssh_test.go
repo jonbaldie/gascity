@@ -8,7 +8,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
 // fakeRunner captures the remote argv it is asked to run and returns a

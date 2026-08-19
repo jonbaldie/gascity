@@ -3,7 +3,7 @@ package api
 import (
 	"sort"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // runStepDependencyEdges returns each member's step-ordering prerequisite

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 // Verifier authenticates one inbound webhook delivery under a single scheme.

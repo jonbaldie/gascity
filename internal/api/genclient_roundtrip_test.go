@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/api/genclient"
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/api/genclient"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // TestGenClientRoundTripCitiesList exercises the supervisor-scope

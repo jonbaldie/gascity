@@ -5,8 +5,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/sling"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/sling"
 )
 
 // crossStoreClaimDir resolves the working directory a cross-store-eligible

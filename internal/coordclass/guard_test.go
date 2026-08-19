@@ -3,7 +3,7 @@ package coordclass
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/session"
 )
 
 // TestContractStringsMatchCanonical pins the contract strings this leaf package

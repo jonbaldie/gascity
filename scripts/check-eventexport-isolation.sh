@@ -34,7 +34,7 @@ fail() { echo "check-eventexport-isolation: FAIL: $1" >&2; exit 1; }
 # commercial fabric that lives OUTSIDE the OSS. The 'gascity\.com' token is the
 # FQDN (literal .com): test fixtures intentionally carry path-shaped
 # 'gascity/...' / 'gascity-packs/...' leak-bait, which do not match it, and the
-# module path github.com/gastownhall/gascity has no '.com' after 'gascity', so
+# module path github.com/jonbaldie/gascity has no '.com' after 'gascity', so
 # neither false-positives.
 BRAND='gasworks|works\.gascity|gascity\.com|manifold|events-ingest|x-gc-'
 hits=$(grep -rniE "$BRAND" "${SURFACE[@]}" 2>/dev/null || true)
@@ -52,8 +52,8 @@ for sym in 'allowedTypes = map' 'func ActorHash' 'func CityHash' 'func safeRef';
 done
 
 # 3. Module boundary: the published package must not import internal/.
-if go list -deps ./pkg/eventexport 2>/dev/null | grep -q 'gastownhall/gascity/internal'; then
-  go list -deps ./pkg/eventexport | grep 'gastownhall/gascity/internal' >&2
+if go list -deps ./pkg/eventexport 2>/dev/null | grep -q 'jonbaldie/gascity/internal'; then
+  go list -deps ./pkg/eventexport | grep 'jonbaldie/gascity/internal' >&2
   fail "pkg/eventexport must import nothing from internal/ (see above)"
 fi
 

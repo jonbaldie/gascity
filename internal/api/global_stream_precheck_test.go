@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/events"
 )
 
 // afterSeqRecordingProvider is an events.Provider test double that reports a

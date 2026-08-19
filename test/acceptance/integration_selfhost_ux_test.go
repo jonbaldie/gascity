@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/logutil"
-	helpers "github.com/gastownhall/gascity/test/acceptance/helpers"
+	"github.com/jonbaldie/gascity/internal/logutil"
+	helpers "github.com/jonbaldie/gascity/test/acceptance/helpers"
 )
 
 func TestSelfhostUX_PackV1V2Collision(t *testing.T) {

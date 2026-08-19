@@ -15,7 +15,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 	"golang.org/x/sys/unix"
 	_ "modernc.org/sqlite" // Registers the pure-Go driver for the private immutable snapshot only.
 )

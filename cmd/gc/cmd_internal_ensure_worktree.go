@@ -5,7 +5,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/git"
+	"github.com/jonbaldie/gascity/internal/git"
 	"github.com/spf13/cobra"
 )
 

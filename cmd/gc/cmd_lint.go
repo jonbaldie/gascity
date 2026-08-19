@@ -13,12 +13,12 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/gastownhall/gascity/internal/bdflags"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/formula"
-	"github.com/gastownhall/gascity/internal/fsys"
-	"github.com/gastownhall/gascity/internal/overlay"
-	"github.com/gastownhall/gascity/internal/promptmeta"
+	"github.com/jonbaldie/gascity/internal/bdflags"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/formula"
+	"github.com/jonbaldie/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/overlay"
+	"github.com/jonbaldie/gascity/internal/promptmeta"
 	"github.com/spf13/cobra"
 )
 

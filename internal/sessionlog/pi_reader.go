@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
 
 // ErrAmbiguousPiSessionFile reports multiple Pi transcripts for one workdir.

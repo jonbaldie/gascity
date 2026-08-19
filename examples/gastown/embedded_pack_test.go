@@ -10,9 +10,9 @@ import (
 
 	gascitypacks "github.com/gastownhall/gascity-packs"
 
-	"github.com/gastownhall/gascity/internal/builtinpacks"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/packman"
+	"github.com/jonbaldie/gascity/internal/builtinpacks"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/packman"
 )
 
 // The gastown pack is no longer a checked-in copy: the gc binary embeds it

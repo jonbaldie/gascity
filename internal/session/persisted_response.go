@@ -1,6 +1,6 @@
 package session
 
-import "github.com/gastownhall/gascity/internal/beads"
+import "github.com/jonbaldie/gascity/internal/beads"
 
 // PersistedResponse is the persisted half of a session's API response: the
 // bead-stored facts (status and metadata) that the response builder needs but

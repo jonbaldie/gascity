@@ -9,7 +9,7 @@ import (
 	"slices"
 	"strings"
 
-	gascity "github.com/gastownhall/gascity"
+	gascity "github.com/jonbaldie/gascity"
 	"github.com/spf13/cobra"
 )
 

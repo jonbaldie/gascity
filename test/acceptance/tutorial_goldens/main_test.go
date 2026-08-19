@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	helpers "github.com/gastownhall/gascity/test/acceptance/helpers"
-	"github.com/gastownhall/gascity/test/dolttest"
+	helpers "github.com/jonbaldie/gascity/test/acceptance/helpers"
+	"github.com/jonbaldie/gascity/test/dolttest"
 )
 
 const canonicalTutorialRoot = "docs/tutorials"

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // These tests pin the keyset-cursor contract on GET /v0/beads: opaque v1

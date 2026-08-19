@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 const (

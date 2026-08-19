@@ -16,11 +16,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/nudgequeue"
-	"github.com/gastownhall/gascity/internal/orders"
-	"github.com/gastownhall/gascity/internal/storebinding"
-	"github.com/gastownhall/gascity/internal/storebinding/storebindingtest"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/nudgequeue"
+	"github.com/jonbaldie/gascity/internal/orders"
+	"github.com/jonbaldie/gascity/internal/storebinding"
+	"github.com/jonbaldie/gascity/internal/storebinding/storebindingtest"
 )
 
 // idleNudgeQueue answers every claim with an empty batch and no error: an idle

@@ -3,7 +3,7 @@ package session
 import (
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // PollerKeyFromBead returns the concrete nudge-poller ownership key for a

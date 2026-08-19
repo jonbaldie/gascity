@@ -7,7 +7,7 @@ import (
 	"sort"
 	"text/tabwriter"
 
-	"github.com/gastownhall/gascity/internal/usage"
+	"github.com/jonbaldie/gascity/internal/usage"
 	"github.com/spf13/cobra"
 )
 

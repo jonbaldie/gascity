@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/api"
+	"github.com/jonbaldie/gascity/internal/api"
 )
 
 func remoteTestClient(t *testing.T, url string) *api.Client {

@@ -24,8 +24,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/materialize"
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/materialize"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
 // TestSkillLifecycle_AddEditDeleteRename walks a city-pack skill

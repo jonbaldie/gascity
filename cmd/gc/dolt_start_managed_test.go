@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	bdpack "github.com/gastownhall/gascity/examples/bd"
-	"github.com/gastownhall/gascity/internal/processgroup/processgrouptest"
+	bdpack "github.com/jonbaldie/gascity/examples/bd"
+	"github.com/jonbaldie/gascity/internal/processgroup/processgrouptest"
 )
 
 func TestDoltServerEnv_DoesNotInjectGCSchedulerDefault(t *testing.T) {

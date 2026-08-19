@@ -30,8 +30,8 @@ import (
 	"io"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/events"
 )
 
 // demandSpawnOriginValue is the presence-only marker the controller sets on a

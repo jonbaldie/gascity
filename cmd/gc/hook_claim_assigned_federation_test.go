@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // The assigned-ready tier is federated: `gc ready --assignee` reads city-wide,

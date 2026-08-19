@@ -8,8 +8,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/pidutil"
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/pidutil"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
 // KillByPID terminates pid with SIGTERM, then SIGKILL after

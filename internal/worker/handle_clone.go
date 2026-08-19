@@ -1,6 +1,6 @@
 package worker
 
-import "github.com/gastownhall/gascity/internal/runtime"
+import "github.com/jonbaldie/gascity/internal/runtime"
 
 func profileFamily(profile Profile) string {
 	switch profile {

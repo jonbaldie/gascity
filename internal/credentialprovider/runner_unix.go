@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"sync"
 
-	"github.com/gastownhall/gascity/internal/processgroup"
+	"github.com/jonbaldie/gascity/internal/processgroup"
 )
 
 func newCommandControl(cmd *exec.Cmd) (*commandControl, error) {

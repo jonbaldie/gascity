@@ -3,7 +3,7 @@ package storebinding
 import (
 	"fmt"
 
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 // AuthCredentialProvider is the BindingSpec.Auth reference that delegates

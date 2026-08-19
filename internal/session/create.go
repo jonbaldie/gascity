@@ -1,6 +1,6 @@
 package session
 
-import "github.com/gastownhall/gascity/internal/beads"
+import "github.com/jonbaldie/gascity/internal/beads"
 
 // CreateSpec captures the typed vocabulary for creating a session bead through
 // the front door. It is the byte-identical replacement for the inline

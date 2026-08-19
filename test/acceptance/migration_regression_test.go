@@ -15,9 +15,9 @@ import (
 	"testing"
 
 	"github.com/BurntSushi/toml"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/fsys"
-	helpers "github.com/gastownhall/gascity/test/acceptance/helpers"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/fsys"
+	helpers "github.com/jonbaldie/gascity/test/acceptance/helpers"
 )
 
 // hasAgent reports whether cfg contains an agent with the given name

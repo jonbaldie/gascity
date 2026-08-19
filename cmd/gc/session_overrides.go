@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 // replaceSchemaFlags strips all CLI flags associated with the provider's

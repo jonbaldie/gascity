@@ -4,7 +4,7 @@ import (
 	"container/list"
 	"sync"
 
-	"github.com/gastownhall/gascity/internal/runproj"
+	"github.com/jonbaldie/gascity/internal/runproj"
 )
 
 // runDetailMemoCap bounds the per-tailer detail memo. It holds the actively

@@ -10,9 +10,9 @@
 package featureflags
 
 import (
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/formula"
-	"github.com/gastownhall/gascity/internal/molecule"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/formula"
+	"github.com/jonbaldie/gascity/internal/molecule"
 )
 
 // Flags is a snapshot of the feature-flag state. FormulaV2 gates the formula

@@ -4,11 +4,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/agentutil"
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/config"
-	sessionpkg "github.com/gastownhall/gascity/internal/session"
-	"github.com/gastownhall/gascity/internal/session/sessiontest"
+	"github.com/jonbaldie/gascity/internal/agentutil"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/config"
+	sessionpkg "github.com/jonbaldie/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/session/sessiontest"
 )
 
 // sessionInfosFromBeads projects raw session beads to session.Info through the

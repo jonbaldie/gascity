@@ -11,9 +11,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/beads/beadstest"
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads/beadstest"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
 
 type statRaceFS struct {

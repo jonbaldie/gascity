@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
 // TestSeamsSshExecAndOpen proves Place.Exec delegates over the ssh connection

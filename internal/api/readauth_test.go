@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/citywriteauth"
+	"github.com/jonbaldie/gascity/internal/citywriteauth"
 )
 
 func newTestReadVerifier(t *testing.T, pub ed25519.PublicKey, now time.Time) *citywriteauth.Verifier {

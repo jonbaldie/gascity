@@ -1,6 +1,6 @@
 package main
 
-import "github.com/gastownhall/gascity/internal/beads"
+import "github.com/jonbaldie/gascity/internal/beads"
 
 // ReadyGraphOnlyHandle returns a graph-only-ready handle when the wrapped store
 // exposes GraphOnlyReadyStore. The handle delegates without applying

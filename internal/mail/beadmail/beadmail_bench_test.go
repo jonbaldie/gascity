@@ -3,7 +3,7 @@ package beadmail
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // BenchmarkArchiveMany measures the cost of an N-message eager-delete path

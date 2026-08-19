@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/doctor"
+	"github.com/jonbaldie/gascity/internal/doctor"
 )
 
 // forkRateCheckWith builds a forkRateCheck that returns the given /proc/stat

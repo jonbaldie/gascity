@@ -1,6 +1,6 @@
 package t3bridge
 
-import "github.com/gastownhall/gascity/internal/runtime"
+import "github.com/jonbaldie/gascity/internal/runtime"
 
 // seamBackedProvider serves the legacy [runtime.Provider] through the
 // de-conflated seams (via [runtime.NewProviderFromSeams]), passing SleepCapability

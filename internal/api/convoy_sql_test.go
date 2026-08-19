@@ -11,8 +11,8 @@ import (
 
 	mysql "github.com/go-sql-driver/mysql"
 
-	"github.com/gastownhall/gascity/internal/beads/contract"
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/beads/contract"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
 
 func TestResolveDoltConnectionUsesCanonicalExternalEndpoint(t *testing.T) {

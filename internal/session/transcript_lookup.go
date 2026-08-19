@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/sessionlog"
-	workertranscript "github.com/gastownhall/gascity/internal/worker/transcript"
+	"github.com/jonbaldie/gascity/internal/sessionlog"
+	workertranscript "github.com/jonbaldie/gascity/internal/worker/transcript"
 )
 
 // ResolveKeyedTranscriptPath returns a transcript only when info carries a

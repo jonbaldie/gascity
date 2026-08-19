@@ -6,9 +6,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/beadmeta"
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/extmsg"
+	"github.com/jonbaldie/gascity/internal/beadmeta"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/extmsg"
 )
 
 // wispStepInjectionContent resolves the agent's current in-progress formula

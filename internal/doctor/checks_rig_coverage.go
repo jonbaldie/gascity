@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 // RigPackCoverageCheck warns when a city-level pack declares rig-scoped

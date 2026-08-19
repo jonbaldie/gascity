@@ -3,8 +3,8 @@ package dispatch
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/formula"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/formula"
 )
 
 // TestBuildAttemptRecipeStampsControlFor asserts W4/W5: buildAttemptRecipe

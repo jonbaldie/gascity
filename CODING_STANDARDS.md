@@ -85,7 +85,7 @@
   user-controlled paths, subprocess arguments, SQL identifiers, and external
   input before use; linter exclusions are not evidence that an operation is
   safe.
-- Keep the module path `github.com/gastownhall/gascity` and the Go version in
+- Keep the module path `github.com/jonbaldie/gascity` and the Go version in
   `go.mod` honest. Do not use newer language features without deliberately
   updating the module version.
 - Follow Zero Framework Cognition: Go transports data, enforces deterministic

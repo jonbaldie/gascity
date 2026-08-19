@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // prefixedStore wraps a MemStore and reports an IDPrefix(), standing in for the

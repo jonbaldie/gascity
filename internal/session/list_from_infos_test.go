@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
 // TestListFromInfosMatchesListFullFromBeads is the oracle that lets WI-6 W2 delete

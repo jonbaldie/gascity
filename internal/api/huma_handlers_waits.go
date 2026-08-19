@@ -5,10 +5,10 @@ import (
 	"errors"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/api/apierr"
+	"github.com/jonbaldie/gascity/internal/api/apierr"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/session"
 )
 
 // Handlers for the durable-wait wire (GET /v0/city/{cityName}/waits and

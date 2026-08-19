@@ -9,9 +9,9 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/runtime"
-	sessionexec "github.com/gastownhall/gascity/internal/runtime/exec"
-	"github.com/gastownhall/gascity/internal/runtime/runtimetest"
+	"github.com/jonbaldie/gascity/internal/runtime"
+	sessionexec "github.com/jonbaldie/gascity/internal/runtime/exec"
+	"github.com/jonbaldie/gascity/internal/runtime/runtimetest"
 )
 
 // TestK8sSessionConformance runs the session conformance suite against a

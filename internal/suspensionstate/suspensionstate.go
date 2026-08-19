@@ -48,8 +48,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/citylayout"
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/citylayout"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
 
 // Override holds one scope's runtime overrides. New fields can be

@@ -204,7 +204,7 @@ run_packages_shard() {
   local line
   while IFS= read -r line; do
     packages+=("$line")
-  done < <(go list ./... | grep -v '^github.com/gastownhall/gascity/test/integration$')
+  done < <(go list ./... | grep -v '^github.com/jonbaldie/gascity/test/integration$')
   if [[ ${#packages[@]} -eq 0 ]]; then
     echo "no non-integration packages found" >&2
     exit 1
@@ -228,9 +228,9 @@ run_packages_core_shard() {
     packages+=("$line")
   done < <(
     go list ./... |
-      grep -v '^github.com/gastownhall/gascity/test/integration$' |
-      grep -v '^github.com/gastownhall/gascity/cmd/gc$' |
-      grep -v '^github.com/gastownhall/gascity/internal/runtime/tmux$'
+      grep -v '^github.com/jonbaldie/gascity/test/integration$' |
+      grep -v '^github.com/jonbaldie/gascity/cmd/gc$' |
+      grep -v '^github.com/jonbaldie/gascity/internal/runtime/tmux$'
   )
   if [[ ${#packages[@]} -eq 0 ]]; then
     echo "no core packages found" >&2

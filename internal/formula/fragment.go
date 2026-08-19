@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/gastownhall/gascity/internal/beadmeta"
+	"github.com/jonbaldie/gascity/internal/beadmeta"
 )
 
 // FragmentRecipe is a compiled rootless subgraph that can be instantiated into

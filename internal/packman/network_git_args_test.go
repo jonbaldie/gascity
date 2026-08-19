@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/gitcred"
+	"github.com/jonbaldie/gascity/internal/gitcred"
 )
 
 // TestBuildNetworkGitArgsByteIdenticalWhenNoInjection is the headline guarantee:

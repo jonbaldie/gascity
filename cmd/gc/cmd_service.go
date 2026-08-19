@@ -8,9 +8,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/api"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/workspacesvc"
+	"github.com/jonbaldie/gascity/internal/api"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/workspacesvc"
 	"github.com/spf13/cobra"
 )
 

@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/doctor"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/doctor"
 )
 
 func TestHoldLabelConventionsCheckCleanState(t *testing.T) {

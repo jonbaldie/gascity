@@ -1,7 +1,7 @@
 package api
 
 import (
-	"github.com/gastownhall/gascity/internal/api/genclient"
+	"github.com/jonbaldie/gascity/internal/api/genclient"
 )
 
 // maintenanceRunViewFromGen translates one genclient.MaintenanceRunBody

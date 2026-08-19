@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/supervisor"
+	"github.com/jonbaldie/gascity/internal/supervisor"
 )
 
 // unservableStorageCityTOML is a city whose [storage.classes] describe a partial

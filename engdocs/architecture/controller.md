@@ -368,9 +368,9 @@ testing philosophy and tier boundaries.
   crash loop quarantine, idle tracking, and order dispatch details
 - [Architecture glossary](glossary.md) -- authoritative definitions
   of controller, pool, provider, rig, and other terms used in this doc
-- [Config struct definitions](https://github.com/gastownhall/gascity/blob/main/internal/config/config.go) --
+- [Config struct definitions](https://github.com/jonbaldie/gascity/blob/main/internal/config/config.go) --
   `DaemonConfig`, `City`, `Agent`, `PoolConfig` struct fields and defaults
-- [Runtime Provider interface](https://github.com/gastownhall/gascity/blob/main/internal/runtime/runtime.go) --
+- [Runtime Provider interface](https://github.com/jonbaldie/gascity/blob/main/internal/runtime/runtime.go) --
   the provider interface that the controller uses for all session operations
 - [Orders architecture](orders.md) -- trigger types, dispatch
   model, and order configuration

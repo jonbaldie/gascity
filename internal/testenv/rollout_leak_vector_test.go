@@ -3,8 +3,8 @@ package testenv_test
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/rollout"
-	"github.com/gastownhall/gascity/internal/testenv"
+	"github.com/jonbaldie/gascity/internal/rollout"
+	"github.com/jonbaldie/gascity/internal/testenv"
 )
 
 // TestRolloutEnvOverridesAreLeakVectors: every rollout gate's env override must

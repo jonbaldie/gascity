@@ -16,22 +16,22 @@ func TestRunAggregatesHistoricalSchemaV1Timings(t *testing.T) {
 
 	root := t.TempDir()
 	first := timingArtifact("101", defaultRunner("runner-a"), []timingUnit{
-		{UnitID: "cmd/gc:TestAlpha", Kind: "test", Package: "github.com/gastownhall/gascity/cmd/gc", Test: "TestAlpha", Outcome: "pass", DurationSeconds: 1},
-		{UnitID: "cmd/gc:TestBeta", Kind: "test", Package: "github.com/gastownhall/gascity/cmd/gc", Test: "TestBeta", Outcome: "pass", DurationSeconds: 4},
-		{UnitID: "cmd/gc:TestAlpha/slow", Kind: "test", Package: "github.com/gastownhall/gascity/cmd/gc", Test: "TestAlpha", Subtest: "slow", Outcome: "pass", DurationSeconds: 999},
-		{UnitID: "cmd/gc", Kind: "package", Package: "github.com/gastownhall/gascity/cmd/gc", Outcome: "pass", DurationSeconds: 1000},
+		{UnitID: "cmd/gc:TestAlpha", Kind: "test", Package: "github.com/jonbaldie/gascity/cmd/gc", Test: "TestAlpha", Outcome: "pass", DurationSeconds: 1},
+		{UnitID: "cmd/gc:TestBeta", Kind: "test", Package: "github.com/jonbaldie/gascity/cmd/gc", Test: "TestBeta", Outcome: "pass", DurationSeconds: 4},
+		{UnitID: "cmd/gc:TestAlpha/slow", Kind: "test", Package: "github.com/jonbaldie/gascity/cmd/gc", Test: "TestAlpha", Subtest: "slow", Outcome: "pass", DurationSeconds: 999},
+		{UnitID: "cmd/gc", Kind: "package", Package: "github.com/jonbaldie/gascity/cmd/gc", Outcome: "pass", DurationSeconds: 1000},
 	})
 	writeArtifact(t, root, "first/timing.json", first)
 	writeArtifact(t, root, "duplicate/timing.json", first)
 	writeArtifact(t, root, "second.json", timingArtifact("102", defaultRunner("runner-b"), []timingUnit{
-		{UnitID: "cmd/gc:TestAlpha", Kind: "test", Package: "github.com/gastownhall/gascity/cmd/gc", Test: "TestAlpha", Outcome: "pass", DurationSeconds: 2},
-		{UnitID: "cmd/gc:TestBeta", Kind: "test", Package: "github.com/gastownhall/gascity/cmd/gc", Test: "TestBeta", Outcome: "fail", DurationSeconds: 5},
-		{UnitID: "cmd/gc:TestOnlyFails", Kind: "test", Package: "github.com/gastownhall/gascity/cmd/gc", Test: "TestOnlyFails", Outcome: "fail", DurationSeconds: 6},
+		{UnitID: "cmd/gc:TestAlpha", Kind: "test", Package: "github.com/jonbaldie/gascity/cmd/gc", Test: "TestAlpha", Outcome: "pass", DurationSeconds: 2},
+		{UnitID: "cmd/gc:TestBeta", Kind: "test", Package: "github.com/jonbaldie/gascity/cmd/gc", Test: "TestBeta", Outcome: "fail", DurationSeconds: 5},
+		{UnitID: "cmd/gc:TestOnlyFails", Kind: "test", Package: "github.com/jonbaldie/gascity/cmd/gc", Test: "TestOnlyFails", Outcome: "fail", DurationSeconds: 6},
 	}))
 	writeArtifact(t, root, "third.json", timingArtifact("103", defaultRunner("runner-c"), []timingUnit{
-		{UnitID: "cmd/gc:TestAlpha", Kind: "test", Package: "github.com/gastownhall/gascity/cmd/gc", Test: "TestAlpha", Outcome: "pass", DurationSeconds: 100},
-		{UnitID: "cmd/gc:TestBeta", Kind: "test", Package: "github.com/gastownhall/gascity/cmd/gc", Test: "TestBeta", Outcome: "skip", DurationSeconds: 0},
-		{UnitID: "cmd/gc:TestOnlyFails", Kind: "test", Package: "github.com/gastownhall/gascity/cmd/gc", Test: "TestOnlyFails", Outcome: "skip", DurationSeconds: 0},
+		{UnitID: "cmd/gc:TestAlpha", Kind: "test", Package: "github.com/jonbaldie/gascity/cmd/gc", Test: "TestAlpha", Outcome: "pass", DurationSeconds: 100},
+		{UnitID: "cmd/gc:TestBeta", Kind: "test", Package: "github.com/jonbaldie/gascity/cmd/gc", Test: "TestBeta", Outcome: "skip", DurationSeconds: 0},
+		{UnitID: "cmd/gc:TestOnlyFails", Kind: "test", Package: "github.com/jonbaldie/gascity/cmd/gc", Test: "TestOnlyFails", Outcome: "skip", DurationSeconds: 0},
 	}))
 
 	stdout, stderr, exitCode := runSummary(root)
@@ -67,7 +67,7 @@ func TestRunCapsAndOrdersBothTablesDeterministically(t *testing.T) {
 			units = append(units, timingUnit{
 				UnitID:          "internal/example:" + name,
 				Kind:            "test",
-				Package:         "github.com/gastownhall/gascity/internal/example",
+				Package:         "github.com/jonbaldie/gascity/internal/example",
 				Test:            name,
 				Outcome:         "pass",
 				DurationSeconds: float64(n) * multiplier,
@@ -109,7 +109,7 @@ func TestRunSeparatesIncomparableRunnerProfiles(t *testing.T) {
 		{runner: timingRunner{Label: "blacksmith-64vcpu", Name: "ephemeral-c", OS: "Linux", Arch: "X64", CPUCount: 64}, duration: 10},
 	} {
 		writeArtifact(t, root, fmt.Sprintf("profile-%d.json", index), timingArtifact(fmt.Sprint(300+index), tc.runner, []timingUnit{{
-			UnitID: "internal/example:TestProfile", Kind: "test", Package: "github.com/gastownhall/gascity/internal/example", Test: "TestProfile", Outcome: "pass", DurationSeconds: tc.duration,
+			UnitID: "internal/example:TestProfile", Kind: "test", Package: "github.com/jonbaldie/gascity/internal/example", Test: "TestProfile", Outcome: "pass", DurationSeconds: tc.duration,
 		}}))
 	}
 
@@ -138,8 +138,8 @@ func TestRunBreaksMetricTiesByUnitID(t *testing.T) {
 	root := t.TempDir()
 	for run, duration := range []float64{1, 3} {
 		writeArtifact(t, root, fmt.Sprintf("tie-%d.json", run), timingArtifact(fmt.Sprint(350+run), defaultRunner(fmt.Sprintf("runner-%d", run)), []timingUnit{
-			{UnitID: "internal/example:TestZulu", Kind: "test", Package: "github.com/gastownhall/gascity/internal/example", Test: "TestZulu", Outcome: "pass", DurationSeconds: duration},
-			{UnitID: "internal/example:TestAlpha", Kind: "test", Package: "github.com/gastownhall/gascity/internal/example", Test: "TestAlpha", Outcome: "pass", DurationSeconds: duration},
+			{UnitID: "internal/example:TestZulu", Kind: "test", Package: "github.com/jonbaldie/gascity/internal/example", Test: "TestZulu", Outcome: "pass", DurationSeconds: duration},
+			{UnitID: "internal/example:TestAlpha", Kind: "test", Package: "github.com/jonbaldie/gascity/internal/example", Test: "TestAlpha", Outcome: "pass", DurationSeconds: duration},
 		}))
 	}
 
@@ -165,7 +165,7 @@ func TestRunHandlesLargeFiniteVarianceInputsHonestly(t *testing.T) {
 		root := t.TempDir()
 		for run := range 2 {
 			writeArtifact(t, root, fmt.Sprintf("large-%d.json", run), timingArtifact(fmt.Sprint(370+run), defaultRunner(fmt.Sprintf("runner-%d", run)), []timingUnit{{
-				UnitID: "internal/example:TestLarge", Kind: "test", Package: "github.com/gastownhall/gascity/internal/example", Test: "TestLarge", Outcome: "pass", DurationSeconds: 1e308,
+				UnitID: "internal/example:TestLarge", Kind: "test", Package: "github.com/jonbaldie/gascity/internal/example", Test: "TestLarge", Outcome: "pass", DurationSeconds: 1e308,
 			}}))
 		}
 
@@ -183,7 +183,7 @@ func TestRunHandlesLargeFiniteVarianceInputsHonestly(t *testing.T) {
 		root := t.TempDir()
 		for run, duration := range []float64{0, 1e308} {
 			writeArtifact(t, root, fmt.Sprintf("spread-%d.json", run), timingArtifact(fmt.Sprint(380+run), defaultRunner(fmt.Sprintf("runner-%d", run)), []timingUnit{{
-				UnitID: "internal/example:TestSpread", Kind: "test", Package: "github.com/gastownhall/gascity/internal/example", Test: "TestSpread", Outcome: "pass", DurationSeconds: duration,
+				UnitID: "internal/example:TestSpread", Kind: "test", Package: "github.com/jonbaldie/gascity/internal/example", Test: "TestSpread", Outcome: "pass", DurationSeconds: duration,
 			}}))
 		}
 
@@ -199,7 +199,7 @@ func TestRunHandlesLargeFiniteVarianceInputsHonestly(t *testing.T) {
 		samples := []float64{0, 0, 0, 0, 0, 1e154, 1e154, 1e154, 1e154, 1e154}
 		for run, duration := range samples {
 			writeArtifact(t, root, fmt.Sprintf("normalized-%d.json", run), timingArtifact(fmt.Sprint(385+run), defaultRunner(fmt.Sprintf("runner-%d", run)), []timingUnit{{
-				UnitID: "internal/example:TestRepresentable", Kind: "test", Package: "github.com/gastownhall/gascity/internal/example", Test: "TestRepresentable", Outcome: "pass", DurationSeconds: duration,
+				UnitID: "internal/example:TestRepresentable", Kind: "test", Package: "github.com/jonbaldie/gascity/internal/example", Test: "TestRepresentable", Outcome: "pass", DurationSeconds: duration,
 			}}))
 		}
 
@@ -236,7 +236,7 @@ func TestRunRendersUntrustedProfileMetadataAsCode(t *testing.T) {
 
 	root := t.TempDir()
 	item := timingArtifact("390", defaultRunner("ephemeral"), []timingUnit{{
-		UnitID: "internal/example:TestSafe", Kind: "test", Package: "github.com/gastownhall/gascity/internal/example", Test: "TestSafe", Outcome: "pass", DurationSeconds: 1,
+		UnitID: "internal/example:TestSafe", Kind: "test", Package: "github.com/jonbaldie/gascity/internal/example", Test: "TestSafe", Outcome: "pass", DurationSeconds: 1,
 	}})
 	item.Job = "![tracker](https://example.invalid/pixel)"
 	item.Variant = "**injected**"
@@ -264,7 +264,7 @@ func TestRunRejectsMalformedUnsupportedAndConflictingArtifacts(t *testing.T) {
 	t.Parallel()
 
 	valid := timingArtifact("401", defaultRunner("runner-a"), []timingUnit{{
-		UnitID: "internal/example:TestValid", Kind: "test", Package: "github.com/gastownhall/gascity/internal/example", Test: "TestValid", Outcome: "pass", DurationSeconds: 1,
+		UnitID: "internal/example:TestValid", Kind: "test", Package: "github.com/jonbaldie/gascity/internal/example", Test: "TestValid", Outcome: "pass", DurationSeconds: 1,
 	}})
 	for _, tc := range []struct {
 		name       string
@@ -473,7 +473,7 @@ func TestRunUpdatesHistoryFromEnvelopeFile(t *testing.T) {
 	envelope := historyRunEnvelope("50", "sha-50", "2026-07-15T13:00:00Z")
 	writeArtifact(t, root, "timing.json", historyArtifact(envelope, "shard-a", []timingUnit{{
 		UnitID: "internal/example:TestCLI", Kind: "test",
-		Package: "github.com/gastownhall/gascity/internal/example", Test: "TestCLI",
+		Package: "github.com/jonbaldie/gascity/internal/example", Test: "TestCLI",
 		Outcome: "pass", DurationSeconds: 1.25,
 	}}))
 	if err := os.WriteFile(envelopePath, mustJSON(t, envelope), 0o600); err != nil {

@@ -12,8 +12,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/clientcontext"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/clientcontext"
 	"github.com/google/uuid"
 )
 
@@ -34,7 +34,7 @@ func TestCapstoneIntegrationRealMinter(t *testing.T) {
 
 	// Build the real minter. The test cwd is cmd/gc, so build by import path.
 	bin := filepath.Join(t.TempDir(), "gc-write-mint")
-	if out, err := exec.Command("go", "build", "-o", bin, "github.com/gastownhall/gascity/cmd/gc-write-mint").CombinedOutput(); err != nil {
+	if out, err := exec.Command("go", "build", "-o", bin, "github.com/jonbaldie/gascity/cmd/gc-write-mint").CombinedOutput(); err != nil {
 		t.Fatalf("build gc-write-mint: %v\n%s", err, out)
 	}
 

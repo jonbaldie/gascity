@@ -12,7 +12,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
 
 // CityEndpointKeyEdit is one scalar-key edit in city.toml, scoped to the keys

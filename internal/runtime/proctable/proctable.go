@@ -1,6 +1,6 @@
 package proctable
 
-import "github.com/gastownhall/gascity/internal/runtime"
+import "github.com/jonbaldie/gascity/internal/runtime"
 
 // ScanAll returns all live agent root processes with a non-empty
 // GC_SESSION_ID.

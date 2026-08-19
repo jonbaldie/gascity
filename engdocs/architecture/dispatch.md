@@ -400,7 +400,7 @@ reviewer-created mutations.
 ## Testing
 
 Dispatch testing follows the philosophy in
-[TESTING.md](https://github.com/gastownhall/gascity/blob/main/TESTING.md), relying heavily on injected fakes:
+[TESTING.md](https://github.com/jonbaldie/gascity/blob/main/TESTING.md), relying heavily on injected fakes:
 
 **Unit tests** (`cmd/gc/cmd_sling_test.go`): All dispatch logic is tested
 through `doSling` and `doSlingBatch` with injected `fakeRunner` (records
@@ -467,10 +467,10 @@ both `sling_query` and `work_query` together or neither.
   model that keeps pool agents alive to receive dispatched work
 - [Config architecture](config.md) -- how agent configuration
   (sling_query, pool, suspended) drives dispatch behavior
-- [CLAUDE.md](https://github.com/gastownhall/gascity/blob/main/CLAUDE.md) -- design principles including "the
+- [CLAUDE.md](https://github.com/jonbaldie/gascity/blob/main/CLAUDE.md) -- design principles including "the
   controller drives all SDK infrastructure operations" (layering
   invariant 6)
 - [Formula spec (v2)](../../docs/reference/specs/formula-spec-v2.md) -- formula structure,
   layer resolution, and wisp instantiation inputs
-- [TESTING.md](https://github.com/gastownhall/gascity/blob/main/TESTING.md) -- testing philosophy and tier
+- [TESTING.md](https://github.com/jonbaldie/gascity/blob/main/TESTING.md) -- testing philosophy and tier
   boundaries for the fake-injection approach used in dispatch tests

@@ -2,7 +2,7 @@
 // lightweight metadata extraction (model, context usage).
 package sessionlog
 
-import "github.com/gastownhall/gascity/internal/modelwindow"
+import "github.com/jonbaldie/gascity/internal/modelwindow"
 
 // ModelContextWindow returns the context-window size for a model ID; it
 // delegates to modelwindow.Window.

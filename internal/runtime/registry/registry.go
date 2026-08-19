@@ -17,8 +17,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
 // ErrUnknownRuntime reports a selection name with no registered factory,
