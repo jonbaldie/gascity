@@ -48,14 +48,16 @@ func BuildProviderLaunchCommand(cityPath string, resolved *ResolvedProvider, opt
 	return appendProviderSettings(cityPath, providerSettingsFamily(resolved), command), nil
 }
 
-// BuildProviderResumeCommand applies schema-managed option overrides to a
-// provider's explicit resume_command template.
+// BuildProviderResumeCommand applies schema-managed defaults plus any
+// explicit option overrides to a provider's resume_command template.
+// Provider EffectiveDefaults count, matching BuildProviderLaunchCommand,
+// so a defaults-only resume does not drop permission or effort flags.
 func BuildProviderResumeCommand(resolved *ResolvedProvider, optionOverrides map[string]string) (string, error) {
 	if resolved == nil {
 		return "", fmt.Errorf("resolved provider is nil")
 	}
 	command := strings.TrimSpace(resolved.ResumeCommand)
-	if command == "" || len(resolved.OptionsSchema) == 0 || !hasSchemaOptionOverrides(optionOverrides) {
+	if command == "" || len(resolved.OptionsSchema) == 0 || !hasProviderOptionValues(resolved, optionOverrides) {
 		return command, nil
 	}
 	mergedArgs, err := providerOptionArgs(resolved, optionOverrides)
