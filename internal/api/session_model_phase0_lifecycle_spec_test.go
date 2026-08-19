@@ -525,6 +525,34 @@ func TestPhase0AgentCompatibility_CreateWritesEphemeralOrigin(t *testing.T) {
 	}
 }
 
+// City-scoped Huma agent create must stamp ephemeral like the legacy
+// projection so demand/adhoc pool seats pass the routed-pool origin gate.
+func TestPhase0AgentCompatibility_CityScopedCreateWritesEphemeralOrigin(t *testing.T) {
+	fs := newSessionFakeState(t)
+	srv := New(fs)
+	h := newTestCityHandlerWith(t, fs, srv)
+
+	req := newPostRequest(cityURL(fs, "/sessions"), strings.NewReader(`{"kind":"agent","name":"myrig/worker"}`))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("status = %d, want %d; body: %s", rec.Code, http.StatusAccepted, rec.Body.String())
+	}
+
+	var resp sessionResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	bead, err := fs.cityBeadStore.Get(resp.ID)
+	if err != nil {
+		t.Fatalf("Get(%s): %v", resp.ID, err)
+	}
+	if got := bead.Metadata["session_origin"]; got != "ephemeral" {
+		t.Fatalf("session_origin = %q, want ephemeral", got)
+	}
+}
+
 func TestPhase0NamedCompatibility_MaterializeWritesNamedOrigin(t *testing.T) {
 	fs := newSessionFakeState(t)
 	srv := New(fs)
