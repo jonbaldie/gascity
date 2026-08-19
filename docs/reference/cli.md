@@ -88,6 +88,7 @@ gc [flags]
 | [gc version](#gc-version) | Print gc version |
 | [gc wait](#gc-wait) | Inspect and manage durable session waits |
 | [gc whoami](#gc-whoami) | Show the authenticated hosted Gas City account |
+| [gc worktree](#gc-worktree) | Manage cross-rig worktrees (crew pattern) |
 
 ## gc agent
 
@@ -4729,6 +4730,10 @@ whether or not --wait is set, gc then verifies a previously-running
 supervisor actually exited (failing with its PID when the unit does
 not manage it), and stop with nothing running still exits 1.
 
+On macOS, stop disables and boots out the LaunchAgent, then verifies
+launchd no longer has the job loaded. If that postcondition cannot be
+proved, the command exits non-zero instead of reporting success.
+
 ```
 gc supervisor stop [flags]
 ```
@@ -5002,3 +5007,55 @@ gc whoami [flags]
 |------|------|---------|-------------|
 | `--at` | string |  | service base URL; defaults to GC_SERVICE_URL, the stored default, then https://gascity.com |
 | `--token` | string |  | API token to check; defaults to GC_SERVICE_TOKEN or the stored login |
+
+## gc worktree
+
+Manage git worktrees for working in other rigs.
+
+```
+gc worktree
+```
+
+| Subcommand | Description |
+|------------|-------------|
+| [gc worktree add](#gc-worktree-add) | Add a cross-rig worktree |
+| [gc worktree list](#gc-worktree-list) | List cross-rig worktrees |
+| [gc worktree remove](#gc-worktree-remove) | Remove a cross-rig worktree |
+
+## gc worktree add
+
+Add a cross-rig worktree
+
+```
+gc worktree add <target-rig> [flags]
+```
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--agent` | string |  | Agent name (defaults to GC_AGENT or GC_ALIAS) |
+| `--source-rig` | string |  | Source rig name (defaults to GC_RIG) |
+
+## gc worktree list
+
+List cross-rig worktrees
+
+```
+gc worktree list [flags]
+```
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--target-rig` | string |  | Filter by target rig |
+
+## gc worktree remove
+
+Remove a cross-rig worktree
+
+```
+gc worktree remove <target-rig> [flags]
+```
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--agent` | string |  | Agent name (defaults to GC_AGENT or GC_ALIAS) |
+| `--source-rig` | string |  | Source rig name (defaults to GC_RIG) |

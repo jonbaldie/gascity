@@ -106,7 +106,11 @@ When GC_SUPERVISOR_SYSTEMD_UNIT is set, stop is delegated to
 The systemctl invocation is synchronous and bounded by --wait-timeout
 whether or not --wait is set, gc then verifies a previously-running
 supervisor actually exited (failing with its PID when the unit does
-not manage it), and stop with nothing running still exits 1.`,
+not manage it), and stop with nothing running still exits 1.
+
+On macOS, stop disables and boots out the LaunchAgent, then verifies
+launchd no longer has the job loaded. If that postcondition cannot be
+proved, the command exits non-zero instead of reporting success.`,
 		Args: cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			if stopSupervisorWithWaitJSON(stdout, stderr, wait, waitTimeout, jsonOut) != 0 {
@@ -786,9 +790,11 @@ func stopSupervisor(stdout, stderr io.Writer) int {
 // it stops answering. This is the shape tests and shell scripts want: on
 // return, the supervisor has fully shut down and any failure is visible.
 //
-// It also unloads the platform service (without removing the unit file) after
-// the supervisor acknowledges the destructive socket stop, so launchd/systemd
-// will not restart it when the process exits.
+// It also tears down the platform service (without removing the unit file)
+// after the supervisor acknowledges the destructive socket stop, so
+// launchd/systemd will not restart it when the process exits. If that
+// teardown cannot prove the job will stay down, the command fails closed
+// instead of reporting success.
 //
 // When GC_SUPERVISOR_SYSTEMD_UNIT is set, the stop is redirected to the
 // delegated unit instead of the socket protocol. Callers that must stop
@@ -841,8 +847,12 @@ func stopSupervisorViaSocketJSON(stdout, stderr io.Writer, wait bool, waitTimeou
 	if !jsonOut {
 		fmt.Fprintln(stdout, "Supervisor stopping...") //nolint:errcheck
 	}
-	unloadSupervisorService()
+	serviceErr := unloadSupervisorService()
 	if !wait {
+		if serviceErr != nil {
+			fmt.Fprintf(stderr, "gc supervisor stop: platform service did not stop durably: %v\n", serviceErr) //nolint:errcheck
+			return 1
+		}
 		if jsonOut {
 			return writeSupervisorStopSuccess(stdout, stderr, wait)
 		}
@@ -867,6 +877,10 @@ func stopSupervisorViaSocketJSON(stdout, stderr io.Writer, wait bool, waitTimeou
 			// budget — the server already told us shutdown finished.
 			if err := waitForSupervisorExitUntil(sockPath, time.Now().Add(5*time.Second)); err != nil {
 				fmt.Fprintf(stderr, "gc supervisor stop: %v\n", err) //nolint:errcheck
+				return 1
+			}
+			if serviceErr != nil {
+				fmt.Fprintf(stderr, "gc supervisor stop: platform service did not stop durably: %v\n", serviceErr) //nolint:errcheck
 				return 1
 			}
 			if jsonOut {
@@ -897,6 +911,10 @@ func stopSupervisorViaSocketJSON(stdout, stderr io.Writer, wait bool, waitTimeou
 
 	if err := waitForSupervisorExitUntil(sockPath, deadline); err != nil {
 		fmt.Fprintf(stderr, "gc supervisor stop: %v\n", err) //nolint:errcheck
+		return 1
+	}
+	if serviceErr != nil {
+		fmt.Fprintf(stderr, "gc supervisor stop: platform service did not stop durably: %v\n", serviceErr) //nolint:errcheck
 		return 1
 	}
 	if jsonOut {
