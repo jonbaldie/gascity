@@ -370,6 +370,31 @@ func newEventsProvider(t *testing.T, evts []events.Event) events.Provider {
 	return rec
 }
 
+func TestCheckTriggerEventCommaSeparatedTypes(t *testing.T) {
+	ep := newEventsProvider(t, []events.Event{
+		{Type: "bead.created"},
+		{Type: "bead.updated"},
+		{Type: "bead.closed"},
+	})
+	a := Order{Name: "nudge-on-route", Trigger: "event", On: "bead.updated,bead.created"}
+	result := CheckTrigger(a, time.Time{}, neverRan, ep, nil)
+	if !result.Due {
+		t.Fatalf("Due = false, want true for created-already-routed + updated; reason: %s", result.Reason)
+	}
+	if result.Reason != "event: 2 matching event(s)" {
+		t.Errorf("Reason = %q, want %q", result.Reason, "event: 2 matching event(s)")
+	}
+
+	updatedOnly := Order{Name: "nudge-on-route", Trigger: "event", On: "bead.updated"}
+	updated := CheckTrigger(updatedOnly, time.Time{}, neverRan, ep, nil)
+	if !updated.Due {
+		t.Fatalf("bead.updated-only Due = false, want true")
+	}
+	if updated.Reason != "event: 1 bead.updated event(s)" {
+		t.Errorf("bead.updated-only Reason = %q, want the creation-stamped event excluded", updated.Reason)
+	}
+}
+
 func TestCheckTriggerEventDue(t *testing.T) {
 	ep := newEventsProvider(t, []events.Event{
 		{Type: "bead.closed"},

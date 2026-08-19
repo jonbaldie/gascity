@@ -228,6 +228,9 @@ type preparedStart struct {
 	// re-derivation from the template (S19 re-eligibility).
 	promptDelivered bool
 	promptHash      string
+	// cityPath is the city root used to enqueue a first-work prompt after a
+	// successful spawn. Empty in hand-built test fixtures, which skip kickoff.
+	cityPath string
 }
 
 type startResult struct {
@@ -1185,6 +1188,7 @@ func buildPreparedStartWithWorkDirResolver(
 		launchHash:      launchHash,
 		promptDelivered: promptDelivered,
 		promptHash:      promptHash,
+		cityPath:        cityPath,
 	}, candidate.info, nil
 }
 
@@ -2187,6 +2191,7 @@ func commitStartResultTraced(
 		SessionID: info.ID,
 	})
 	telemetry.RecordAgentStart(context.Background(), name, tp.DisplayName(), nil)
+	enqueueSpawnKickoffNudge(result.prepared.cityPath, sessionFrontBeads(sessFront), result, clk.Now(), stderr)
 	if trace != nil {
 		trace.RecordMutation(TraceSiteMutationBeadMetadata, TraceReasonUnknown, TraceOutcomeSuccess, "metadata_batch", info.ID, "started_config_hash", traceRecordPayload{
 			"wave":     wave,

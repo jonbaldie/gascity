@@ -9,10 +9,12 @@
 # currently in an active turn cycle.
 #
 # This order is exactly that workaround, shipped. It subscribes to
-# bead.updated events; whenever a bead carries a gc.routed_to target it
-# runs `gc session nudge <target> "<message>"`. Idempotent: a given
-# (bead, routed_to) pair is nudged at most once. Dedup state lives in
-# $GC_PACK_STATE_DIR/nudge-on-route-state.json, so it is both city- and
+# bead.updated AND bead.created events; whenever a bead carries a
+# gc.routed_to target it runs `gc session nudge <target> "<message>"`.
+# Formula steps stamp gc.routed_to in the creation payload, so a
+# bead.updated-only read structurally misses them (#4382). Idempotent: a
+# given (bead, routed_to) pair is nudged at most once. Dedup state lives
+# in $GC_PACK_STATE_DIR/nudge-on-route-state.json, so it is both city- and
 # pack-scoped — multi-city installs never cross-pollinate.
 #
 # Runs as an exec order (no LLM, no agent, no wisp).
@@ -80,9 +82,14 @@ MEMBERS
     gc session nudge "$_target" "$NUDGE_MESSAGE" >/dev/null 2>&1
 }
 
-# Pull recent bead.updated events. Best-effort: a read failure (API down)
+# Pull recent bead.updated AND bead.created events. Formula steps stamp
+# gc.routed_to in the creation payload, so a bead.updated-only read
+# structurally misses them (#4382). Best-effort: a read failure (API down)
 # must not crash the controller's order loop.
-EVENTS="$(gc events --type bead.updated --since "$LOOKBACK" 2>/dev/null)" || exit 0
+EVENTS="$( {
+    gc events --type bead.updated --since "$LOOKBACK" 2>/dev/null || true
+    gc events --type bead.created --since "$LOOKBACK" 2>/dev/null || true
+} )"
 [ -n "$EVENTS" ] || exit 0
 
 # Reduce to unique "<bead_id>\t<routed_to>" pairs. Only events that actually
