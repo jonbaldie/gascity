@@ -13,7 +13,6 @@ func TestImplicitRigPoolAgentsResolveDistinctWorkDirs(t *testing.T) {
 	cityPath := t.TempDir()
 	rigRoot := filepath.Join(cityPath, "repos", "demo")
 	cfg := &config.City{
-		Daemon:    config.DaemonConfig{FormulaV2: true},
 		Providers: map[string]config.ProviderSpec{"claude": {}},
 		Rigs:      []config.Rig{{Name: "demo", Path: rigRoot}},
 	}
