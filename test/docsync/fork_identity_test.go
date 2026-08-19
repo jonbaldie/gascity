@@ -8,11 +8,13 @@ import (
 )
 
 const (
-	forkModule     = "github.com/jonbaldie/gascity"
-	forkGoInstall  = "go install github.com/jonbaldie/gascity/cmd/gc@latest"
-	forkCloneURL   = "https://github.com/jonbaldie/gascity.git"
-	upstreamOrg    = "gastownhall"
-	upstreamModule = "github.com/" + upstreamOrg + "/gascity"
+	forkModule       = "github.com/jonbaldie/gascity"
+	forkGoInstall    = "go install github.com/jonbaldie/gascity/cmd/gc@latest"
+	forkCloneURL     = "https://github.com/jonbaldie/gascity.git"
+	forkBeadsRepo    = "jonbaldie/beads"
+	forkBeadsInstall = "go install github.com/jonbaldie/beads/cmd/bd@latest"
+	upstreamOrg      = "gastownhall"
+	upstreamModule   = "github.com/" + upstreamOrg + "/gascity"
 )
 
 func TestForkModulePath(t *testing.T) {
@@ -66,6 +68,44 @@ func TestCodingStandardsUseForkModulePath(t *testing.T) {
 	}
 	if !strings.Contains(body, "Keep the module path `"+forkModule+"`") {
 		t.Fatalf("CODING_STANDARDS.md does not tell contributors to keep %s", forkModule)
+	}
+}
+
+func TestForkBeadsInstallIdentity(t *testing.T) {
+	env := mustReadRepoFile(t, "deps.env")
+	if !strings.Contains(env, "BD_REPO="+forkBeadsRepo) {
+		t.Fatalf("deps.env BD_REPO is not %s", forkBeadsRepo)
+	}
+	if strings.Contains(env, "BD_REPO=gastownhall/beads") || strings.Contains(env, "BD_REPO=steveyegge/beads") {
+		t.Fatal("deps.env still pins an upstream beads repo")
+	}
+
+	files := []string{
+		"README.md",
+		"docs/getting-started/installation.md",
+		"docs/getting-started/troubleshooting.md",
+	}
+	for _, rel := range files {
+		body := mustReadRepoFile(t, rel)
+		if !strings.Contains(body, forkBeadsInstall) {
+			t.Errorf("%s does not recommend %q as the bd install path", rel, forkBeadsInstall)
+		}
+		if strings.Contains(body, "github.com/gastownhall/beads/releases") ||
+			strings.Contains(body, "github.com/steveyegge/beads/releases") {
+			t.Errorf("%s still recommends upstream beads GitHub releases as the way to get bd", rel)
+		}
+		if strings.Contains(body, "brew install beads") {
+			t.Errorf("%s still recommends `brew install beads` as a way to get this fork's bd", rel)
+		}
+	}
+
+	installScript := mustReadRepoFile(t, ".github/scripts/install-bd-archive.sh")
+	if strings.Contains(installScript, "github.com/gastownhall/beads/releases") ||
+		strings.Contains(installScript, "github.com/steveyegge/beads/releases") {
+		t.Fatal("install-bd-archive.sh still downloads bd from an upstream beads release URL")
+	}
+	if !strings.Contains(installScript, forkBeadsRepo) && !strings.Contains(installScript, "github.com/jonbaldie/beads") {
+		t.Fatal("install-bd-archive.sh does not install bd from jonbaldie/beads")
 	}
 }
 

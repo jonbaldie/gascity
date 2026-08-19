@@ -974,6 +974,51 @@ func initBareProviderPackRepo(t *testing.T, name, provider string) string {
 	return bareDir
 }
 
+func TestCheckHardDependenciesBdInstallHintUsesForkGoInstall(t *testing.T) {
+	t.Setenv("GC_BEADS", "bd")
+
+	oldLookPath := initLookPath
+	initLookPath = func(name string) (string, error) {
+		if name == "bd" {
+			return "", os.ErrNotExist
+		}
+		return "/usr/bin/" + name, nil
+	}
+	t.Cleanup(func() { initLookPath = oldLookPath })
+
+	oldRunVersion := initRunVersion
+	initRunVersion = func(binary string) (string, error) {
+		switch binary {
+		case "dolt":
+			return "dolt version " + doltMinVersion, nil
+		case "flock", "tmux", "jq", "git", "pgrep", "lsof":
+			return binary + " version", nil
+		default:
+			return binary + " version", nil
+		}
+	}
+	t.Cleanup(func() { initRunVersion = oldRunVersion })
+
+	missing := checkHardDependencies(t.TempDir())
+	var bd *missingDep
+	for i := range missing {
+		if missing[i].name == "bd" {
+			bd = &missing[i]
+			break
+		}
+	}
+	if bd == nil {
+		t.Fatalf("missing deps = %#v, want bd among them", missing)
+	}
+	want := "go install github.com/jonbaldie/beads/cmd/bd@latest"
+	if bd.installHint != want {
+		t.Fatalf("bd install hint = %q, want %q", bd.installHint, want)
+	}
+	if strings.Contains(bd.installHint, "gastownhall/beads") || strings.Contains(bd.installHint, "steveyegge/beads") {
+		t.Fatalf("bd install hint still points at upstream: %q", bd.installHint)
+	}
+}
+
 func TestCheckHardDependenciesTreatsExecGcBeadsBdAsBdContract(t *testing.T) {
 	t.Setenv("GC_BEADS", "exec:/tmp/gc-beads-bd")
 

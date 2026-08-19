@@ -5,7 +5,10 @@ usage() {
   cat >&2 <<'USAGE'
 Usage: install-bd-archive.sh VERSION [--cache]
 
-Downloads a bd release tarball, verifies its pinned SHA-256, and installs bd.
+Builds bd from jonbaldie/beads at VERSION (a git tag or commit) and installs it.
+This fork publishes no GitHub release assets, so the install path is source
+build / go install rather than an upstream release tarball.
+
 Use --cache on self-hosted runners to install under RUNNER_TOOL_CACHE/HOME
 and add that bin directory to GITHUB_PATH.
 USAGE
@@ -53,67 +56,8 @@ case "$(uname -m)" in
     ;;
 esac
 
-version_no_v="${version#v}"
 platform_tuple="${os}_${arch}"
-expected_sha=""
-case "${version}:${platform_tuple}" in
-  v1.1.0:linux_amd64) expected_sha="b0f3dd607c3fb989ee08d0a6854fba80d0402971eb108f9af6170bc14d491a34" ;;
-  v1.1.0:linux_arm64) expected_sha="e64eb6f5f998c9eae3ef9ec786f5f1c907ab3ed04fe220ebf265ca9952e21b2f" ;;
-  v1.1.0:darwin_amd64) expected_sha="5d7d30fdadcf012b7e0c1933a62cdfaef106e2561509b904e50a6733621cf8da" ;;
-  v1.1.0:darwin_arm64) expected_sha="c42e24d83b258f7ba9f52a6d2d5f6b055869dfe7807165055988b12e7ea8c564" ;;
-  v1.0.5:linux_amd64) expected_sha="24706f65c7131c7b3261388709ae8781c8db53f0795398f67aa40538750aacf3" ;;
-  v1.0.5:linux_arm64) expected_sha="ccae5eb4478876ae224687ba98baef46848e603470b241966b63ccd3e01129a4" ;;
-  v1.0.5:darwin_amd64) expected_sha="0b0b017a3f2b23a1a9b53056ff160de318ebbca6a991c3db5924f5f48390e490" ;;
-  v1.0.5:darwin_arm64) expected_sha="648a2d19d767e8700bee809d4667cb52be3443d877dadb8106be550396982f58" ;;
-  v1.0.4:linux_amd64) expected_sha="643e602e27f666c8726abff0f22001e2b5883988fa960204bde20a3129d448a5" ;;
-  v1.0.4:linux_arm64) expected_sha="48cdf571cd8b64bae81da829c1309e402bc12e6a4cc6b87606dfc9220b7ece60" ;;
-  v1.0.4:darwin_amd64) expected_sha="8a52f7e54fe038d369cc9ea0e65f76853b75f5469c70c9c693d64671623c4ce9" ;;
-  v1.0.4:darwin_arm64) expected_sha="0c53479fea070a1cabe8eb31e3824d74c5643b1deca71a5fe832ebd38e9ef877" ;;
-  v1.0.3:linux_amd64) expected_sha="1ef5dca818d7e81574df9e9f9fc2a16ab711da09b0fa7b822ae162d9a81c8912" ;;
-  v1.0.3:linux_arm64) expected_sha="243a9c75012e794888fcafb957e7624b8fefdfef033d14cd03ebc9831c3bc12f" ;;
-  v1.0.3:darwin_amd64) expected_sha="6bd75ac056288a5e8bbb203750e95af5a441d5ad1d20ca5511e60cd6c813e54b" ;;
-  v1.0.3:darwin_arm64) expected_sha="fe6e4465751f46d9f3a670c3cf656714a171e44c8bc318fe19054f513b8306ed" ;;
-  v1.0.0:linux_amd64) expected_sha="7057db1e92428fcf5c08d5dc6b07ead57e588b262cba78b9a26893d55bd29fdb" ;;
-  v1.0.0:linux_arm64) expected_sha="9bb30413041e50dac945a0f8aa64011e4b345ebfd0a3f9b5fccd646c6dca61a7" ;;
-  v1.0.0:darwin_amd64) expected_sha="9a3d5bca07c9ce809c205ef9a20f73de6503ab3714655239ce306d862ceeb0d0" ;;
-  v1.0.0:darwin_arm64) expected_sha="b8763b428e6b68550eb2b2505483797794b49ae497a2e265ed3c60f0f0a0bcd2" ;;
-esac
-
-github_release_asset_sha() {
-  local owner_repo="$1"
-  local tag="$2"
-  local asset="$3"
-  if ! command -v jq >/dev/null 2>&1; then
-    echo "jq is required to resolve GitHub release asset checksums" >&2
-    exit 1
-  fi
-  local auth_header=()
-  if [[ -n "${GITHUB_TOKEN:-}" ]]; then
-    auth_header=(-H "Authorization: Bearer ${GITHUB_TOKEN}")
-  fi
-  curl -fsSL --retry 5 --retry-delay 2 --retry-all-errors --retry-connrefused "${auth_header[@]}" \
-    -H "Accept: application/vnd.github+json" \
-    "https://api.github.com/repos/${owner_repo}/releases/tags/${tag}" \
-    | jq -r --arg asset "$asset" '.assets[] | select(.name == $asset) | .digest // empty' \
-    | sed 's/^sha256://'
-}
-
-archive="beads_${version_no_v}_${platform_tuple}.tar.gz"
-if [[ -z "$expected_sha" ]]; then
-  expected_sha="$(github_release_asset_sha "gastownhall/beads" "$version" "$archive")"
-  if [[ -z "$expected_sha" ]]; then
-    echo "No bd checksum found for ${version}/${platform_tuple}" >&2
-    exit 1
-  fi
-fi
-
-sha256_file() {
-  if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum "$1" | cut -d ' ' -f 1
-  else
-    shasum -a 256 "$1" | cut -d ' ' -f 1
-  fi
-}
+repo="${BD_REPO:-jonbaldie/beads}"
 
 install_binary() {
   local src="$1"
@@ -149,26 +93,25 @@ target="${bin_dir}/bd"
 if [[ -x "$target" ]]; then
   echo "Reusing cached bd ${version} at ${target}"
 else
-  tmp="$(mktemp -d)"
-  trap 'rm -rf "$tmp"' EXIT
-  curl -fsSL --retry 5 --retry-delay 2 --retry-all-errors --retry-connrefused -o "${tmp}/${archive}" \
-    "https://github.com/gastownhall/beads/releases/download/${version}/${archive}"
-  actual_sha="$(sha256_file "${tmp}/${archive}")"
-  if [[ "$actual_sha" != "$expected_sha" ]]; then
-    echo "bd checksum mismatch for ${version}/${platform_tuple}" >&2
-    echo "expected: $expected_sha" >&2
-    echo "actual:   $actual_sha" >&2
+  if ! command -v git >/dev/null 2>&1; then
+    echo "git is required to install bd from ${repo}" >&2
     exit 1
   fi
-  tar -xzf "${tmp}/${archive}" -C "$tmp"
-  src="${tmp}/bd"
-  if [[ ! -x "$src" ]]; then
-    src="${tmp}/beads_${version_no_v}_${platform_tuple}/bd"
+  if ! command -v go >/dev/null 2>&1; then
+    echo "go is required to install bd from ${repo}" >&2
+    exit 1
   fi
+  tmp="$(mktemp -d)"
+  trap 'rm -rf "$tmp"' EXIT
+  src="${tmp}/beads-src"
+  GIT_TERMINAL_PROMPT=0 git clone --depth 1 --filter=blob:none --branch "$version" \
+    "https://github.com/${repo}" "$src"
+  echo "Building bd ${version} from ${repo} with go build -tags gms_pure_go"
+  go -C "$src" build -tags gms_pure_go -o "${tmp}/bd" ./cmd/bd
   if $use_cache; then
-    install_binary "$src" "$target"
+    install_binary "${tmp}/bd" "$target"
   else
-    install_binary_with_sudo_fallback "$src" "$target"
+    install_binary_with_sudo_fallback "${tmp}/bd" "$target"
   fi
 fi
 
