@@ -50,6 +50,281 @@ name = "changed"
 	}
 }
 
+func TestRevision_UsesLoadedSourceSnapshot(t *testing.T) {
+	dir := t.TempDir()
+	cityPath := filepath.Join(dir, "city.toml")
+	writeFile(t, dir, "city.toml", `[workspace]
+name = "test"
+`)
+
+	cfg, prov, err := LoadWithIncludes(fsys.OSFS{}, cityPath)
+	if err != nil {
+		t.Fatalf("LoadWithIncludes: %v", err)
+	}
+	loadedRevision := Revision(fsys.OSFS{}, prov, cfg, dir)
+
+	writeFile(t, dir, "city.toml", `[workspace]
+name = "changed"
+`)
+	afterWriteRevision := Revision(fsys.OSFS{}, prov, cfg, dir)
+	if afterWriteRevision != loadedRevision {
+		t.Fatalf("revision changed after source file write; got %q, want loaded snapshot %q", afterWriteRevision, loadedRevision)
+	}
+
+	reloadedCfg, reloadedProv, err := LoadWithIncludes(fsys.OSFS{}, cityPath)
+	if err != nil {
+		t.Fatalf("reloading config: %v", err)
+	}
+	reloadedRevision := Revision(fsys.OSFS{}, reloadedProv, reloadedCfg, dir)
+	if reloadedRevision == loadedRevision {
+		t.Fatal("revision did not change after reloading changed source file")
+	}
+}
+
+func TestRevision_UsesLoadedSnapshotForResolvedInputs(t *testing.T) {
+	tests := []struct {
+		name   string
+		setup  func(t *testing.T, dir string)
+		mutate func(t *testing.T, dir string)
+	}{
+		{
+			name: "fragment",
+			setup: func(t *testing.T, dir string) {
+				writeFile(t, dir, "city.toml", `
+include = ["agents.toml"]
+
+[workspace]
+name = "test"
+`)
+				writeFile(t, dir, "agents.toml", `[[agent]]
+name = "builder"
+`)
+			},
+			mutate: func(t *testing.T, dir string) {
+				writeFile(t, dir, "agents.toml", `[[agent]]
+name = "builder-renamed"
+`)
+			},
+		},
+		{
+			name: "city pack.toml",
+			setup: func(t *testing.T, dir string) {
+				writeFile(t, dir, "city.toml", `[workspace]
+name = "test"
+`)
+				writeFile(t, dir, "pack.toml", `[pack]
+name = "citypack"
+schema = 1
+
+[[agent]]
+name = "builder"
+`)
+			},
+			mutate: func(t *testing.T, dir string) {
+				writeFile(t, dir, "pack.toml", `[pack]
+name = "citypack"
+schema = 1
+
+[[agent]]
+name = "builder-renamed"
+`)
+			},
+		},
+		{
+			name: "implicit imports file",
+			setup: func(t *testing.T, dir string) {
+				gcHome := filepath.Join(dir, "gc-home")
+				t.Setenv("GC_HOME", gcHome)
+				writeFile(t, gcHome, "implicit-import.toml", `schema = 1
+
+[imports.core]
+source = "github.com/gastownhall/gc-core"
+version = "0.1.0"
+`)
+				writeFile(t, dir, "city.toml", `[workspace]
+name = "test"
+`)
+			},
+			mutate: func(t *testing.T, dir string) {
+				writeFile(t, filepath.Join(dir, "gc-home"), "implicit-import.toml", `schema = 1
+
+[imports.core]
+source = "github.com/gastownhall/gc-core"
+version = "0.1.1"
+`)
+			},
+		},
+		{
+			name: "legacy city include pack tree",
+			setup: func(t *testing.T, dir string) {
+				writeFile(t, dir, "city.toml", `[workspace]
+name = "test"
+includes = ["packs/shared"]
+`)
+				writeFile(t, dir, "packs/shared/pack.toml", `[pack]
+name = "shared"
+schema = 1
+
+[[agent]]
+name = "builder"
+prompt_template = "prompts/builder.template.md"
+`)
+				writeFile(t, dir, "packs/shared/prompts/builder.template.md", "first prompt\n")
+			},
+			mutate: func(t *testing.T, dir string) {
+				writeFile(t, dir, "packs/shared/prompts/builder.template.md", "second prompt\n")
+			},
+		},
+		{
+			name: "legacy rig include pack tree",
+			setup: func(t *testing.T, dir string) {
+				writeFile(t, dir, "city.toml", `[workspace]
+name = "test"
+
+[[rigs]]
+name = "frontend"
+path = "../frontend"
+includes = ["packs/rig"]
+`)
+				writeFile(t, dir, "packs/rig/pack.toml", `[pack]
+name = "rigpack"
+schema = 1
+
+[[agent]]
+name = "runner"
+scope = "rig"
+prompt_template = "prompts/runner.template.md"
+`)
+				writeFile(t, dir, "packs/rig/prompts/runner.template.md", "first prompt\n")
+			},
+			mutate: func(t *testing.T, dir string) {
+				writeFile(t, dir, "packs/rig/prompts/runner.template.md", "second prompt\n")
+			},
+		},
+		{
+			name: "packs.lock",
+			setup: func(t *testing.T, dir string) {
+				writeFile(t, dir, "city.toml", `[workspace]
+name = "test"
+
+[imports.shared]
+source = "./packs/shared"
+`)
+				writeFile(t, dir, "packs/shared/pack.toml", `[pack]
+name = "shared"
+schema = 1
+`)
+				writeFile(t, dir, "packs.lock", `schema = 1
+
+[packs."./packs/shared"]
+version = "1.0.0"
+commit = "aaaa"
+`)
+			},
+			mutate: func(t *testing.T, dir string) {
+				writeFile(t, dir, "packs.lock", `schema = 1
+
+[packs."./packs/shared"]
+version = "1.0.1"
+commit = "bbbb"
+`)
+			},
+		},
+		{
+			name: "PackV2 city import tree",
+			setup: func(t *testing.T, dir string) {
+				writeFile(t, dir, "city.toml", `[workspace]
+name = "test"
+
+[imports.shared]
+source = "./packs/shared"
+`)
+				writeFile(t, dir, "packs/shared/pack.toml", `[pack]
+name = "shared"
+schema = 1
+
+[[agent]]
+name = "builder"
+prompt_template = "prompts/builder.template.md"
+`)
+				writeFile(t, dir, "packs/shared/prompts/builder.template.md", "first prompt\n")
+			},
+			mutate: func(t *testing.T, dir string) {
+				writeFile(t, dir, "packs/shared/prompts/builder.template.md", "second prompt\n")
+			},
+		},
+		{
+			name: "PackV2 rig import tree",
+			setup: func(t *testing.T, dir string) {
+				writeFile(t, dir, "city.toml", `[workspace]
+name = "test"
+
+[[rigs]]
+name = "frontend"
+path = "../frontend"
+
+[rigs.imports.shared]
+source = "./packs/shared"
+`)
+				writeFile(t, dir, "packs/shared/pack.toml", `[pack]
+name = "shared"
+schema = 1
+
+[[agent]]
+name = "runner"
+scope = "rig"
+prompt_template = "prompts/runner.template.md"
+`)
+				writeFile(t, dir, "packs/shared/prompts/runner.template.md", "first prompt\n")
+			},
+			mutate: func(t *testing.T, dir string) {
+				writeFile(t, dir, "packs/shared/prompts/runner.template.md", "second prompt\n")
+			},
+		},
+		{
+			name: "convention discovery tree",
+			setup: func(t *testing.T, dir string) {
+				writeFile(t, dir, "city.toml", `[workspace]
+name = "test"
+`)
+				writeFile(t, dir, "agents/builder/prompt.template.md", "first prompt\n")
+			},
+			mutate: func(t *testing.T, dir string) {
+				writeFile(t, dir, "agents/builder/prompt.template.md", "second prompt\n")
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			cityPath := filepath.Join(dir, "city.toml")
+			tt.setup(t, dir)
+
+			cfg, prov, err := LoadWithIncludes(fsys.OSFS{}, cityPath)
+			if err != nil {
+				t.Fatalf("LoadWithIncludes: %v", err)
+			}
+			loadedRevision := Revision(fsys.OSFS{}, prov, cfg, dir)
+
+			tt.mutate(t, dir)
+			afterWriteRevision := Revision(fsys.OSFS{}, prov, cfg, dir)
+			if afterWriteRevision != loadedRevision {
+				t.Fatalf("revision changed after post-load mutation; got %q, want loaded snapshot %q", afterWriteRevision, loadedRevision)
+			}
+
+			reloadedCfg, reloadedProv, err := LoadWithIncludes(fsys.OSFS{}, cityPath)
+			if err != nil {
+				t.Fatalf("reloading config: %v", err)
+			}
+			reloadedRevision := Revision(fsys.OSFS{}, reloadedProv, reloadedCfg, dir)
+			if reloadedRevision == loadedRevision {
+				t.Fatal("revision did not change after reloading changed input")
+			}
+		})
+	}
+}
+
 func TestRevision_IncludesFragments(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, "city.toml", `[workspace]
@@ -370,5 +645,122 @@ func TestWatchDirs_Deduplicates(t *testing.T) {
 	dirs := WatchDirs(prov, &City{}, dir)
 	if len(dirs) != 1 {
 		t.Errorf("got %d dirs, want 1 (deduplicated): %v", len(dirs), dirs)
+	}
+}
+
+// The revision snapshot is captured at load time so a later Revision() call can
+// compare against the config as it was loaded rather than as it is now. Building
+// it content-hashes every pack directory, which is pure cost for a caller that
+// never computes a Revision — and cmd/gc's city-config loaders do not even
+// return the Provenance. LoadOptions.SkipRevisionSnapshot lets those callers
+// decline it.
+//
+// Every read of the snapshot already falls back to reading from disk
+// (writeRevisionDirHash -> PackContentHashRecursive, revisionSnapshotFile ->
+// fs.ReadFile, revisionConventionDirs -> existingConventionDiscoveryDirsFS), so
+// declining it must not change a revision VALUE for anybody. The tests below pin
+// that, and pin that the option stays opt-in.
+
+// writeRevisionSnapshotOptCity builds a city whose revision covers more than
+// city.toml: a city pack directory and a convention-discovered agents tree, so
+// both the directory-hash and the convention-directory fallbacks are exercised.
+func writeRevisionSnapshotOptCity(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	writeFile(t, dir, "city.toml", `[workspace]
+name = "revision-snapshot-opt"
+includes = ["packs/shared"]
+`)
+	writeFile(t, dir, "packs/shared/pack.toml", `[pack]
+name = "shared"
+schema = 1
+`)
+	writeFile(t, dir, "packs/shared/prompts/worker.md", "worker prompt body\n")
+	writeFile(t, dir, "agents/worker/prompt.template.md", "first prompt\n")
+	return dir
+}
+
+func TestSkipRevisionSnapshot_PreservesRevisionValue(t *testing.T) {
+	dir := writeRevisionSnapshotOptCity(t)
+	cityPath := filepath.Join(dir, "city.toml")
+
+	capturedCfg, capturedProv, err := LoadWithIncludesOptions(fsys.OSFS{}, cityPath, LoadOptions{})
+	if err != nil {
+		t.Fatalf("loading with snapshot: %v", err)
+	}
+	skippedCfg, skippedProv, err := LoadWithIncludesOptions(fsys.OSFS{}, cityPath, LoadOptions{SkipRevisionSnapshot: true})
+	if err != nil {
+		t.Fatalf("loading without snapshot: %v", err)
+	}
+
+	// Without these the test would compare two identical states and pass
+	// vacuously.
+	if capturedProv.revisionSnapshot == nil {
+		t.Fatal("default load captured no snapshot; the two arms are not different states")
+	}
+	if skippedProv.revisionSnapshot != nil {
+		t.Fatal("SkipRevisionSnapshot captured a snapshot anyway")
+	}
+
+	captured := Revision(fsys.OSFS{}, capturedProv, capturedCfg, dir)
+	skipped := Revision(fsys.OSFS{}, skippedProv, skippedCfg, dir)
+	if captured == "" {
+		t.Fatal("revision is empty; the fixture is not exercising Revision")
+	}
+	if captured != skipped {
+		t.Fatalf("revision differs without the snapshot:\n  with    %s\n  without %s", captured, skipped)
+	}
+}
+
+// TestSkipRevisionSnapshot_StillDetectsPackContentChange pins that declining the
+// prefetch does not blind revision comparison: editing a file inside a pack must
+// still change the revision, which is the property the reconciler depends on
+// (regression guard gastownhall/gascity#779). The default arm is a control — it
+// proves the edited file participates in the revision at all, so a passing
+// skipped arm means something.
+func TestSkipRevisionSnapshot_StillDetectsPackContentChange(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts LoadOptions
+	}{
+		{name: "default", opts: LoadOptions{}},
+		{name: "skip snapshot", opts: LoadOptions{SkipRevisionSnapshot: true}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := writeRevisionSnapshotOptCity(t)
+			cityPath := filepath.Join(dir, "city.toml")
+
+			cfg, prov, err := LoadWithIncludesOptions(fsys.OSFS{}, cityPath, tc.opts)
+			if err != nil {
+				t.Fatalf("loading: %v", err)
+			}
+			before := Revision(fsys.OSFS{}, prov, cfg, dir)
+
+			writeFile(t, dir, "packs/shared/prompts/worker.md", "edited prompt body\n")
+
+			reloadedCfg, reloadedProv, err := LoadWithIncludesOptions(fsys.OSFS{}, cityPath, tc.opts)
+			if err != nil {
+				t.Fatalf("reloading: %v", err)
+			}
+			after := Revision(fsys.OSFS{}, reloadedProv, reloadedCfg, dir)
+
+			if before == after {
+				t.Fatal("pack content edit did not change the revision; reconciler change detection would be blind")
+			}
+		})
+	}
+}
+
+// TestLoadWithIncludes_CapturesRevisionSnapshotByDefault pins that the option is
+// opt-in, so every existing caller keeps today's load-time-faithful behavior.
+func TestLoadWithIncludes_CapturesRevisionSnapshotByDefault(t *testing.T) {
+	dir := writeRevisionSnapshotOptCity(t)
+
+	_, prov, err := LoadWithIncludes(fsys.OSFS{}, filepath.Join(dir, "city.toml"))
+	if err != nil {
+		t.Fatalf("loading: %v", err)
+	}
+	if prov.revisionSnapshot == nil {
+		t.Fatal("LoadWithIncludes captured no revision snapshot; the default changed")
 	}
 }

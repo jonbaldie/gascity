@@ -22,37 +22,220 @@ const (
 	SessionCrashed          = "session.crashed"
 	BeadCreated             = "bead.created"
 	BeadClosed              = "bead.closed"
+	BeadDeleted             = "bead.deleted"
 	BeadUpdated             = "bead.updated"
-	MailSent                = "mail.sent"
-	MailRead                = "mail.read"
-	MailArchived            = "mail.archived"
-	MailMarkedRead          = "mail.marked_read"
-	MailMarkedUnread        = "mail.marked_unread"
-	MailReplied             = "mail.replied"
-	MailDeleted             = "mail.deleted"
-	SessionDraining         = "session.draining"
-	SessionUndrained        = "session.undrained"
-	SessionQuarantined      = "session.quarantined"
-	SessionIdleKilled       = "session.idle_killed"
-	SessionSuspended        = "session.suspended"
-	SessionUpdated          = "session.updated"
+	BeadWorktreeReaped      = "bead.worktree.reaped"
+	BeadWorktreeReapSkipped = "bead.worktree.reap_skipped"
+	// BeadClaimRejected fires when a worker attempts to claim a work bead that
+	// is already live-claimed by a different worker — the claim is rejected as
+	// an idempotent no-op rather than fanning out a second concurrent claim.
+	// Turns the otherwise-silent lost-claim race (RCA gc-typpc: one bead, four
+	// concurrent polecat claims) into an observable signal. ADR-0009.
+	BeadClaimRejected = "bead.claim_rejected"
+	// BeadClaimReleased fires when a claim this process WON is given back
+	// because it could not be delivered to a live consumer: the worker's result
+	// write failed (the provider closed the tool pipe), or the CAS landed after
+	// the invoking turn's claim window was already spent. Both shapes produce an
+	// in_progress bead nobody will ever execute, so the claim is released
+	// compare-and-swap and this event records that it happened. It is the
+	// release dual of BeadClaimRejected: that one reports a claim we did not
+	// get, this one a claim we could not keep.
+	//
+	// COMPENSATION PAIR — read this before treating step lifecycle as monotonic.
+	// A bead.claim_released whose subject already has an execution.step_started
+	// is the second half of a compensating pair, not a step that ran and
+	// finished: the claim path emits step_started at claim time and only then
+	// discovers it cannot deliver the result (or that the CAS landed past its
+	// window), so the release UNDOES a step that never executed. An
+	// event-sourcing consumer — the runs view especially — must treat that pair
+	// as "no attempt happened" rather than leaving the step in-flight forever
+	// waiting for an execution.step_completed that is never coming. The pair is
+	// always same-subject and same-process, and the payload's reason names which
+	// unwind ran.
+	BeadClaimReleased = "bead.claim_released"
+	// ExecutionClaimWindowExpired fires when gc hook --claim reaches a claim
+	// mutation after its invocation window has elapsed — the signature of a
+	// claim command that outlived the agent turn that invoked it (an abandoned
+	// or killed provider tool call). No claim is minted. The payload's
+	// invocation_age_ms and parent_alive let the fleet distinguish honest slow
+	// stores from orphaned claimers reparented to init.
+	ExecutionClaimWindowExpired = "execution.claim_window_expired"
+	// ExecutionWorkAssociated records an authoritative association between a
+	// graph.v2 workflow run and one physical input work bead. Subject carries
+	// the work bead and RunID carries the workflow root.
+	ExecutionWorkAssociated = "execution.work_associated"
+	// ExecutionRunAnchored records an authoritative relation between a graph.v2
+	// workflow run and a source work bead. Subject carries the source bead
+	// and RunID carries the workflow root; it does not replace the physical
+	// launch carried by ExecutionWorkAssociated.
+	ExecutionRunAnchored = "execution.run_anchored"
+	// ExecutionStepDefined records one physical native execution-step
+	// occurrence. Subject carries the physical step bead, RunID the workflow
+	// root, and StepID/DependsOnStepIDs the semantic topology.
+	ExecutionStepDefined = "execution.step_defined"
+	// ExecutionStepStarted and ExecutionStepCompleted record the lifecycle of one
+	// physical graph.v2 native step attempt. Subject is the physical step bead;
+	// RunID, SessionID, StepID, and DependsOnStepIDs carry its durable identity.
+	ExecutionStepStarted   = "execution.step_started"
+	ExecutionStepCompleted = "execution.step_completed"
+	// ExecutionStepStalled records that a session claimed a step and then never
+	// executed it: the claim-without-execution shape the controller's execution
+	// backstop gave up re-delivering a claim nudge for. Subject carries the work
+	// bead, RunID the workflow root, SessionID the holder. It is a controller
+	// LIVENESS fact, not a graph execution fact — nothing about the step's
+	// topology is asserted, and no projector consumes it.
+	ExecutionStepStalled = "execution.step_stalled"
+	// BeadDeadAssigneeReopened fires when the reconciler reopens a routed work
+	// bead whose assignee resolves to no open session bead — the owning session
+	// closed/retired while the bead stayed assigned, leaving it open+routed but
+	// invisible to every claim probe (pool tier and demand require --unassigned;
+	// the hook requires an empty assignee). releaseOrphanedPoolAssignments clears
+	// the dead assignee so the pool can reclaim it; this event turns that
+	// otherwise-silent repair into an observable signal (mirrors the
+	// bead.claim_rejected shape).
+	BeadDeadAssigneeReopened = "bead.dead_assignee_reopened"
+	MailSent                 = "mail.sent"
+	MailRead                 = "mail.read"
+	MailArchived             = "mail.archived"
+	MailMarkedRead           = "mail.marked_read"
+	MailMarkedUnread         = "mail.marked_unread"
+	MailReplied              = "mail.replied"
+	MailDeleted              = "mail.deleted"
+	SessionDraining          = "session.draining"
+	SessionUndrained         = "session.undrained"
+	SessionQuarantined       = "session.quarantined"
+	SessionIdleKilled        = "session.idle_killed"
+	// SessionMaxAgeKilled fires when the controller preemptively restarts a
+	// long-running session because its wall-clock age exceeded the agent's
+	// max_session_age threshold. Motivating case: provider SDKs that cache
+	// credentials at session start and wedge when the cached token expires.
+	SessionMaxAgeKilled = "session.max_age_killed"
+	SessionSuspended    = "session.suspended"
+	SessionUpdated      = "session.updated"
+	// SessionDrainAckedWithAssignedWork fires when a session acknowledges
+	// drain (via `gc runtime drain-ack`) while still holding the assignee
+	// on an open or in-progress work bead. Distinguishes a worker that
+	// exited mid-task (e.g., per-turn cap, crash) from a worker that
+	// performed a clean phase handoff (the latter null the bead's
+	// assignee before drain-acking). The reconciler emits this as a
+	// mechanism-only signal; pack-level subscribers own the recovery
+	// policy (commit-and-push, clear-assignee-and-respawn, or escalate).
+	// See gastownhall/gascity#2293.
+	SessionDrainAckedWithAssignedWork = "session.drain_acked_with_assigned_work"
+	// SessionStranded fires when a pool slot retains an in-progress work
+	// bead after its runtime has exited — i.e., the worker process is
+	// gone but the bead's assignee/state still references it. Surfaces
+	// the reconciler-detected leak so pack-level subscribers can decide
+	// whether to clear-assignee-and-respawn or escalate.
+	SessionStranded = "session.stranded"
+	// SessionUnknownState fires when the reconciler observes a session bead
+	// whose metadata state it does not recognize. The reconciler skips such
+	// beads (forward-compatible rollback: an older reconciler ignores a newer
+	// writer's state rather than crashing), so this is the only durable signal
+	// that a bead is stuck outside the state machine. Emitted on first sight
+	// (and again with escalated=true once the bead has sat unrecognized past a
+	// threshold), never as a recovery action — pack-level subscribers or
+	// operators own recovery. See gastownhall/gascity#1497, #2085, #2389.
+	SessionUnknownState = "session.unknown_state"
+	// SessionResetStalled fires when a session reset was committed but
+	// the follow-up wake remains pending past the configured startup
+	// timeout. Operators use the typed payload to correlate the stuck
+	// session, template, reset timestamp, and elapsed wait.
+	SessionResetStalled = "session.reset_stalled"
+	// SessionWorkQueryFailed fires when the current managed session's
+	// work-discovery query FAILED — killed by an external signal, aborted by the
+	// runner-imposed timeout, or exited non-zero — before producing output.
+	// Emission requires the current session ID so the lifecycle payload
+	// remains correlated; the companion reconciler handler is tracked in
+	// #1497.
+	SessionWorkQueryFailed = "session.work_query_failed"
+	// SessionDemandClaimDivergence fires when a seat the controller spawned on
+	// DEMAND evidence drains with no work. It is a diagnostics counter for the
+	// agreement invariant between the two readers — the controller's demand read
+	// and the worker's claim read — and it never influences the drain it reports
+	// on. Two classifications: benign (a sibling legitimately claimed the row
+	// first, which is correct pull, not a defect) and divergence (the row is
+	// still open, unassigned and route-matching, so the readers disagreed).
+	SessionDemandClaimDivergence = "session.demand_claim_divergence"
+	// SessionColdStartTimeout fires when a pool session's first runtime spawn
+	// (a pending create) exceeds the start deadline and is rolled back. It is
+	// per-session: it fires whenever a fresh spawn times out, including a warm
+	// pool scale-up adding capacity — not only when the whole pool was at zero.
+	// Emitted by the session reconciler's start-result commit path; the
+	// envelope's Subject carries the session name.
+	SessionColdStartTimeout = "session.cold_start_timeout"
 	ConvoyCreated           = "convoy.created"
 	ConvoyClosed            = "convoy.closed"
 	ControllerStarted       = "controller.started"
 	ControllerStopped       = "controller.stopped"
-	CitySuspended           = "city.suspended"
-	CityResumed             = "city.resumed"
-	CityCreated             = "city.created"
-	CityReady               = "city.ready"
-	CityInitFailed          = "city.init_failed"
-	CityUnregisterRequested = "city.unregister_requested"
-	CityUnregistered        = "city.unregistered"
-	CityUnregisterFailed    = "city.unregister_failed"
-	OrderFired              = "order.fired"
-	OrderCompleted          = "order.completed"
-	OrderFailed             = "order.failed"
-	ProviderSwapped         = "provider.swapped"
-	WorkerOperation         = "worker.operation"
+	// ControlStalled fires once, when a control bead's bounded semantic-refusal
+	// retry budget expires and the control dispatcher quarantines it. Before
+	// this event the control plane had no control.* vocabulary at all, so a
+	// city whose dispatcher spent 95% of its throughput re-asking a question
+	// the store had already refused was, by construction, invisible on the
+	// event bus: no event, no metric, every health surface green. It is
+	// edge-triggered on the quarantine, not level-triggered on the retry — one
+	// emission per stalled bead under the intended single-control-dispatcher-
+	// per-city topology, never one per attempt. Control beads carry no
+	// claim/lease, so a misconfigured second dispatcher over the same store
+	// could also observe expiry and emit; consumers should tolerate a duplicate
+	// rather than assume a globally exactly-once signal.
+	ControlStalled = "control.stalled"
+	// SupervisorStarted fires once per supervisor startup, after the
+	// instance lock is acquired. Its payload classifies how the previous
+	// supervisor instance exited (clean, crash, or unknown), derived from
+	// the clean-shutdown handoff token the STOPPING path leaves behind,
+	// so flap alerts can distinguish a crash loop from deploy restarts.
+	SupervisorStarted = "supervisor.started"
+	// SupervisorShutdownRequested fires when the supervisor's main loop
+	// observes a shutdown trigger (signal or socket stop) and is about to
+	// cancel the supervisor context. Carries attribution so operators can
+	// answer "why did the supervisor exit" without scraping macOS/launchd
+	// logs.
+	SupervisorShutdownRequested = "supervisor.shutdown_requested"
+	// SupervisorRequest records one bounded audit entry for a request handled
+	// by the machine-wide supervisor API. Payloads omit request bodies and
+	// query strings.
+	SupervisorRequest = "supervisor.request"
+	CitySuspended     = "city.suspended"
+	CityResumed       = "city.resumed"
+	// Typed async request result events. 5 success types (one per
+	// operation, fully typed payload) + 1 shared failure type.
+	RequestResultCityCreate     = "request.result.city.create"
+	RequestResultCityUnregister = "request.result.city.unregister"
+	RequestResultSessionCreate  = "request.result.session.create"
+	RequestResultSessionMessage = "request.result.session.message"
+	RequestResultSessionSubmit  = "request.result.session.submit"
+	RequestResultRigCreate      = "request.result.rig.create"
+	RequestFailed               = "request.failed"
+
+	// RigProvisionProgress reports one provisioning step of a server-side
+	// rig add (clone, beads-init, packs, config, routes). Non-terminal;
+	// the terminal outcome is RequestResultRigCreate or RequestFailed.
+	RigProvisionProgress = "rig.provision.progress"
+
+	// Non-terminal city lifecycle events recorded in the per-city
+	// event log during init/unregister for diagnostics.
+	CityCreated                     = "city.created"
+	CityUnregisterRequested         = "city.unregister_requested"
+	OrderFired                      = "order.fired"
+	OrderCompleted                  = "order.completed"
+	OrderFailed                     = "order.failed"
+	ProviderSwapped                 = "provider.swapped"
+	WorkerOperation                 = "worker.operation"
+	ProjectIdentityStamped          = "project.identity.stamped"
+	SupervisorFSPressureSkippedTick = "supervisor.fs_pressure.skipped_tick"
+
+	// MoleculeResolved fires once at the molecule-autoclose Go close site
+	// when a molecule root transitions to closed. It carries the
+	// state-transition record (issue, from/to status, close reason) joined
+	// to the resolving session, resolved from the root's stamped metadata
+	// (gc.session_name / gc.session_id / gc.work_dir). It is additive: the
+	// existing bead.closed emission is unchanged. A manual non-molecule
+	// `bd close` produces bead.closed but NOT molecule.resolved, so this
+	// event attributes molecule-resolution closes only — a root hand-closed
+	// directly has no resolving session and degrades to empty session fields.
+	MoleculeResolved = "molecule.resolved"
 
 	// External messaging events.
 	ExtMsgBound          = "extmsg.bound"
@@ -62,6 +245,87 @@ const (
 	ExtMsgAdapterRemoved = "extmsg.adapter_removed"
 	ExtMsgInbound        = "extmsg.inbound"
 	ExtMsgOutbound       = "extmsg.outbound"
+
+	// ExtMsgOutboundChannelMismatch fires when a session attempts to publish
+	// to a conversation that is bound to a different session. The publish is
+	// rejected; this event turns that otherwise-silent cross-wire into an
+	// observable signal (RCA gc-5aie6: per-PL Slack channel cross-wiring).
+	ExtMsgOutboundChannelMismatch = "extmsg.outbound_channel_mismatch"
+
+	// Supervisor webhook receiver events (E8). WebhookReceived fires on every
+	// accepted, cryptographically authentic delivery — whether it dispatched an
+	// order, was suppressed as a duplicate, or matched no rule. WebhookRejected
+	// fires on every refused delivery, carrying a reason enum. Their payloads
+	// (internal/api WebhookReceivedPayload / WebhookRejectedPayload) MUST NOT carry
+	// the secret, signature, or raw body — a body byte-count and the provider's
+	// own delivery id are the most that appear.
+	WebhookReceived = "webhook.received"
+	WebhookRejected = "webhook.rejected"
+
+	// EventsRotated is the forensic anchor written as the first event in
+	// a freshly-rotated active log. Its payload carries the prior
+	// archive's filename and seq range so log readers can stitch back
+	// across rotations.
+	EventsRotated = "events.rotated"
+
+	// Dolt store maintenance events. Emitted by the supervisor's
+	// StoreMaintenanceLoop (internal/supervisor/maintenance.go) after
+	// each scheduled maintenance cycle completes or fails.
+	StoreMaintenanceDone   = "gc.store.maintenance.done"
+	StoreMaintenanceFailed = "gc.store.maintenance.failed"
+
+	// Dolt disk pre-flight events. Emitted by the supervisor's
+	// StoreMaintenanceLoop before CALL DOLT_GC when the container free
+	// space is below a configured threshold.
+	// StoreDiskWarn fires when free space is below GC_DOLT_WARN_FREE_BYTES
+	// but still above GC_DOLT_MIN_FREE_BYTES; the GC proceeds.
+	// StoreDiskCritical fires when free space is below GC_DOLT_MIN_FREE_BYTES;
+	// the GC is skipped to avoid growing the store further.
+	StoreDiskWarn     = "gc.store.disk_warn"
+	StoreDiskCritical = "gc.store.disk_critical"
+
+	// BackendCredentialResolved records that a credential for a storage
+	// backend was resolved for one scope. The payload names the backend,
+	// the scope and the resolution tier that supplied the value; it MUST
+	// NOT carry the value itself (asserted by
+	// TestBackendCredentialResolvedPayloadOmitsTheCredential).
+	BackendCredentialResolved = "backend.credential_resolved"
+
+	// ProviderHealthGateAlert fires once per red episode when the provider-health
+	// gate parks respawns for a provider. Carries episode ID, onset time, and
+	// session count. One alert per episode; AlertSent is cleared on green so
+	// the next episode fires independently. (ADR-0013 A1 M3a)
+	ProviderHealthGateAlert = "provider.health_gate_alert"
+
+	// Emergency events are dolt-independent escalation records written to
+	// .gc/emergency and mirrored into the city event log.
+	EmergencySignaled = "emergency.signaled"
+	EmergencyAcked    = "emergency.acked"
+
+	// BeadsConditionalWritesDegraded fires when a store resolved under the
+	// beads.conditional_writes rollout gate at mode=auto is vetoed by runtime
+	// capability (bd lacks --if-revision, a runtime unsupported latch, or a
+	// revision-less read path) and loud-degrades to the legacy write path.
+	// Latched once per store instance by the emitter so log/event storms are
+	// structurally impossible (DESIGN §12.2). The name mirrors the FLAG key
+	// beads.conditional_writes (hence plural beads., unlike the per-bead
+	// lifecycle events under bead.*). Registered in stage 2 (S2-T11);
+	// emission is wired in stage 3 — nothing emits it yet.
+	BeadsConditionalWritesDegraded = "beads.conditional_writes.degraded"
+
+	// Storage-class binding outcomes. Emitted once per controller boot by the
+	// storage gate, and once per run by `gc storage migrate`, for a city whose
+	// [storage.classes] relocate the infrastructure classes to a binding.
+	//
+	// Converged and Genesis are the two serving outcomes: the first opened a
+	// binding a proven copy already populated, the second created one for a
+	// city that had nothing to move. Unconverged and Uncheckable are the two
+	// refusals: config and data disagree, or the check that would decide could
+	// not run. A city with no [storage] section emits none of them.
+	StorageBindingConverged   = "storage.binding.converged"
+	StorageBindingGenesis     = "storage.binding.genesis"
+	StorageBindingUnconverged = "storage.binding.unconverged"
+	StorageBindingUncheckable = "storage.binding.uncheckable"
 )
 
 // KnownEventTypes lists every event-type constant this package defines.
@@ -71,31 +335,78 @@ const (
 var KnownEventTypes = []string{
 	SessionWoke, SessionStopped, SessionCrashed,
 	SessionDraining, SessionUndrained, SessionQuarantined,
-	SessionIdleKilled, SessionSuspended, SessionUpdated,
-	BeadCreated, BeadClosed, BeadUpdated,
+	SessionIdleKilled, SessionMaxAgeKilled, SessionSuspended, SessionUpdated,
+	SessionDrainAckedWithAssignedWork,
+	SessionStranded,
+	SessionUnknownState,
+	SessionResetStalled,
+	SessionWorkQueryFailed,
+	SessionDemandClaimDivergence,
+	SessionColdStartTimeout,
+	BeadCreated, BeadClosed, BeadDeleted, BeadUpdated,
+	BeadWorktreeReaped, BeadWorktreeReapSkipped,
+	BeadClaimRejected, BeadClaimReleased,
+	BeadDeadAssigneeReopened,
+	ExecutionWorkAssociated, ExecutionRunAnchored, ExecutionStepDefined, ExecutionStepStarted, ExecutionStepCompleted,
+	ExecutionClaimWindowExpired,
+	ExecutionStepStalled,
 	MailSent, MailRead, MailArchived, MailMarkedRead, MailMarkedUnread,
 	MailReplied, MailDeleted,
 	ConvoyCreated, ConvoyClosed,
 	ControllerStarted, ControllerStopped,
+	ControlStalled,
 	CitySuspended, CityResumed,
-	CityCreated, CityReady, CityInitFailed,
-	CityUnregisterRequested, CityUnregistered, CityUnregisterFailed,
+	RequestResultCityCreate, RequestResultCityUnregister,
+	RequestResultSessionCreate, RequestResultSessionMessage,
+	RequestResultSessionSubmit, RequestResultRigCreate, RequestFailed,
+	RigProvisionProgress,
+	CityCreated, CityUnregisterRequested,
 	OrderFired, OrderCompleted, OrderFailed,
-	ProviderSwapped, WorkerOperation,
+	ProviderSwapped, WorkerOperation, ProjectIdentityStamped, SupervisorFSPressureSkippedTick,
+	MoleculeResolved,
+	SupervisorStarted, SupervisorShutdownRequested, SupervisorRequest,
 	ExtMsgBound, ExtMsgUnbound, ExtMsgGroupCreated,
 	ExtMsgAdapterAdded, ExtMsgAdapterRemoved,
 	ExtMsgInbound, ExtMsgOutbound,
+	ExtMsgOutboundChannelMismatch,
+	WebhookReceived, WebhookRejected,
+	EventsRotated,
+	StoreMaintenanceDone, StoreMaintenanceFailed,
+	StoreDiskWarn, StoreDiskCritical,
+	BackendCredentialResolved,
+	EmergencySignaled, EmergencyAcked,
+	BeadsConditionalWritesDegraded,
+	StorageBindingConverged, StorageBindingGenesis,
+	StorageBindingUnconverged, StorageBindingUncheckable,
+	// ProviderHealthGateAlert is intentionally omitted from KnownEventTypes.
+	// The event is emitted by the reconciler but its typed SSE payload is not
+	// yet registered in internal/api (the payload registration lives in a
+	// follow-up that adds the full SSE projection). Until then, subscribers
+	// receive it via the custom-event envelope.
 }
 
 // Event is a single recorded occurrence in the system.
+//
+// RunID/SessionID are opaque correlation ids stamped at the record site (run
+// root via the bead metadata run-chain; session bead id), used by downstream
+// consumers to join an event to its run/session. They are additive and
+// omitempty: old records lack them and unmarshal as "". They are NOT derived
+// from Payload — the redacted export forwards them as typed primitives, never by
+// decoding the free-form payload.
 type Event struct {
-	Seq     uint64          `json:"seq"`
-	Type    string          `json:"type"`
-	Ts      time.Time       `json:"ts"`
-	Actor   string          `json:"actor"`
-	Subject string          `json:"subject,omitempty"`
-	Message string          `json:"message,omitempty"`
-	Payload json.RawMessage `json:"payload,omitempty"`
+	Seq       uint64          `json:"seq"`
+	Type      string          `json:"type"`
+	Ts        time.Time       `json:"ts"`
+	Actor     string          `json:"actor"`
+	Subject   string          `json:"subject,omitempty"`
+	Message   string          `json:"message,omitempty"`
+	Payload   json.RawMessage `json:"payload,omitempty"`
+	RunID     string          `json:"run_id,omitempty"`
+	SessionID string          `json:"session_id,omitempty"`
+	StepID    string          `json:"step_id,omitempty"`
+	// DependsOnStepIDs is nil for unknown native topology; a present empty
+	// slice represents a known root.
+	DependsOnStepIDs *[]string `json:"depends_on_step_ids,omitempty"`
 }
 
 // Recorder records events. Safe for concurrent use. Best-effort.
@@ -117,13 +428,38 @@ type Provider interface {
 	// LatestSeq returns the highest sequence number, or 0 if empty.
 	LatestSeq() (uint64, error)
 
-	// Watch returns a Watcher that yields events with Seq > afterSeq.
-	// The watcher blocks on Next() until an event arrives or ctx is
-	// canceled. Callers must call Close() when done.
+	// Watch returns a Watcher that yields every RETAINED event with
+	// Seq > afterSeq, in sequence order, exactly once per watcher —
+	// including events recorded before Watch was called and events that
+	// have since rotated into an archive. (Across separate watcher
+	// instances delivery is at-least-once; callers de-dupe by seq.) The
+	// watcher blocks on Next() until an event arrives or ctx is
+	// canceled. afterSeq=0 therefore requests the entire retained
+	// history; pass LatestSeq() to stream only from now. Callers must
+	// call Close() when done.
 	Watch(ctx context.Context, afterSeq uint64) (Watcher, error)
 
 	// Close releases any resources held by the provider.
 	Close() error
+}
+
+// TailProvider is an optional extension for providers that can return the
+// trailing matching events without scanning or materializing the whole history.
+type TailProvider interface {
+	ListTail(filter Filter, limit int) ([]Event, error)
+}
+
+// InFlightProvider is an optional extension for providers whose plain List can
+// momentarily miss events stranded in an in-flight rotation file. When a
+// file-backed provider rotates, the just-rotated segment lives only in the
+// events.jsonl.rotating-* file until a background goroutine gzips it into the
+// canonical .gz archive; List reads archives + the active file, so during that
+// window it cannot see the segment. ListInFlight folds those events back in,
+// preserving seq order and de-duplicating by seq, so a keyset walk cannot skip
+// a whole seq range mid-rotation. Providers with no such window (in-memory
+// fakes, exec scripts) need not implement it.
+type InFlightProvider interface {
+	ListInFlight(filter Filter) ([]Event, error)
 }
 
 // Watcher yields events one at a time. Created by [Provider.Watch].

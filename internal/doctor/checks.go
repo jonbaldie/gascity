@@ -27,6 +27,7 @@ import (
 	"github.com/gastownhall/gascity/internal/config"
 	"github.com/gastownhall/gascity/internal/doltversion"
 	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/gastownhall/gascity/internal/pathutil"
 	"github.com/gastownhall/gascity/internal/pidutil"
 	"github.com/gastownhall/gascity/internal/runtime"
 	"github.com/gastownhall/gascity/internal/workspacesvc"
@@ -125,6 +126,11 @@ func (c *ConfigValidCheck) Run(_ *CheckContext) *CheckResult {
 		r.Message = fmt.Sprintf("rig validation: %v", err)
 		return r
 	}
+	if err := config.ValidateWebhooks(c.cfg.Webhooks); err != nil {
+		r.Status = StatusError
+		r.Message = fmt.Sprintf("webhook validation: %v", err)
+		return r
+	}
 	if err := config.ValidateServices(c.cfg.Services); err != nil {
 		r.Status = StatusError
 		r.Message = fmt.Sprintf("service validation: %v", err)
@@ -177,7 +183,7 @@ func (c *ConfigRefsCheck) Run(_ *CheckContext) *CheckResult {
 			}
 		}
 		if a.SessionSetupScript != "" {
-			path := resolveConfigRefPath(c.cityPath, a.SessionSetupScript)
+			path := config.ResolveSessionSetupScriptPath(c.cityPath, a.SourceDir, a.SessionSetupScript)
 			if _, err := os.Stat(path); err != nil {
 				issues = append(issues, fmt.Sprintf("agent %q: session_setup_script %q not found", qn, path))
 			}
@@ -249,6 +255,11 @@ func (c *BuiltinPackFamilyCheck) Run(_ *CheckContext) *CheckResult {
 	if v := os.Getenv("GC_BEADS"); v != "" {
 		provider = v
 	}
+	if strings.EqualFold(strings.TrimSpace(c.cfg.Beads.Backend), "doltlite") {
+		r.Status = StatusOK
+		r.Message = "builtin bd/dolt pack family not required for doltlite backend"
+		return r
+	}
 	if !providerUsesBDDoltStore(provider) {
 		r.Status = StatusOK
 		r.Message = "builtin bd/dolt pack family not required"
@@ -283,12 +294,21 @@ func (c *BuiltinPackFamilyCheck) Fix(_ *CheckContext) error { return nil }
 
 func (c *BuiltinPackFamilyCheck) userBuiltinPackOverrides() map[string]bool {
 	systemRoot := filepath.Clean(filepath.Join(c.cityPath, citylayout.SystemPacksRoot))
+	// Builtin packs compose from the user-global repo cache; dirs under it
+	// are the bundled packs themselves, not user-authored overrides.
+	cacheRoot := ""
+	if root, err := config.GlobalRepoCacheRoot(); err == nil {
+		cacheRoot = filepath.Clean(root)
+	}
 	seenDirs := make(map[string]bool)
 	overrides := make(map[string]bool)
 
 	for _, dir := range packDirsForCheck(c.cfg) {
 		dir = filepath.Clean(dir)
 		if seenDirs[dir] || isSubpath(systemRoot, dir) {
+			continue
+		}
+		if cacheRoot != "" && isSubpath(cacheRoot, dir) {
 			continue
 		}
 		seenDirs[dir] = true
@@ -314,7 +334,7 @@ func isSubpath(root, path string) bool {
 	if err != nil {
 		return false
 	}
-	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)))
+	return !pathutil.IsOutsideDir(rel)
 }
 
 func readPackName(dir string) string {
@@ -634,22 +654,29 @@ func (c *OrphanSessionsCheck) Fix(_ *CheckContext) error {
 
 // --- Data checks ---
 
-// BeadsStoreCheck verifies the bead store opens and Ping succeeds.
+// BeadsStoreCheck verifies the bead store opens and Ping succeeds, and warns
+// when the store selection silently fell back to the fork-per-op BdStore
+// (gastownhall/gascity#4245) instead of the native store.
 type BeadsStoreCheck struct {
 	cityPath string
-	newStore func(cityPath string) (beads.Store, error)
+	newStore func(cityPath string) (beads.StoreOpenResult, error)
 }
 
 // NewBeadsStoreCheck creates a check for the bead store.
-// newStore is a factory that opens a store from the city path.
-func NewBeadsStoreCheck(cityPath string, newStore func(string) (beads.Store, error)) *BeadsStoreCheck {
+// newStore is a factory that opens a store from the city path and reports
+// the native/fallback selection diagnostic alongside it.
+func NewBeadsStoreCheck(cityPath string, newStore func(string) (beads.StoreOpenResult, error)) *BeadsStoreCheck {
 	return &BeadsStoreCheck{cityPath: cityPath, newStore: newStore}
 }
 
 // Name returns the check identifier.
 func (c *BeadsStoreCheck) Name() string { return "beads-store" }
 
-// Run opens the store and pings it to verify accessibility.
+// Run opens the store and pings it to verify accessibility. A successful
+// open that silently fell back to BdStore (fork-per-op, dramatically more
+// expensive than the native store) surfaces as a warning naming the
+// preflight gate and reason, instead of looking identically healthy to a
+// native-store city.
 func (c *BeadsStoreCheck) Run(_ *CheckContext) *CheckResult {
 	r := &CheckResult{Name: c.Name()}
 	target, fixHint, active, err := validateBDStoreTarget(c.cityPath, c.cityPath)
@@ -672,15 +699,23 @@ func (c *BeadsStoreCheck) Run(_ *CheckContext) *CheckResult {
 		}
 		conn.Close() //nolint:errcheck // best-effort close
 	}
-	store, err := c.newStore(c.cityPath)
+	result, err := c.newStore(c.cityPath)
 	if err != nil {
 		r.Status = StatusError
 		r.Message = fmt.Sprintf("store open failed: %v", err)
 		return r
 	}
-	if err := store.Ping(); err != nil {
+	if err := result.Store.Ping(); err != nil {
 		r.Status = StatusError
 		r.Message = fmt.Sprintf("store ping failed: %v", err)
+		return r
+	}
+	if result.Diagnostic.Store == beads.BeadsStoreNameBdStore {
+		r.Status = StatusWarning
+		r.Message = fmt.Sprintf(
+			"beads store running on BdStore fallback (fork-per-op; gate=%s): %s",
+			result.Diagnostic.PreflightGate, result.Diagnostic.PreflightReason)
+		r.FixHint = "native store unavailable; repair the named preflight gate, then restart the process to pick up native store eligibility"
 		return r
 	}
 	r.Status = StatusOK
@@ -725,6 +760,9 @@ func (c *BDSplitStoreCheck) Run(_ *CheckContext) *CheckResult {
 	serverExists := splitStoreDirExists(serverDir)
 	embeddedExists := splitStoreDirExists(embeddedDir)
 	if !serverExists || !embeddedExists {
+		if unread := c.unreadStoreBesideTheActiveOne(beadsDir, serverDir, embeddedDir); unread != nil {
+			return unread
+		}
 		r.Status = StatusOK
 		r.Message = "no legacy split store detected"
 		return r
@@ -776,6 +814,58 @@ func (c *BDSplitStoreCheck) Run(_ *CheckContext) *CheckResult {
 	r.Details = splitStoreDetails(activeStore, activeSource, serverRepos, embeddedRepos)
 	r.FixHint = splitStoreFixHint(activeStore)
 	return r
+}
+
+// unreadStoreBesideTheActiveOne reports a bead database sitting in the mode
+// directory the scope's metadata does NOT point at, when the mode it does point
+// at has no directory of its own yet.
+//
+// That shape is the one gc's own storage-mode change produces, and it is the
+// one the announcement steers here for: canonicalizing an embedded workspace to
+// server mode re-points the ledger before any .beads/dolt exists, so the
+// both-directories test above answers "no legacy split store detected" for
+// exactly the scope that has one. A diagnostic an operator is told to run and
+// which reports OK on the state they were warned about is worse than no
+// diagnostic — it converts a real warning into a false all-clear.
+//
+// The evidential standard is the one this check already applies: a `.dolt`
+// repository under the inactive mode's directory, without opening it. A
+// repository `bd init` created and never wrote to reports the same as a
+// populated one, which is why this is a WARNING that names both paths and never
+// an error — see splitStoreDetails for the recovery it prescribes.
+//
+// It answers nothing when the active store is unidentifiable, when the inactive
+// directory is absent, or when it holds no repository: each of those is a scope
+// with one ledger, which is the ordinary case.
+func (c *BDSplitStoreCheck) unreadStoreBesideTheActiveOne(beadsDir, serverDir, embeddedDir string) *CheckResult {
+	activeSource, activeStore := c.activeBDStore(beadsDir)
+	inactiveStore, inactiveDir := "embeddeddolt", embeddedDir
+	switch activeStore {
+	case "dolt":
+	case "embeddeddolt":
+		inactiveStore, inactiveDir = "dolt", serverDir
+	default:
+		return nil
+	}
+	if !splitStoreDirExists(inactiveDir) {
+		return nil
+	}
+	inactiveRepos, err := doltReposUnder(inactiveDir)
+	if err != nil || len(inactiveRepos) == 0 {
+		return nil
+	}
+	serverRepos, embeddedRepos := inactiveRepos, []string(nil)
+	if inactiveStore == "embeddeddolt" {
+		serverRepos, embeddedRepos = nil, inactiveRepos
+	}
+	return &CheckResult{
+		Name:   c.Name(),
+		Status: StatusWarning,
+		Message: fmt.Sprintf("unread bead database beside the active store: active .beads/%s (%s), unread .beads/%s contains %d Dolt repo(s)",
+			activeStore, activeSource, inactiveStore, len(inactiveRepos)),
+		Details: splitStoreDetails(activeStore, activeSource, serverRepos, embeddedRepos),
+		FixHint: splitStoreFixHint(activeStore),
+	}
 }
 
 // CanFix returns false; reconciliation requires explicit user review.
@@ -901,11 +991,27 @@ func splitStoreDetails(activeStore, activeSource string, serverRepos, embeddedRe
 	return details
 }
 
+// splitStoreFixHint prescribes the reconciliation, and names what the operator
+// will see while they are in the middle of it.
+//
+// "Keep both directories until reconciled" parks a scope in the exact shape
+// BdStore's read-time guard notices (internal/beads/unread_store_notice.go): an
+// active store with no rows beside a second bead database. That guard is a
+// notice and never a refusal precisely so this advice stays safe to follow —
+// but an operator who takes it and then sees an unexplained line on every empty
+// `gc ready` has been sent into a state the diagnostic did not warn them about.
+// Naming the override here is what keeps the two from contradicting each other.
+//
+// The bound stated here is the one the guard actually holds: once per scope per
+// process. A `gc` command is one process, so an operator sees it once per
+// command; a supervisor sees it once for the life of the daemon.
 func splitStoreFixHint(activeStore string) string {
+	silence := "; keep both directories until reconciled — while both exist, an empty whole-ledger read from this scope prints one notice per gc process, which " +
+		beads.AllowUnreadStoreReadEnvVar + "=1 silences"
 	if activeStore == "" || activeStore == "unknown" {
-		return "export from each legacy store into backup JSONL, review with bd import --dry-run, then import into the current or intended active store; keep both directories until reconciled"
+		return "export from each legacy store into backup JSONL, review with bd import --dry-run, then import into the current or intended active store" + silence
 	}
-	return "export from the inactive store into a backup JSONL, review with bd import --dry-run, then import into the active store; keep both directories until reconciled"
+	return "export from the inactive store into a backup JSONL, review with bd import --dry-run, then import into the active store" + silence
 }
 
 func describeRepoList(repos []string) string {
@@ -950,6 +1056,9 @@ func validateBDStoreTarget(cityPath, scopeRoot string) (contract.DoltConnectionT
 	if !scopeUsesBDDoltStore(cityPath, scopeRoot) {
 		return contract.DoltConnectionTarget{}, "", false, nil
 	}
+	if scopeUsesBDDoltliteStore(cityPath, scopeRoot) {
+		return contract.DoltConnectionTarget{}, "", false, nil
+	}
 	resolved, err := contract.ResolveScopeConfigState(fsys.OSFS{}, cityPath, scopeRoot, "")
 	if err != nil {
 		return contract.DoltConnectionTarget{}, "reconcile the canonical Dolt endpoint", true, err
@@ -986,6 +1095,20 @@ func providerUsesBDDoltStore(provider string) bool {
 		return true
 	}
 	return false
+}
+
+func scopeUsesBDDoltliteStore(cityPath, scopePath string) bool {
+	if backend := strings.TrimSpace(os.Getenv("GC_BEADS_BACKEND")); strings.EqualFold(backend, "doltlite") {
+		scopedRoot := strings.TrimSpace(os.Getenv("GC_BEADS_SCOPE_ROOT"))
+		if scopedRoot == "" || sameDoctorScope(resolveDoctorScopePath(cityPath, scopedRoot), resolveDoctorScopePath(cityPath, scopePath)) {
+			return true
+		}
+	}
+	cfg, err := config.Load(fsys.OSFS{}, filepath.Join(cityPath, "city.toml"))
+	if err != nil {
+		return false
+	}
+	return strings.EqualFold(strings.TrimSpace(cfg.Beads.Backend), "doltlite")
 }
 
 func doctorExecProviderBase(provider string) string {
@@ -1094,6 +1217,11 @@ func (c *DoltServerCheck) Run(_ *CheckContext) *CheckResult {
 		r.Message = "skipped (file backend or GC_DOLT=skip)"
 		return r
 	}
+	if scopeUsesBDDoltliteStore(c.cityPath, c.cityPath) {
+		r.Status = StatusOK
+		r.Message = "not required (bd backend=doltlite)"
+		return r
+	}
 
 	target, err := contract.ResolveDoltConnectionTarget(fsys.OSFS{}, c.cityPath, c.cityPath)
 	if err != nil {
@@ -1152,6 +1280,11 @@ func (c *RigDoltServerCheck) Run(_ *CheckContext) *CheckResult {
 	rigPath := c.rig.Path
 	if !filepath.IsAbs(rigPath) {
 		rigPath = filepath.Join(c.cityPath, rigPath)
+	}
+	if scopeUsesBDDoltliteStore(c.cityPath, rigPath) {
+		r.Status = StatusOK
+		r.Message = "not required (bd backend=doltlite)"
+		return r
 	}
 	if err := contract.ValidateInheritedCityEndpointMirror(fsys.OSFS{}, c.cityPath, rigPath); err != nil {
 		r.Status = StatusError
@@ -2206,7 +2339,7 @@ func duDirBytes(root string) (int64, bool, error) {
 	if ctx.Err() == context.DeadlineExceeded {
 		total, exists, fallbackErr := boundedSumDirBytes(root)
 		if fallbackErr != nil {
-			return 0, true, fmt.Errorf("measure dolt data dir: du -sk timed out after %s; fallback walk: %w", doltDirMeasureTimeout, fallbackErr)
+			return 0, true, fmt.Errorf("measure directory: du -sk timed out after %s; fallback walk: %w", doltDirMeasureTimeout, fallbackErr)
 		}
 		return total, exists, nil
 	}
@@ -2214,16 +2347,16 @@ func duDirBytes(root string) (int64, bool, error) {
 		if errors.Is(err, exec.ErrNotFound) {
 			return boundedSumDirBytes(root)
 		}
-		return 0, true, fmt.Errorf("measure dolt data dir with du -sk: %w", err)
+		return 0, true, fmt.Errorf("measure directory with du -sk: %w", err)
 	}
 
 	fields := strings.Fields(string(out))
 	if len(fields) == 0 {
-		return 0, true, fmt.Errorf("measure dolt data dir with du -sk: empty output")
+		return 0, true, fmt.Errorf("measure directory with du -sk: empty output")
 	}
 	kb, err := strconv.ParseInt(fields[0], 10, 64)
 	if err != nil {
-		return 0, true, fmt.Errorf("measure dolt data dir with du -sk: parse %q: %w", fields[0], err)
+		return 0, true, fmt.Errorf("measure directory with du -sk: parse %q: %w", fields[0], err)
 	}
 	return kb * 1024, true, nil
 }
@@ -2387,19 +2520,68 @@ type DoltConfigExpectedValue struct {
 //
 // This is intentionally a contract subset, not a byte-for-byte mirror of
 // writeManagedDoltConfigFile in cmd/gc/cmd_dolt_config.go. It covers the keys
-// whose drift would change managed runtime behavior materially. Dynamic values
-// such as data_dir are checked by DoltConfigCheck because they depend on the
-// inspected city path.
+// whose drift would change managed runtime behavior materially. wait_timeout
+// follows the same GC_DOLT_WAIT_TIMEOUT environment override as config
+// generation. Dynamic values such as data_dir are checked by DoltConfigCheck
+// because they depend on the inspected city path.
 func DoltConfigExpectedValues() []DoltConfigExpectedValue {
-	return []DoltConfigExpectedValue{
-		{"behavior.auto_gc_behavior.enable", true},
-		{"behavior.auto_gc_behavior.archive_level", 1},
-		{"listener.read_timeout_millis", 300000},
-		{"listener.write_timeout_millis", 300000},
-		{"listener.max_connections", 1000},
+	return DoltConfigExpectedValuesForConfig(config.DoltConfig{})
+}
+
+// DoltConfigExpectedValuesForConfig returns the managed Dolt config contract
+// after applying city-level [dolt] overrides.
+func DoltConfigExpectedValuesForConfig(doltConfig config.DoltConfig) []DoltConfigExpectedValue {
+	values := []DoltConfigExpectedValue{
+		{"behavior.auto_gc_behavior.enable", doltConfig.EffectiveAutoGCEnabled()},
+		{"behavior.auto_gc_behavior.archive_level", doltConfig.EffectiveArchiveLevel()},
+		{"system_variables.dolt_auto_gc_enabled", doltConfig.AutoGCSysVar()},
+		{"system_variables.dolt_stats_enabled", "OFF"},
+		{"system_variables.dolt_stats_gc_enabled", "OFF"},
+		{"system_variables.dolt_stats_memory_only", "ON"},
+		{"system_variables.dolt_stats_paused", "ON"},
+		{"listener.read_timeout_millis", doltConfig.EffectiveReadTimeoutMillis()},
+		{"listener.write_timeout_millis", doltConfig.EffectiveWriteTimeoutMillis()},
+		{"listener.max_connections", doltConfig.EffectiveMaxConnections()},
 		{"listener.back_log", 50},
 		{"listener.max_connections_timeout_millis", 5000},
 	}
+	if waitTimeout := managedDoltConfigExpectedWaitTimeoutForConfig(doltConfig); waitTimeout > 0 {
+		values = append(values, DoltConfigExpectedValue{
+			Path:  "system_variables.wait_timeout",
+			Value: strconv.Itoa(waitTimeout),
+		})
+	}
+	return values
+}
+
+// managedDoltConfigExpectedWaitTimeoutForConfig mirrors the renderer's
+// resolution order so the drift check compares against what a start would
+// actually write. Reading only the env made the check report drift on any city
+// that configures wait_timeout while doctor runs from a shell that does not
+// export GC_DOLT_WAIT_TIMEOUT — and its remediation hint ("stop dolt and
+// restart to regenerate managed config") then pointed at the one action that
+// would really have introduced drift.
+func managedDoltConfigExpectedWaitTimeoutForConfig(doltConfig config.DoltConfig) int {
+	if doltConfig.WaitTimeoutSeconds > 0 {
+		return doltConfig.WaitTimeoutSeconds
+	}
+	return managedDoltConfigExpectedWaitTimeout()
+}
+
+func managedDoltConfigExpectedWaitTimeout() int {
+	const defaultWaitTimeout = 30
+	raw := os.Getenv("GC_DOLT_WAIT_TIMEOUT")
+	if raw == "" {
+		return defaultWaitTimeout
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil {
+		return defaultWaitTimeout
+	}
+	if n < 0 {
+		return 0
+	}
+	return n
 }
 
 // lookupYAMLPath walks a dotted key path through a decoded YAML map and
@@ -2446,6 +2628,7 @@ type DoltConfigCheck struct {
 	skip            bool
 	applicableKnown bool
 	applicable      bool
+	doltConfig      config.DoltConfig
 }
 
 // NewDoltConfigCheck creates a managed Dolt config drift check.
@@ -2455,11 +2638,16 @@ func NewDoltConfigCheck(cityPath string, skip bool) *DoltConfigCheck {
 
 // NewDoltConfigCheckForConfig creates a managed Dolt config drift check using preloaded city config.
 func NewDoltConfigCheckForConfig(cityPath string, skip bool, cfg *config.City, cfgErr error) *DoltConfigCheck {
+	var doltConfig config.DoltConfig
+	if cfg != nil {
+		doltConfig = cfg.Dolt
+	}
 	return &DoltConfigCheck{
 		cityPath:        cityPath,
 		skip:            skip,
 		applicableKnown: true,
 		applicable:      ManagedLocalDoltChecksApplicableForConfig(cityPath, cfg, cfgErr),
+		doltConfig:      doltConfig,
 	}
 }
 
@@ -2511,7 +2699,7 @@ func (c *DoltConfigCheck) Run(_ *CheckContext) *CheckResult {
 	}
 
 	var drifted []string
-	for _, exp := range DoltConfigExpectedValues() {
+	for _, exp := range DoltConfigExpectedValuesForConfig(c.doltConfig) {
 		got, present := lookupYAMLPath(doc, exp.Path)
 		if !present {
 			drifted = append(drifted, exp.Path+" (missing)")
@@ -2523,7 +2711,7 @@ func (c *DoltConfigCheck) Run(_ *CheckContext) *CheckResult {
 				drifted = append(drifted, fmt.Sprintf("%s (got %v, want %v)", exp.Path, got, want))
 			}
 		case int:
-			if !yamlIntEqual(got, want) {
+			if !doltConfigExpectedIntEqual(exp.Path, got, want) {
 				drifted = append(drifted, fmt.Sprintf("%s (got %v, want %d)", exp.Path, got, want))
 			}
 		default:
@@ -2554,6 +2742,20 @@ func (c *DoltConfigCheck) Run(_ *CheckContext) *CheckResult {
 	return r
 }
 
+func doltConfigExpectedIntEqual(path string, got any, want int) bool {
+	if yamlIntEqual(got, want) {
+		return true
+	}
+	// Managed configs written before archive_level defaulted to 0 can contain
+	// archive_level: 1. Accept that one-release compatibility value so first
+	// post-upgrade doctor runs do not report drift before gc start rewrites the
+	// managed config.
+	if path == "behavior.auto_gc_behavior.archive_level" && want == 0 {
+		return yamlIntEqual(got, 1)
+	}
+	return false
+}
+
 // CanFix returns false. TODO: wire Fix() into the same code path as
 // `gc start` uses to rewrite the managed config once that helper is exposed
 // from the doctor package.
@@ -2562,87 +2764,14 @@ func (c *DoltConfigCheck) CanFix() bool { return false }
 // Fix is a no-op. See TODO on CanFix.
 func (c *DoltConfigCheck) Fix(_ *CheckContext) error { return nil }
 
-// doltVersionInfo is the parsed semantic version of the installed `dolt`.
-type doltVersionInfo struct {
-	Major, Minor, Patch int
-	Raw                 string
-}
+type doltVersionInfo = doltversion.Info
 
-// parseDoltVersion parses the first version-like token from `dolt version`
-// output. Accepted formats:
-//
-//	"dolt version 1.75.2\nWarning: ..."
-//	"dolt version 1.75.2"
-//	"1.75.2"
-//
-// Any suffix after patch (e.g. "-rc1") is ignored.
 func parseDoltVersion(out string) (doltVersionInfo, error) {
-	out = strings.TrimSpace(out)
-	if out == "" {
-		return doltVersionInfo{}, fmt.Errorf("empty version output")
-	}
-	// Only look at the first line — dolt sometimes emits a "Warning: ..."
-	// second line for deprecated flags.
-	if i := strings.IndexByte(out, '\n'); i >= 0 {
-		out = out[:i]
-	}
-	out = strings.TrimSpace(out)
-	// Strip the "dolt version " prefix if present.
-	const prefix = "dolt version "
-	if strings.HasPrefix(strings.ToLower(out), prefix) {
-		out = out[len(prefix):]
-	}
-	// Take the first whitespace-delimited token.
-	if i := strings.IndexAny(out, " \t"); i >= 0 {
-		out = out[:i]
-	}
-	out = strings.TrimPrefix(out, "v")
-	// Strip any pre-release / build suffix after MAJOR.MINOR.PATCH.
-	core := out
-	for _, sep := range []string{"-", "+"} {
-		if i := strings.Index(core, sep); i >= 0 {
-			core = core[:i]
-		}
-	}
-	parts := strings.Split(core, ".")
-	if len(parts) < 3 {
-		return doltVersionInfo{}, fmt.Errorf("unrecognized version %q", out)
-	}
-	major, err := strconv.Atoi(parts[0])
-	if err != nil {
-		return doltVersionInfo{}, fmt.Errorf("unrecognized major in %q: %w", out, err)
-	}
-	minor, err := strconv.Atoi(parts[1])
-	if err != nil {
-		return doltVersionInfo{}, fmt.Errorf("unrecognized minor in %q: %w", out, err)
-	}
-	patch, err := strconv.Atoi(parts[2])
-	if err != nil {
-		return doltVersionInfo{}, fmt.Errorf("unrecognized patch in %q: %w", out, err)
-	}
-	return doltVersionInfo{Major: major, Minor: minor, Patch: patch, Raw: fmt.Sprintf("%d.%d.%d", major, minor, patch)}, nil
+	return doltversion.Parse(out)
 }
 
-// compareDoltVersion returns -1 if a<b, 0 if a==b, 1 if a>b.
 func compareDoltVersion(a, b doltVersionInfo) int {
-	switch {
-	case a.Major != b.Major:
-		if a.Major < b.Major {
-			return -1
-		}
-		return 1
-	case a.Minor != b.Minor:
-		if a.Minor < b.Minor {
-			return -1
-		}
-		return 1
-	case a.Patch != b.Patch:
-		if a.Patch < b.Patch {
-			return -1
-		}
-		return 1
-	}
-	return 0
+	return doltversion.Compare(a, b)
 }
 
 // DoltVersionCheck shells out to `dolt version` and verifies the managed-Dolt
@@ -2730,21 +2859,24 @@ func (c *DoltVersionCheck) Run(_ *CheckContext) *CheckResult {
 		return r
 	}
 
-	info, err := parseDoltVersion(out)
-	if err != nil {
+	info, err := doltversion.CheckFinalMinimum(out, doltversion.ManagedMin)
+	switch {
+	case errors.Is(err, doltversion.ErrPreRelease):
+		r.Status = StatusError
+		r.Message = fmt.Sprintf("dolt version %s is a pre-release; final release %s or newer is required for managed config", info.Raw, doltversion.ManagedMin)
+		r.FixHint = "upgrade dolt: https://docs.dolthub.com/introduction/installation"
+		return r
+	case errors.Is(err, doltversion.ErrBelowMinimum):
+		r.Status = StatusError
+		r.Message = fmt.Sprintf("dolt version %s is below minimum %s required for managed config", info.Raw, doltversion.ManagedMin)
+		r.FixHint = "upgrade dolt: https://docs.dolthub.com/introduction/installation"
+		return r
+	case err != nil:
 		r.Status = StatusWarning
 		r.Message = fmt.Sprintf("parse dolt version: %v", err)
 		return r
 	}
 
-	minVer, _ := parseDoltVersion(doltversion.ManagedMin)
-
-	if compareDoltVersion(info, minVer) < 0 {
-		r.Status = StatusError
-		r.Message = fmt.Sprintf("dolt version %s is below minimum %s required for managed config", info.Raw, doltversion.ManagedMin)
-		r.FixHint = "upgrade dolt: https://docs.dolthub.com/introduction/installation"
-		return r
-	}
 	r.Status = StatusOK
 	r.Message = fmt.Sprintf("dolt %s", info.Raw)
 	return r

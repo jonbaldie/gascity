@@ -84,6 +84,9 @@ create)
 	parent_id=$(echo "$input" | jq -r '.parent_id // ""')
 	ref=$(echo "$input" | jq -r '.ref // ""')
 	description=$(echo "$input" | jq -r '.description // ""')
+	ephemeral=$(echo "$input" | jq -r '.ephemeral // false')
+	no_history=$(echo "$input" | jq -r '.no_history // false')
+	defer_until=$(echo "$input" | jq -r '.defer_until // ""')
 	created_at=$(now)
 
 	# Build labels array from input, including metadata as meta: labels.
@@ -111,6 +114,9 @@ create)
 		--argjson needs "$needs" \
 		--arg description "$description" \
 		--argjson labels "$labels" \
+		--argjson ephemeral "$ephemeral" \
+		--argjson no_history "$no_history" \
+		--arg defer_until "$defer_until" \
 		'{
         id: $id,
         title: $title,
@@ -123,8 +129,10 @@ create)
         ref: $ref,
         needs: $needs,
         description: $description,
-        labels: $labels
-      }' >"$STATE_ROOT/$id.json"
+        labels: $labels,
+        ephemeral: $ephemeral,
+        no_history: $no_history
+      } + (if $defer_until == "" then {} else {defer_until: $defer_until} end)' >"$STATE_ROOT/$id.json"
 
 	# Output the created bead (normalized: meta: labels → .metadata map).
 	normalize_bead_output <"$STATE_ROOT/$id.json"
@@ -150,11 +158,22 @@ update)
 	input=$(cat)
 	current=$(cat "$bead_file")
 
-	# Apply description if present (non-null).
-	has_desc=$(echo "$input" | jq 'has("description") and .description != null')
-	if [ "$has_desc" = "true" ]; then
-		new_desc=$(echo "$input" | jq -r '.description')
-		current=$(echo "$current" | jq --arg d "$new_desc" '.description = $d')
+	# Apply the scalar string fields the update request may carry. Omitted
+	# fields are left unchanged.
+	for field in title status type description; do
+		has_field=$(echo "$input" | jq --arg f "$field" 'has($f) and .[$f] != null')
+		if [ "$has_field" = "true" ]; then
+			new_value=$(echo "$input" | jq -r --arg f "$field" '.[$f]')
+			current=$(echo "$current" | jq --arg f "$field" --arg v "$new_value" '.[$f] = $v')
+		fi
+	done
+
+	# Apply priority if present (non-null). Numeric, so it is not part of the
+	# string loop above.
+	has_priority=$(echo "$input" | jq 'has("priority") and .priority != null')
+	if [ "$has_priority" = "true" ]; then
+		new_priority=$(echo "$input" | jq '.priority')
+		current=$(echo "$current" | jq --argjson p "$new_priority" '.priority = $p')
 	fi
 
 	# Apply parent_id if present (non-null).
@@ -185,6 +204,12 @@ update)
 	new_labels=$(echo "$input" | jq -c '.labels // []')
 	if [ "$new_labels" != "[]" ]; then
 		current=$(echo "$current" | jq --argjson nl "$new_labels" '.labels = (.labels + $nl | unique)')
+	fi
+
+	# Remove labels if present.
+	drop_labels=$(echo "$input" | jq -c '.remove_labels // []')
+	if [ "$drop_labels" != "[]" ]; then
+		current=$(echo "$current" | jq --argjson dl "$drop_labels" '.labels = [.labels[] | select(. as $l | $dl | index($l) | not)]')
 	fi
 
 	echo "$current" >"$bead_file"

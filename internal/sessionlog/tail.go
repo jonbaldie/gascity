@@ -9,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/gastownhall/gascity/internal/pathutil"
 )
 
 // TailMeta holds metadata extracted from the tail of a session file.
@@ -77,7 +79,7 @@ func validateSearchPathFile(searchPaths []string, path string) (string, error) {
 			continue
 		}
 		rel, err := filepath.Rel(cleanRoot, cleanPath)
-		if err != nil || rel == "." || filepath.IsAbs(rel) || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		if err != nil || rel == "." || filepath.IsAbs(rel) || pathutil.IsOutsideDir(rel) {
 			continue
 		}
 		return cleanPath, nil
@@ -87,20 +89,28 @@ func validateSearchPathFile(searchPaths []string, path string) (string, error) {
 
 // readTail reads the last n bytes of r (or the whole thing if smaller).
 func readTail(r io.ReadSeeker, n int64) ([]byte, bool, error) {
+	data, startsMidLine, _, err := readTailWindow(r, n)
+	return data, startsMidLine, err
+}
+
+// readTailWindow also reports whether bytes before the returned window were
+// omitted. A truncated window can begin exactly on a line boundary, so that
+// state cannot be inferred from startsMidLine.
+func readTailWindow(r io.ReadSeeker, n int64) ([]byte, bool, bool, error) {
 	size, err := r.Seek(0, io.SeekEnd)
 	if err != nil {
-		return nil, false, err
+		return nil, false, false, err
 	}
 	offset := size - n
 	if offset < 0 {
 		offset = 0
 	}
 	if _, err := r.Seek(offset, io.SeekStart); err != nil {
-		return nil, false, err
+		return nil, false, false, err
 	}
 	data, err := io.ReadAll(r)
 	if err != nil {
-		return nil, false, err
+		return nil, false, false, err
 	}
 	startsMidLine := false
 	if offset > 0 {
@@ -111,7 +121,7 @@ func readTail(r io.ReadSeeker, n int64) ([]byte, bool, error) {
 			}
 		}
 	}
-	return data, startsMidLine, nil
+	return data, startsMidLine, offset > 0, nil
 }
 
 // splitLines splits data into JSONL lines. Partial lines from a mid-file
@@ -136,6 +146,7 @@ func splitLines(data []byte) [][]byte {
 type tailEntry struct {
 	Type    string          `json:"type"`
 	Subtype string          `json:"subtype,omitempty"`
+	UUID    string          `json:"uuid"`
 	Message json.RawMessage `json:"message"`
 }
 
@@ -250,10 +261,15 @@ func unwrapJSONString(raw json.RawMessage) json.RawMessage {
 
 // assistantMessage is the structure inside the "message" field for assistant entries.
 type assistantMessage struct {
+	// ID is the provider message identifier (msg_*). Claude Code writes one
+	// assistant entry per content block of a single API response; every
+	// block entry repeats the same message ID and usage object.
+	ID    string `json:"id"`
 	Role  string `json:"role"`
 	Model string `json:"model"`
 	Usage *struct {
 		InputTokens              int `json:"input_tokens"`
+		OutputTokens             int `json:"output_tokens"`
 		CacheReadInputTokens     int `json:"cache_read_input_tokens"`
 		CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
 	} `json:"usage"`

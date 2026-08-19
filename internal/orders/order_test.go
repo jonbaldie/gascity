@@ -1,6 +1,7 @@
 package orders
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -70,6 +71,95 @@ func TestParseInvalid(t *testing.T) {
 	_, err := Parse([]byte(`not valid toml {{{`))
 	if err == nil {
 		t.Fatal("Parse should fail on invalid TOML")
+	}
+}
+
+func TestParseIdempotent(t *testing.T) {
+	on, err := Parse([]byte("[order]\nexec = \"true\"\ntrigger = \"cooldown\"\ninterval = \"1m\"\nidempotent = true\n"))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if !on.Idempotent {
+		t.Error("Idempotent = false, want true")
+	}
+	off, err := Parse([]byte("[order]\nexec = \"true\"\ntrigger = \"cooldown\"\ninterval = \"1m\"\n"))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if off.Idempotent {
+		t.Error("Idempotent = true, want false (default)")
+	}
+}
+
+// TestOrderNoWorkGateParsed covers vp-cixi.6: an order can opt out of the
+// dispatcher's open-work gates via no_work_gate. Pure cooldown probes that
+// track no beads (provider-health-probe) set this so a slow Dolt store can't
+// time the gate out and skip the probe every cycle (#2893 dispatch starvation).
+func TestOrderNoWorkGateParsed(t *testing.T) {
+	on, err := Parse([]byte("[order]\nexec = \"true\"\ntrigger = \"cooldown\"\ninterval = \"10m\"\nno_work_gate = true\n"))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if !on.NoWorkGate {
+		t.Error("NoWorkGate = false, want true")
+	}
+	off, err := Parse([]byte("[order]\nexec = \"true\"\ntrigger = \"cooldown\"\ninterval = \"10m\"\n"))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if off.NoWorkGate {
+		t.Error("NoWorkGate = true, want false (default)")
+	}
+	// Validate must accept the flag (no extra constraint).
+	if err := Validate(Order{Name: "probe", Exec: "true", Trigger: "cooldown", Interval: "10m", NoWorkGate: true}); err != nil {
+		t.Errorf("Validate with NoWorkGate: %v", err)
+	}
+}
+
+// TestProviderHealthProbeOrderOptsOutOfWorkGate covers the deployed shape of
+// provider-health-probe (vp-cixi.6 GAP D): a cooldown-triggered exec probe on
+// a 10m interval with a real 120s timeout. The shipped pack will flip
+// no_work_gate = true (sling S-1) so the dispatcher skips its open-work gates
+// and a slow Dolt store can no longer time them out and skip the probe every
+// cycle (#2893 dispatch starvation). This test pins the parse shape so the
+// pack flip is mechanically known to be valid: WITH the flag the order opts
+// out and passes Validate; WITHOUT it the order parses as a plain cooldown
+// probe (NoWorkGate == false, the pre-S-1 default).
+func TestProviderHealthProbeOrderOptsOutOfWorkGate(t *testing.T) {
+	base := `[order]
+description = "Probe provider health"
+exec = "$ORDER_DIR/scripts/provider-health-probe.sh"
+trigger = "cooldown"
+interval = "10m"
+timeout = "120s"
+`
+	on, err := Parse([]byte(base + "no_work_gate = true\n"))
+	if err != nil {
+		t.Fatalf("Parse (with flag): %v", err)
+	}
+	if !on.NoWorkGate {
+		t.Error("NoWorkGate = false, want true for opted-out probe")
+	}
+	if on.Trigger != "cooldown" || on.Interval != "10m" || on.Timeout != "120s" {
+		t.Errorf("probe shape mismatch: trigger=%q interval=%q timeout=%q", on.Trigger, on.Interval, on.Timeout)
+	}
+	if err := Validate(Order{
+		Name:       "provider-health-probe",
+		Exec:       "$ORDER_DIR/scripts/provider-health-probe.sh",
+		Trigger:    "cooldown",
+		Interval:   "10m",
+		Timeout:    "120s",
+		NoWorkGate: true,
+	}); err != nil {
+		t.Errorf("Validate provider-health-probe with NoWorkGate: %v", err)
+	}
+
+	off, err := Parse([]byte(base))
+	if err != nil {
+		t.Fatalf("Parse (without flag): %v", err)
+	}
+	if off.NoWorkGate {
+		t.Error("NoWorkGate = true, want false (default) for probe without the flag")
 	}
 }
 
@@ -159,6 +249,39 @@ func TestValidateExecWithPool(t *testing.T) {
 	}
 }
 
+func TestValidateFormulaWithEnv(t *testing.T) {
+	a := Order{Name: "bad", Formula: "mol-x", Trigger: "manual", Env: map[string]string{"CUSTOM_ORDER_FLAG": "enabled"}}
+	err := Validate(a)
+	if err == nil {
+		t.Fatal("Validate should fail: formula order with env")
+	}
+	if !strings.Contains(err.Error(), "env") {
+		t.Fatalf("Validate error = %q, want env diagnostic", err)
+	}
+}
+
+func TestValidateEnvKeyShape(t *testing.T) {
+	tests := []struct {
+		name string
+		key  string
+	}{
+		{name: "empty", key: ""},
+		{name: "contains equals", key: "BAD=KEY"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := Order{Name: "bad", Exec: "scripts/x.sh", Trigger: "manual", Env: map[string]string{tt.key: "value"}}
+			err := Validate(a)
+			if err == nil {
+				t.Fatal("Validate should fail for invalid env key")
+			}
+			if !strings.Contains(err.Error(), "env") {
+				t.Fatalf("Validate error = %q, want env diagnostic", err)
+			}
+		})
+	}
+}
+
 func TestValidateTimeout(t *testing.T) {
 	a := Order{Name: "t", Formula: "mol-t", Trigger: "manual", Timeout: "90s"}
 	if err := Validate(a); err != nil {
@@ -170,6 +293,33 @@ func TestValidateTimeoutInvalid(t *testing.T) {
 	a := Order{Name: "t", Formula: "mol-t", Trigger: "manual", Timeout: "not-a-duration"}
 	if err := Validate(a); err == nil {
 		t.Error("Validate should fail: invalid timeout")
+	}
+}
+
+func TestValidateCheckTimeout(t *testing.T) {
+	a := Order{Name: "t", Formula: "mol-t", Trigger: "condition", Check: "true", CheckTimeout: "60s"}
+	if err := Validate(a); err != nil {
+		t.Errorf("Validate: %v", err)
+	}
+}
+
+func TestValidateCheckTimeoutInvalid(t *testing.T) {
+	// A missing-unit typo like "60" must fail at load, not silently revert to
+	// the 10s default at dispatch (the exact starvation check_timeout prevents).
+	a := Order{Name: "t", Formula: "mol-t", Trigger: "condition", Check: "true", CheckTimeout: "60"}
+	if err := Validate(a); err == nil {
+		t.Error("Validate should fail: invalid check_timeout")
+	}
+}
+
+func TestValidateCheckTimeoutNonPositive(t *testing.T) {
+	// A zero or negative check_timeout parses cleanly but CheckTimeoutOrDefault
+	// reverts it to the default, so it must be rejected at load.
+	for _, v := range []string{"0s", "-5s"} {
+		a := Order{Name: "t", Formula: "mol-t", Trigger: "condition", Check: "true", CheckTimeout: v}
+		if err := Validate(a); err == nil {
+			t.Errorf("Validate should fail for non-positive check_timeout %q", v)
+		}
 	}
 }
 
@@ -202,6 +352,44 @@ func TestTimeoutOrDefault(t *testing.T) {
 				t.Errorf("TimeoutOrDefault() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestCheckTimeoutOrDefault(t *testing.T) {
+	tests := []struct {
+		name string
+		a    Order
+		want time.Duration
+	}{
+		{"unset preserves 10s default", Order{Trigger: "condition", Check: "true"}, 10 * time.Second},
+		{"custom check timeout", Order{Trigger: "condition", Check: "true", CheckTimeout: "60s"}, 60 * time.Second},
+		{"invalid falls back to default", Order{Trigger: "condition", Check: "true", CheckTimeout: "bad"}, 10 * time.Second},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.a.CheckTimeoutOrDefault()
+			if got != tt.want {
+				t.Errorf("CheckTimeoutOrDefault() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseOrderCheckTimeout(t *testing.T) {
+	a, err := Parse([]byte(`[order]
+trigger = "condition"
+check = "pr_merge queue-pending"
+exec = "drain.sh"
+check_timeout = "60s"
+`))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if a.CheckTimeout != "60s" {
+		t.Errorf("CheckTimeout = %q, want %q", a.CheckTimeout, "60s")
+	}
+	if got := a.CheckTimeoutOrDefault(); got != 60*time.Second {
+		t.Errorf("CheckTimeoutOrDefault() = %v, want %v", got, 60*time.Second)
 	}
 }
 
@@ -326,5 +514,224 @@ interval = "24h"
 	}
 	if a.Trigger != "cron" {
 		t.Fatalf("Trigger = %q, want %q", a.Trigger, "cron")
+	}
+}
+
+func TestParseEnv(t *testing.T) {
+	data := []byte(`
+[order]
+exec = "scripts/doctor.sh"
+trigger = "cooldown"
+interval = "5m"
+
+[order.env]
+GC_DOCTOR_LATENCY_WARN_S = "3"
+GC_JSONL_SPIKE_THRESHOLD = "30"
+`)
+	a, err := Parse(data)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if a.Env["GC_DOCTOR_LATENCY_WARN_S"] != "3" {
+		t.Errorf("Env[GC_DOCTOR_LATENCY_WARN_S] = %q, want %q", a.Env["GC_DOCTOR_LATENCY_WARN_S"], "3")
+	}
+	if a.Env["GC_JSONL_SPIKE_THRESHOLD"] != "30" {
+		t.Errorf("Env[GC_JSONL_SPIKE_THRESHOLD] = %q, want %q", a.Env["GC_JSONL_SPIKE_THRESHOLD"], "30")
+	}
+}
+
+func TestParseEnvAbsent(t *testing.T) {
+	data := []byte(`
+[order]
+formula = "mol-test"
+trigger = "manual"
+`)
+	a, err := Parse(data)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if len(a.Env) != 0 {
+		t.Errorf("Env = %v, want empty when absent", a.Env)
+	}
+}
+
+func TestParseScope(t *testing.T) {
+	data := []byte(`
+[order]
+scope = "city"
+exec = "scripts/sweep.sh"
+trigger = "cooldown"
+interval = "5m"
+`)
+	a, err := Parse(data)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if a.Scope != "city" {
+		t.Errorf("Scope = %q, want %q", a.Scope, "city")
+	}
+	if !a.IsCityScoped() {
+		t.Error("IsCityScoped() = false, want true for scope=city")
+	}
+}
+
+func TestParseScopeDefaultsToRig(t *testing.T) {
+	data := []byte(`
+[order]
+exec = "scripts/health.sh"
+trigger = "cooldown"
+interval = "5m"
+`)
+	a, err := Parse(data)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if a.Scope != "" {
+		t.Errorf("Scope = %q, want empty (rig default)", a.Scope)
+	}
+	if a.IsCityScoped() {
+		t.Error("IsCityScoped() = true, want false for unscoped order")
+	}
+}
+
+func TestValidateRejectsUnknownScope(t *testing.T) {
+	a := Order{
+		Name:     "bad-scope",
+		Exec:     "scripts/x.sh",
+		Trigger:  "cooldown",
+		Interval: "5m",
+		Scope:    "global",
+	}
+	err := Validate(a)
+	if err == nil {
+		t.Fatal("Validate succeeded, want unknown-scope rejection")
+	}
+	if !strings.Contains(err.Error(), "scope") {
+		t.Fatalf("Validate error = %q, want scope context", err.Error())
+	}
+}
+
+func TestValidateAcceptsCityAndRigScope(t *testing.T) {
+	for _, scope := range []string{"", "city", "rig"} {
+		a := Order{
+			Name:     "scoped",
+			Exec:     "scripts/x.sh",
+			Trigger:  "cooldown",
+			Interval: "5m",
+			Scope:    scope,
+		}
+		if err := Validate(a); err != nil {
+			t.Errorf("Validate(scope=%q) = %v, want nil", scope, err)
+		}
+	}
+}
+
+func TestParseOrderParams(t *testing.T) {
+	data := []byte(`
+[order]
+formula = "pr-review"
+trigger = "manual"
+
+[order.params]
+repo = { required = true }
+pr = { required = true }
+note = {}
+`)
+	a, err := Parse(data)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if len(a.Params) != 3 {
+		t.Fatalf("len(Params) = %d, want 3", len(a.Params))
+	}
+	if !a.Params["repo"].Required {
+		t.Fatal("Params[repo].Required = false, want true")
+	}
+	if a.Params["note"].Required {
+		t.Fatal("Params[note].Required = true, want false")
+	}
+}
+
+func TestValidateRequiredParams(t *testing.T) {
+	a := Order{
+		Name:    "pr-review",
+		Formula: "pr-review",
+		Trigger: "manual",
+		Params: map[string]OrderParam{
+			"repo": {Required: true},
+			"pr":   {Required: true},
+			"note": {Required: false},
+		},
+	}
+
+	if err := ValidateRequiredParams(a, map[string]string{"repo": "octo/demo", "pr": "1"}); err != nil {
+		t.Fatalf("ValidateRequiredParams with all required present = %v, want nil", err)
+	}
+
+	// Optional param may be omitted.
+	if err := ValidateRequiredParams(a, map[string]string{"repo": "octo/demo", "pr": "1", "extra": "ignored"}); err != nil {
+		t.Fatalf("ValidateRequiredParams with optional omitted = %v, want nil", err)
+	}
+
+	err := ValidateRequiredParams(a, map[string]string{"repo": "octo/demo"})
+	if err == nil {
+		t.Fatal("ValidateRequiredParams with missing pr = nil, want error")
+	}
+	if !strings.Contains(err.Error(), "pr") {
+		t.Fatalf("error = %q, want it to name missing param pr", err.Error())
+	}
+
+	// A present-but-empty value counts as MISSING: webhook arg extraction inserts
+	// the key even when the payload path resolved to "", so a required param that
+	// rendered empty must not be treated as supplied (else the order fires with an
+	// empty required value).
+	emptyErr := ValidateRequiredParams(a, map[string]string{"repo": "octo/demo", "pr": ""})
+	if emptyErr == nil {
+		t.Fatal("ValidateRequiredParams with empty-but-present pr = nil, want error (empty required value is not supplied)")
+	}
+	if !strings.Contains(emptyErr.Error(), "pr") {
+		t.Fatalf("error = %q, want it to name the empty required param pr", emptyErr.Error())
+	}
+
+	// A whitespace-only value is likewise treated as missing.
+	if err := ValidateRequiredParams(a, map[string]string{"repo": "octo/demo", "pr": "   "}); err == nil {
+		t.Fatal("ValidateRequiredParams with whitespace-only pr = nil, want error")
+	}
+}
+
+func TestParseCronTZ(t *testing.T) {
+	data := []byte(`
+[order]
+formula = "mol-digest-generate"
+trigger = "cron"
+schedule = "30 19 * * *"
+tz = "America/New_York"
+`)
+	a, err := Parse(data)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if a.TZ != "America/New_York" {
+		t.Errorf("TZ = %q, want %q", a.TZ, "America/New_York")
+	}
+}
+
+func TestValidateCronTZ(t *testing.T) {
+	a := Order{Name: "digest", Formula: "mol-digest", Trigger: "cron", Schedule: "30 19 * * *", TZ: "America/New_York"}
+	if err := Validate(a); err != nil {
+		t.Errorf("Validate: %v", err)
+	}
+}
+
+// A misspelled zone must fail order load loudly — a silent fallback would
+// move the order's schedule onto a different wall clock.
+func TestValidateCronBadTZ(t *testing.T) {
+	a := Order{Name: "digest", Formula: "mol-digest", Trigger: "cron", Schedule: "30 19 * * *", TZ: "America/New_Yrok"}
+	err := Validate(a)
+	if err == nil {
+		t.Fatal("Validate should fail: bad tz")
+	}
+	if !strings.Contains(err.Error(), `invalid tz "America/New_Yrok"`) {
+		t.Errorf("error = %q, want it to name the invalid tz", err)
 	}
 }

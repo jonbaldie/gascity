@@ -265,13 +265,7 @@ prefix = "fe"
 func TestDoBeadsCityUseExternalStopsManagedLocalProvider(t *testing.T) {
 	cityDir := t.TempDir()
 	callLog := filepath.Join(cityDir, "provider-calls.log")
-	script := gcBeadsBdScriptPath(cityDir)
-	if err := os.MkdirAll(filepath.Dir(script), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(script, []byte("#!/bin/sh\necho \"$1|${GC_DOLT_HOST:-}|${GC_DOLT_PORT:-}\" >> "+callLog+"\nexit 0\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	script := writeManagedBdTestScript(t, "#!/bin/sh\necho \"$1|${GC_DOLT_HOST:-}|${GC_DOLT_PORT:-}\" >> "+callLog+"\nexit 0\n")
 
 	writeCityEndpointCityConfigWithCompat(t, cityDir, config.DoltConfig{}, nil)
 	writeRigEndpointMetadata(t, cityDir, "hq")
@@ -280,12 +274,25 @@ func TestDoBeadsCityUseExternalStopsManagedLocalProvider(t *testing.T) {
 		EndpointOrigin: contract.EndpointOriginManagedCity,
 		EndpointStatus: contract.EndpointStatusVerified,
 	})
+	if err := writeDoltRuntimeStateFile(managedDoltStatePath(cityDir), doltRuntimeState{
+		Running:   true,
+		PID:       os.Getpid(),
+		Port:      33123,
+		DataDir:   filepath.Join(cityDir, ".beads", "dolt"),
+		StartedAt: "2026-05-15T00:00:00Z",
+	}); err != nil {
+		t.Fatalf("write managed runtime state: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(cityDir, ".beads", "dolt-server.port"), []byte("33123\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	origVerify := verifyCityExternalEndpoint
 	defer func() { verifyCityExternalEndpoint = origVerify }()
 	verifyCityExternalEndpoint = func(contract.ConfigState, string, string) error { return nil }
 
 	t.Setenv("GC_BEADS", "exec:"+script)
+	t.Setenv("GC_BEADS_SCOPE_ROOT", cityDir)
 	var stdout, stderr bytes.Buffer
 	code := doBeadsCityEndpoint(fsys.OSFS{}, cityDir, cityEndpointOptions{
 		External:        true,
@@ -302,21 +309,21 @@ func TestDoBeadsCityUseExternalStopsManagedLocalProvider(t *testing.T) {
 		t.Fatalf("reading call log: %v", err)
 	}
 	ops := strings.TrimSpace(string(data))
-	if ops != "stop||" {
-		t.Fatalf("provider call log = %q, want stop with managed env captured before external rewrite", ops)
+	if ops != "stop||" && ops != "stop||33123" {
+		t.Fatalf("provider call log = %q, want stop without the rewritten external endpoint", ops)
+	}
+	if _, err := os.Stat(managedDoltStatePath(cityDir)); !os.IsNotExist(err) {
+		t.Fatalf("published managed runtime state still present, stat err = %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(cityDir, ".beads", "dolt-server.port")); !os.IsNotExist(err) {
+		t.Fatalf("managed port mirror still present, stat err = %v", err)
 	}
 }
 
 func TestDoBeadsCityUseExternalValidationFailureDoesNotStopManagedLocalProvider(t *testing.T) {
 	cityDir := t.TempDir()
 	callLog := filepath.Join(cityDir, "provider-calls.log")
-	script := gcBeadsBdScriptPath(cityDir)
-	if err := os.MkdirAll(filepath.Dir(script), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(script, []byte("#!/bin/sh\necho \"$1\" >> "+callLog+"\nexit 0\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	script := writeManagedBdTestScript(t, "#!/bin/sh\necho \"$1\" >> "+callLog+"\nexit 0\n")
 
 	writeCityEndpointCityConfigWithCompat(t, cityDir, config.DoltConfig{}, nil)
 	writeRigEndpointMetadata(t, cityDir, "hq")
@@ -331,6 +338,7 @@ func TestDoBeadsCityUseExternalValidationFailureDoesNotStopManagedLocalProvider(
 	verifyCityExternalEndpoint = func(contract.ConfigState, string, string) error { return fmt.Errorf("nope") }
 
 	t.Setenv("GC_BEADS", "exec:"+script)
+	t.Setenv("GC_BEADS_SCOPE_ROOT", cityDir)
 	var stdout, stderr bytes.Buffer
 	code := doBeadsCityEndpoint(fsys.OSFS{}, cityDir, cityEndpointOptions{
 		External: true,
@@ -345,20 +353,77 @@ func TestDoBeadsCityUseExternalValidationFailureDoesNotStopManagedLocalProvider(
 	}
 }
 
+func TestSyncCityManagedPortArtifactsSkipsNonOwnedPostgresCity(t *testing.T) {
+	t.Setenv("GC_BEADS", "bd")
+
+	cityDir := t.TempDir()
+	inheritDir := filepath.Join(t.TempDir(), "frontend")
+	if err := os.MkdirAll(inheritDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeCityEndpointCityConfigWithCompat(t, cityDir, config.DoltConfig{}, []config.Rig{{Name: "frontend", Path: inheritDir, Prefix: "fe"}})
+	writeOpaqueBindingScopeFixture(t, cityDir)
+	for _, dir := range []string{cityDir, inheritDir} {
+		if err := os.MkdirAll(filepath.Join(dir, ".beads"), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, ".beads", "dolt-server.port"), []byte("3311\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	plans := []cityRigEndpointPlan{{
+		Update: true,
+		Rig:    config.Rig{Name: "frontend", Path: inheritDir, Prefix: "fe"},
+		Target: contract.ConfigState{
+			EndpointOrigin: contract.EndpointOriginInheritedCity,
+		},
+	}}
+	err := syncCityManagedPortArtifacts(fsys.OSFS{}, cityDir, contract.ConfigState{
+		EndpointOrigin: contract.EndpointOriginManagedCity,
+	}, plans)
+	if err != nil {
+		t.Fatalf("syncCityManagedPortArtifacts: %v", err)
+	}
+	for _, dir := range []string{cityDir, inheritDir} {
+		if got := strings.TrimSpace(string(mustReadFile(t, filepath.Join(dir, ".beads", "dolt-server.port")))); got != "3311" {
+			t.Fatalf("%s port file = %q, want preserved stale managed port for non-owned city", dir, got)
+		}
+	}
+}
+
+func TestSyncCityManagedPortArtifactsPropagatesOwnedPortReadError(t *testing.T) {
+	t.Setenv("GC_BEADS", "bd")
+
+	cityDir := t.TempDir()
+	writeCityEndpointCityConfigWithCompat(t, cityDir, config.DoltConfig{}, nil)
+	writeRigEndpointMetadata(t, cityDir, "hq")
+	if err := os.MkdirAll(filepath.Dir(managedDoltStatePath(cityDir)), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(managedDoltStatePath(cityDir), []byte("not-json"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	err := syncCityManagedPortArtifacts(fsys.OSFS{}, cityDir, contract.ConfigState{
+		EndpointOrigin: contract.EndpointOriginManagedCity,
+	}, nil)
+	if err == nil {
+		t.Fatal("syncCityManagedPortArtifacts error = nil, want malformed managed runtime state error")
+	}
+	if !strings.Contains(err.Error(), "reading managed runtime published port") {
+		t.Fatalf("syncCityManagedPortArtifacts error = %v, want published port context", err)
+	}
+}
+
 func TestDoBeadsCityUseExternalStopFailureKeepsExternalConfig(t *testing.T) {
 	cityDir := t.TempDir()
 	inheritDir := filepath.Join(t.TempDir(), "frontend")
 	callLog := filepath.Join(cityDir, "provider-calls.log")
-	script := gcBeadsBdScriptPath(cityDir)
-	if err := os.MkdirAll(filepath.Dir(script), 0o755); err != nil {
-		t.Fatal(err)
-	}
 	if err := os.MkdirAll(inheritDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(script, []byte("#!/bin/sh\n"+"echo \"$1\" >> "+callLog+"\n"+"if [ \"$1\" = \"stop\" ]; then\n"+"  echo stop-failed >&2\n"+"  exit 1\n"+"fi\n"+"exit 0\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	script := writeManagedBdTestScript(t, "#!/bin/sh\n"+"echo \"$1\" >> "+callLog+"\n"+"if [ \"$1\" = \"stop\" ]; then\n"+"  echo stop-failed >&2\n"+"  exit 1\n"+"fi\n"+"exit 0\n")
 
 	writeCityEndpointCityConfigWithCompat(t, cityDir, config.DoltConfig{}, []config.Rig{{Name: "frontend", Path: inheritDir, Prefix: "fe"}})
 	writeRigEndpointMetadata(t, cityDir, "hq")
@@ -387,6 +452,7 @@ func TestDoBeadsCityUseExternalStopFailureKeepsExternalConfig(t *testing.T) {
 	verifyCityExternalEndpoint = func(contract.ConfigState, string, string) error { return nil }
 
 	t.Setenv("GC_BEADS", "exec:"+script)
+	t.Setenv("GC_BEADS_SCOPE_ROOT", cityDir)
 	var stdout, stderr bytes.Buffer
 	code := doBeadsCityEndpoint(fsys.OSFS{}, cityDir, cityEndpointOptions{
 		External:        true,
@@ -458,18 +524,14 @@ func TestDoBeadsCityUseExternalRewritesCompatRigWithRelativePath(t *testing.T) {
 	}
 
 	got := readCityEndpointRigCompat(t, cityDir, "frontend")
-	if got.Path != "" {
-		t.Fatalf("frontend city.toml rig path = %q, want empty after site-binding write", got.Path)
+	// The in-place endpoint editor touches only the dolt keys: a legacy
+	// path key stays in city.toml (migrating it to .gc/site.toml is
+	// gc doctor --fix's job, no longer a rewrite side effect here).
+	if got.Path != inheritRel {
+		t.Fatalf("frontend city.toml rig path = %q, want %q preserved in place", got.Path, inheritRel)
 	}
 	if got.DoltHost != "db.example.com" || got.DoltPort != "4406" {
 		t.Fatalf("frontend city.toml rig compat = %+v", got)
-	}
-	binding, err := config.LoadSiteBinding(fsys.OSFS{}, cityDir)
-	if err != nil {
-		t.Fatalf("LoadSiteBinding: %v", err)
-	}
-	if len(binding.Rigs) != 1 || binding.Rigs[0].Name != "frontend" || binding.Rigs[0].Path != inheritRel {
-		t.Fatalf("site binding = %+v, want frontend=%s", binding.Rigs, inheritRel)
 	}
 	state := readRigEndpointConfigState(t, inheritDir)
 	if state.EndpointOrigin != contract.EndpointOriginInheritedCity || state.DoltHost != "db.example.com" || state.DoltPort != "4406" || state.DoltUser != "city-user" {
@@ -674,12 +736,13 @@ func TestDoBeadsCityUseManagedPreservesCompatOnlyExplicitRigs(t *testing.T) {
 func TestSyncCityEndpointCompatConfigUsesAtomicWrite(t *testing.T) {
 	fs := fsys.NewFake()
 	cityDir := "/city"
+	fs.Dirs[cityDir] = true
 	cfg := &config.City{
 		Workspace: config.Workspace{Name: "test-city"},
 		Dolt:      config.DoltConfig{Host: "old-city.example.com", Port: 3306},
 		Rigs:      []config.Rig{{Name: "frontend", Path: "/city/frontend", Prefix: "fe", DoltHost: "old-frontend.example.com", DoltPort: "3306"}},
 	}
-	if err := syncCityEndpointCompatConfig(fs, cityDir, filepath.Join(cityDir, "city.toml"), cfg, contract.ConfigState{IssuePrefix: "gc", EndpointOrigin: contract.EndpointOriginManagedCity, EndpointStatus: contract.EndpointStatusVerified}, nil); err != nil {
+	if err := syncCityEndpointCompatConfig(fs, cityDir, filepath.Join(cityDir, "city.toml"), cfg, contract.ConfigState{IssuePrefix: "gc", EndpointOrigin: contract.EndpointOriginManagedCity, EndpointStatus: contract.EndpointStatusVerified}, nil, &bytes.Buffer{}); err != nil {
 		t.Fatalf("syncCityEndpointCompatConfig: %v", err)
 	}
 	var renamed bool
@@ -809,5 +872,154 @@ func writeCityEndpointCityConfig(t *testing.T, cityDir string, rigs []config.Rig
 	}
 	if err := os.WriteFile(filepath.Join(cityDir, "city.toml"), []byte(content), 0o644); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// Regression test for the ga-lurp5d follow-up: a failed topology change must
+// roll back a symlinked city.toml by restoring the link target, not by
+// replacing the link with a regular file.
+func TestCityTopologyRollbackRestoresThroughCityTomlSymlink(t *testing.T) {
+	fs := fsys.OSFS{}
+	cityDir, link, target := setupSymlinkedCityToml(t)
+
+	snapshots, err := snapshotCityTopologyFiles(fs, cityDir, nil)
+	if err != nil {
+		t.Fatalf("snapshotCityTopologyFiles: %v", err)
+	}
+	if err := os.WriteFile(target, []byte("[workspace]\nname = \"mutated\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := restoreSnapshots(fs, snapshots); err != nil {
+		t.Fatalf("restoreSnapshots: %v", err)
+	}
+	assertCityTomlSymlinkRestored(t, link, target, symlinkedCityTomlOriginal)
+}
+
+const commentedEndpointCityToml = `# City header comment — operational notes live here.
+# EMERGENCY ROLLBACK: cp city.toml.bak city.toml && gc kickstart
+
+[workspace]
+name = "test-city" # workspace trailing comment
+
+# Why the dolt endpoint is pinned: incident notes.
+[dolt]
+host = "stale-city.example.com" # endpoint rationale
+port = 3306
+
+[[rigs]]
+name = "frontend" # rig trailing comment
+path = "%s"
+prefix = "fe"
+# dolt_host mirrors the city endpoint for laptop writers
+dolt_host = "stale-frontend.example.com"
+dolt_port = "3306"
+`
+
+// setupCommentedEndpointCity writes a commented city.toml with one inherited
+// rig, both scopes already city-canonical so use-external is a pure config
+// edit (no managed provider transition).
+func setupCommentedEndpointCity(t *testing.T) (cityDir, inheritDir, cityToml string) {
+	t.Helper()
+	cityDir = t.TempDir()
+	inheritDir = filepath.Join(t.TempDir(), "frontend")
+	if err := os.MkdirAll(inheritDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(cityDir, ".gc"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cityToml = fmt.Sprintf(commentedEndpointCityToml, inheritDir)
+	if err := os.WriteFile(filepath.Join(cityDir, "city.toml"), []byte(cityToml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeRigEndpointMetadata(t, cityDir, "hq")
+	writeRigEndpointMetadata(t, inheritDir, "fe")
+	writeRigEndpointCanonicalConfig(t, cityDir, contract.ConfigState{IssuePrefix: "gc", EndpointOrigin: contract.EndpointOriginCityCanonical, EndpointStatus: contract.EndpointStatusVerified, DoltHost: "stale-city.example.com", DoltPort: "3306", DoltUser: "city-user"})
+	writeRigEndpointCanonicalConfig(t, inheritDir, contract.ConfigState{IssuePrefix: "fe", EndpointOrigin: contract.EndpointOriginInheritedCity, EndpointStatus: contract.EndpointStatusVerified, DoltHost: "stale-city.example.com", DoltPort: "3306", DoltUser: "city-user"})
+	return cityDir, inheritDir, cityToml
+}
+
+// Regression test for the marshal round-trip that rewrote city.toml wholesale
+// on use-external, stripping every comment: the endpoint sync must edit only
+// the dolt endpoint keys and leave every other byte alone.
+func TestDoBeadsCityUseExternalPreservesCityTomlCommentsAndLayout(t *testing.T) {
+	t.Setenv("GC_BEADS", "bd")
+	cityDir, _, original := setupCommentedEndpointCity(t)
+
+	var stdout, stderr bytes.Buffer
+	code := doBeadsCityEndpoint(fsys.OSFS{}, cityDir, cityEndpointOptions{External: true, Host: "127.0.0.1", Port: "4406", AdoptUnverified: true}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("doBeadsCityEndpoint() = %d, stderr = %s", code, stderr.String())
+	}
+
+	got := string(mustReadFile(t, filepath.Join(cityDir, "city.toml")))
+	want := strings.NewReplacer(
+		`host = "stale-city.example.com" # endpoint rationale`, `host = "127.0.0.1" # endpoint rationale`,
+		"port = 3306\n", "port = 4406\n",
+		`dolt_host = "stale-frontend.example.com"`, `dolt_host = "127.0.0.1"`,
+		`dolt_port = "3306"`, `dolt_port = "4406"`,
+	).Replace(original)
+	if got != want {
+		t.Fatalf("city.toml after use-external = %q, want %q", got, want)
+	}
+	if strings.Contains(stderr.String(), "comments may be lost") {
+		t.Fatalf("stderr = %q, want no rewrite fallback warning", stderr.String())
+	}
+}
+
+// An exotic layout the in-place editor does not understand (inline [dolt]
+// table) still updates correctly via the struct rewrite, but must warn that
+// the rewrite drops comments instead of doing so silently.
+func TestDoBeadsCityUseExternalWarnsBeforeLossyRewriteFallback(t *testing.T) {
+	t.Setenv("GC_BEADS", "bd")
+	cityDir, inheritDir, _ := setupCommentedEndpointCity(t)
+	inline := fmt.Sprintf(`# comment that the fallback rewrite will drop
+dolt = { host = "stale-city.example.com", port = 3306 }
+
+[workspace]
+name = "test-city"
+
+[[rigs]]
+name = "frontend"
+path = "%s"
+prefix = "fe"
+dolt_host = "stale-frontend.example.com"
+dolt_port = "3306"
+`, inheritDir)
+	if err := os.WriteFile(filepath.Join(cityDir, "city.toml"), []byte(inline), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := doBeadsCityEndpoint(fsys.OSFS{}, cityDir, cityEndpointOptions{External: true, Host: "127.0.0.1", Port: "4406", AdoptUnverified: true}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("doBeadsCityEndpoint() = %d, stderr = %s", code, stderr.String())
+	}
+	cityToml := readCityEndpointToml(t, cityDir)
+	if cityToml.Dolt.Host != "127.0.0.1" || cityToml.Dolt.Port != 4406 {
+		t.Fatalf("city toml = %+v", cityToml.Dolt)
+	}
+	if !strings.Contains(stderr.String(), "comments may be lost") {
+		t.Fatalf("stderr = %q, want lossy rewrite warning", stderr.String())
+	}
+}
+
+// Regression test: dry-run announced only .beads/config.yaml while the apply
+// also rewrote city.toml as a side effect. The dry-run must name city.toml
+// whenever the apply would touch it.
+func TestDoBeadsCityUseExternalDryRunAnnouncesCityTomlChange(t *testing.T) {
+	t.Setenv("GC_BEADS", "bd")
+	cityDir, _, original := setupCommentedEndpointCity(t)
+
+	var stdout, stderr bytes.Buffer
+	code := doBeadsCityEndpoint(fsys.OSFS{}, cityDir, cityEndpointOptions{External: true, Host: "127.0.0.1", Port: "4406", DryRun: true}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("doBeadsCityEndpoint() = %d, stderr = %s", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "file: city.toml") {
+		t.Fatalf("stdout = %q, want city.toml announced", stdout.String())
+	}
+	if got := string(mustReadFile(t, filepath.Join(cityDir, "city.toml"))); got != original {
+		t.Fatalf("city.toml changed during dry-run:\n%s", got)
 	}
 }

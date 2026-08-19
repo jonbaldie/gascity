@@ -19,9 +19,12 @@ type Provider struct {
 
 var (
 	_ runtime.Provider                      = (*Provider)(nil)
+	_ runtime.DeadRuntimeSessionChecker     = (*Provider)(nil)
 	_ runtime.InteractionProvider           = (*Provider)(nil)
 	_ runtime.InterruptBoundaryWaitProvider = (*Provider)(nil)
 	_ runtime.InterruptedTurnResetProvider  = (*Provider)(nil)
+	_ runtime.RelaunchProvider              = (*Provider)(nil)
+	_ runtime.LivenessObserver              = (*Provider)(nil)
 )
 
 // New creates a hybrid provider. isRemote returns true for sessions
@@ -57,6 +60,16 @@ func (p *Provider) IsRunning(name string) bool {
 	return p.route(name).IsRunning(name)
 }
 
+// IsDeadRuntimeSession delegates to the routed backend when it can positively
+// distinguish live sessions from visible dead artifacts.
+func (p *Provider) IsDeadRuntimeSession(name string) (bool, error) {
+	checker, ok := p.route(name).(runtime.DeadRuntimeSessionChecker)
+	if !ok {
+		return false, nil
+	}
+	return checker.IsDeadRuntimeSession(name)
+}
+
 // IsAttached delegates to the routed backend.
 func (p *Provider) IsAttached(name string) bool {
 	return p.route(name).IsAttached(name)
@@ -70,6 +83,14 @@ func (p *Provider) Attach(name string) error {
 // ProcessAlive delegates to the routed backend.
 func (p *Provider) ProcessAlive(name string, processNames []string) bool {
 	return p.route(name).ProcessAlive(name, processNames)
+}
+
+// ObserveLiveness delegates to the routed backend through runtime.ObserveLiveness
+// so the backend's native LivenessObserver fast-path is preserved (e.g. herdr's
+// agent-status liveness) instead of collapsing to the generic
+// IsRunning+ProcessAlive fold.
+func (p *Provider) ObserveLiveness(name string, processNames []string) runtime.Liveness {
+	return runtime.ObserveLiveness(p.route(name), name, processNames)
 }
 
 // Nudge delegates to the routed backend.
@@ -102,6 +123,16 @@ func (p *Provider) ResetInterruptedTurn(ctx context.Context, name string) error 
 		return rp.ResetInterruptedTurn(ctx, name)
 	}
 	return runtime.ErrInteractionUnsupported
+}
+
+// Relaunch forwards a warm-box agent relaunch to the routed backend when it
+// supports one, so the reconciler's RelaunchProvider type-assert is not masked
+// by the hybrid router.
+func (p *Provider) Relaunch(ctx context.Context, name string, cfg runtime.Config) error {
+	if rp, ok := p.route(name).(runtime.RelaunchProvider); ok {
+		return rp.Relaunch(ctx, name, cfg)
+	}
+	return runtime.ErrRelaunchUnsupported
 }
 
 // WaitForInterruptBoundary delegates to the routed backend when it can confirm
