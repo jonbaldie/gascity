@@ -311,6 +311,123 @@ func TestRegisterCityWithSupervisorRetriesControllerLockInitFailure(t *testing.T
 	}
 }
 
+func TestRegisterCityWithSupervisorTreatsReloadTimeoutAsAsyncStart(t *testing.T) {
+	gcHome := t.TempDir()
+	t.Setenv("GC_HOME", gcHome)
+
+	cityPath := filepath.Join(t.TempDir(), "bright-lights")
+	if err := os.MkdirAll(cityPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cityPath, "city.toml"), []byte("[workspace]\nname = \"bright-lights\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	reloads := 0
+	withSupervisorTestHooks(
+		t,
+		func(_, _ io.Writer) int { return 0 },
+		func(_, stderr io.Writer) int {
+			reloads++
+			_, _ = io.WriteString(stderr, supervisorReloadReconcileTimeoutMessage+"\n")
+			return 1
+		},
+		func() int { return 0 },
+		func(string) (bool, string, bool) { return true, "", true },
+		20*time.Millisecond,
+		time.Millisecond,
+	)
+	waited := 0
+	waitForSupervisorCityHook = func(path string, wantRunning bool, _ time.Duration, _ io.Writer) error {
+		waited++
+		if canonicalTestPath(path) != canonicalTestPath(cityPath) {
+			t.Fatalf("wait path = %q, want %q", path, cityPath)
+		}
+		if !wantRunning {
+			t.Fatal("waitForSupervisorCityHook wantRunning = false, want true")
+		}
+		return nil
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := registerCityWithSupervisor(cityPath, &stdout, &stderr, "gc register", true)
+	if code != 0 {
+		t.Fatalf("registerCityWithSupervisor code = %d, want 0\nstdout: %s\nstderr: %s", code, stdout.String(), stderr.String())
+	}
+	if strings.Contains(stderr.String(), "keeping registration") {
+		t.Fatalf("stderr = %q, did not expect keep-registration message", stderr.String())
+	}
+	if reloads != 1 {
+		t.Fatalf("reloadSupervisorHook called %d times, want 1", reloads)
+	}
+	if waited != 1 {
+		t.Fatalf("waitForSupervisorCityHook called %d times, want 1", waited)
+	}
+}
+
+func TestRegisterCityWithSupervisorKeepsRegistrationWhenReloadTimeoutNeverBecomesReady(t *testing.T) {
+	gcHome := t.TempDir()
+	t.Setenv("GC_HOME", gcHome)
+
+	cityPath := filepath.Join(t.TempDir(), "bright-lights")
+	if err := os.MkdirAll(cityPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cityPath, "city.toml"), []byte("[workspace]\nname = \"bright-lights\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	reloads := 0
+	withSupervisorTestHooks(
+		t,
+		func(_, _ io.Writer) int { return 0 },
+		func(_, stderr io.Writer) int {
+			reloads++
+			_, _ = io.WriteString(stderr, supervisorReloadReconcileTimeoutMessage+"\n")
+			return 1
+		},
+		func() int { return 0 },
+		func(string) (bool, string, bool) { return false, "", true },
+		20*time.Millisecond,
+		time.Millisecond,
+	)
+	waited := 0
+	waitForSupervisorCityHook = func(path string, wantRunning bool, _ time.Duration, _ io.Writer) error {
+		waited++
+		if canonicalTestPath(path) != canonicalTestPath(cityPath) {
+			t.Fatalf("wait path = %q, want %q", path, cityPath)
+		}
+		if !wantRunning {
+			t.Fatal("waitForSupervisorCityHook wantRunning = false, want true")
+		}
+		return errors.New("city did not become ready under supervisor")
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := registerCityWithSupervisor(cityPath, &stdout, &stderr, "gc register", true)
+	if code != 1 {
+		t.Fatalf("registerCityWithSupervisor code = %d, want 1\nstdout: %s\nstderr: %s", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "keeping registration") {
+		t.Fatalf("stderr = %q, want keep-registration message", stderr.String())
+	}
+	if reloads != 1 {
+		t.Fatalf("reloadSupervisorHook called %d times, want 1", reloads)
+	}
+	if waited != 1 {
+		t.Fatalf("waitForSupervisorCityHook called %d times, want 1", waited)
+	}
+
+	reg := supervisor.NewRegistry(supervisor.RegistryPath())
+	entries, err := reg.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || canonicalTestPath(entries[0].Path) != canonicalTestPath(cityPath) {
+		t.Fatalf("expected registry to retain %s, got %v", cityPath, entries)
+	}
+}
+
 func TestRegisterCityWithSupervisorKeepsRegistrationWhenReloadFails(t *testing.T) {
 	skipSlowCmdGCTest(t, "exercises supervisor registration retry behavior; run make test-cmd-gc-process for scenario coverage")
 	gcHome := t.TempDir()
