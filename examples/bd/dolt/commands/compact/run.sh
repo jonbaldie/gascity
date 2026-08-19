@@ -22,11 +22,14 @@
 #   2. Soft-reset to the root commit; all data stays staged.
 #   3. Commit everything as a single "compaction: flatten history" commit.
 #   4. Re-check post-flatten row counts, table value hashes, and database
-#      value hash. Row-count increases are treated as concurrent-writer
-#      evidence and allowed to continue only when table and database value
-#      hashes stay stable. Same-count table hash drift, table-list drift,
-#      or row-count decrease without a proven concurrent writer is
-#      quarantined before full GC.
+#      value hash. Per-table COUNT and HASHOF_TABLE are pinned to the
+#      flatten commit (Dolt revision database db/<flatten_head>) so
+#      concurrent inserts in the live working set cannot look like
+#      flatten data loss. Row-count increases at that snapshot are
+#      treated as concurrent-writer evidence absorbed into the flatten.
+#      Same-count table hash drift, table-list drift, or row-count
+#      decrease without a proven concurrent writer is quarantined
+#      before full GC.
 #   4a. Local-verify HEAD-stability gate. The pre-flight stability loop cannot
 #      close the residual window between its final HEAD check and the flatten,
 #      nor the window during post-flatten verify, so a normal MVCC writer (the
@@ -532,6 +535,17 @@ valid_branch_name() {
   esac
 }
 
+# Dolt revision databases are `db/<commit-or-ref>`. Compact pins COUNT and
+# HASHOF_TABLE to a commit so concurrent working-set inserts cannot look like
+# flatten corruption. Hashes in this script are alphanumeric (dolt commit
+# hashes and the compact test fixture names).
+valid_revision_spec() {
+  case "$1" in
+    ''|*[!A-Za-z0-9]*) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+
 refspec_env_value() {
   db="$1"
   valid_database_name "$db" || return 1
@@ -615,14 +629,28 @@ discover_database_names() {
 # dolt_query — wrapper that runs a single SQL statement against the
 # managed server with the configured port/host/user. Honors the
 # per-call timeout. Output is the raw -r result-format-tsv body.
+# Optional third argument is a Dolt revision (commit hash). When set, the
+# session connects to the revision database `db/rev` so COUNT(*) and
+# DOLT_HASHOF_TABLE read that commit's tree instead of the live working set.
+# HASHOF_TABLE is a unary function over the session root and does not honor
+# SQL AS OF, so the revision database is the supported snapshot pin.
 dolt_query() {
   db="$1"
   query="$2"
+  rev="${3:-}"
+  use_db="$db"
+  if [ -n "$rev" ]; then
+    if ! valid_revision_spec "$rev"; then
+      printf 'compact: db=%s invalid revision spec=%s — fail\n' "$db" "$rev" >&2
+      return 1
+    fi
+    use_db="$db/$rev"
+  fi
   export DOLT_CLI_PASSWORD="${GC_DOLT_PASSWORD:-}"
   run_bounded "$call_timeout" \
     dolt --host "$host" --port "$GC_DOLT_PORT" \
     --user "$GC_DOLT_USER" --no-tls \
-    --use-db "$db" \
+    --use-db "$use_db" \
     sql -r tabular -q "$query"
 }
 
@@ -639,9 +667,10 @@ query_single_cell() {
   db="$1"
   failure_message="$2"
   query="$3"
+  rev="${4:-}"
   out_tmp=$(mktemp)
   err_tmp=$(mktemp)
-  if ! dolt_query "$db" "$query" > "$out_tmp" 2>"$err_tmp"; then
+  if ! dolt_query "$db" "$query" "$rev" > "$out_tmp" 2>"$err_tmp"; then
     printf 'compact: db=%s %s\n' "$db" "$failure_message" >&2
     emit_error_file "$db" "$err_tmp"
     rm -f "$out_tmp" "$err_tmp"
@@ -830,19 +859,33 @@ version_dirty_dolt_ignore() {
   return 0
 }
 
-# row_count — COUNT(*) for one table. Returns "" on error.
+# row_count — COUNT(*) for one table at a pinned revision. Returns "" on error.
+# The revision is required: a live working-set count races concurrent inserts
+# and cannot distinguish captured churn from flatten data loss (#3341).
 row_count() {
   db="$1"
   table="$2"
+  rev="$3"
+  if [ -z "$rev" ]; then
+    printf 'compact: db=%s row count requires a revision pin for table=%s\n' \
+      "$db" "$table" >&2
+    return 1
+  fi
   query_single_cell "$db" "row count probe failed for table=$table" \
-    "SELECT COUNT(*) FROM \`$table\`"
+    "SELECT COUNT(*) FROM \`$table\`" "$rev"
 }
 
 table_value_hash() {
   db="$1"
   table="$2"
+  rev="$3"
+  if [ -z "$rev" ]; then
+    printf 'compact: db=%s table value hash requires a revision pin for table=%s\n' \
+      "$db" "$table" >&2
+    return 1
+  fi
   query_single_cell "$db" "table value hash probe failed for table=$table" \
-    "SELECT DOLT_HASHOF_TABLE('$table')"
+    "SELECT DOLT_HASHOF_TABLE('$table')" "$rev"
 }
 
 db_value_hash() {
@@ -1058,7 +1101,7 @@ preflight_counts() {
       preflight_excluded_tables="$preflight_excluded_tables $t"
       continue
     fi
-    if ! cnt=$(row_count "$db" "$t"); then
+    if ! cnt=$(row_count "$db" "$t" "$at_head"); then
       printf 'compact: db=%s pre-flight row count failed for table=%s\n' "$db" "$t" >&2
       preflight_failed=1
       break
@@ -1070,7 +1113,7 @@ preflight_counts() {
         break
         ;;
     esac
-    if ! table_hash=$(table_value_hash "$db" "$t"); then
+    if ! table_hash=$(table_value_hash "$db" "$t" "$at_head"); then
       printf 'compact: db=%s pre-flight table value hash failed for table=%s\n' "$db" "$t" >&2
       preflight_failed=1
       break
@@ -1090,15 +1133,18 @@ preflight_counts() {
   return "$preflight_failed"
 }
 
-# verify_counts — re-count/re-hash and compare against the pre-flight file.
-# Row-count decreases fail. Row-count increases are recorded as concurrent
-# writer evidence only when the table value hash stays stable. Any table hash
-# drift is quarantined before full GC because row-count gain alone cannot prove
-# pre-flight rows remain reachable. Sets category flags plus
-# verify_counts_failure_reason and verify_counts_failure_guidance for callers.
+# verify_counts — re-count/re-hash the flatten commit and compare against the
+# pre-flight file. Probes are pinned to <at_head> (the flatten commit) via a
+# Dolt revision database so concurrent inserts in the live working set cannot
+# look like flatten corruption. Row-count decreases at that snapshot fail.
+# Row-count increases at that snapshot are concurrent-writer evidence absorbed
+# into the flatten; hash drift there still cannot prove row preservation by
+# itself. Sets category flags plus verify_counts_failure_reason and
+# verify_counts_failure_guidance for callers.
 verify_counts() {
   db="$1"
   preflight="$2"
+  at_head="$3"
   fail=0
   verify_counts_saw_gain=0
   verify_counts_saw_gain_hash_drift=0
@@ -1111,6 +1157,12 @@ verify_counts() {
   verify_counts_failure_reason=""
   verify_counts_failure_guidance=""
   verify_counts_drift_details=""
+  if [ -z "$at_head" ]; then
+    verify_counts_saw_probe_failure=1
+    verify_counts_failure_reason="post-flatten row count probe failed"
+    verify_counts_failure_guidance="post-flatten integrity snapshot HEAD missing; investigate before re-running"
+    return 2
+  fi
   preflight_tables=""
   while IFS= read -r line; do
     [ -n "$line" ] || continue
@@ -1119,7 +1171,7 @@ verify_counts() {
     rest=${line#* }
     expected=${rest%% *}
     expected_hash=${rest#* }
-    if ! actual=$(row_count "$db" "$t"); then
+    if ! actual=$(row_count "$db" "$t" "$at_head"); then
       printf 'compact: db=%s post-flatten row count failed for table=%s\n' "$db" "$t" >&2
       verify_counts_saw_probe_failure=1
       if [ "$fail" -eq 0 ]; then
@@ -1141,7 +1193,7 @@ verify_counts() {
         continue
         ;;
     esac
-    if ! actual_hash=$(table_value_hash "$db" "$t"); then
+    if ! actual_hash=$(table_value_hash "$db" "$t" "$at_head"); then
       printf 'compact: db=%s post-flatten table value hash failed for table=%s\n' "$db" "$t" >&2
       verify_counts_saw_probe_failure=1
       if [ "$fail" -eq 0 ]; then
@@ -2542,7 +2594,7 @@ flatten_database() {
   fi
 
   verify_counts_rc=0
-  verify_counts "$db" "$preflight_tmp" || verify_counts_rc=$?
+  verify_counts "$db" "$preflight_tmp" "$flatten_head" || verify_counts_rc=$?
 
   # Writer-race gate (local-verify HEAD-stability). A normal MVCC writer (the
   # beads/mail workload) can commit to this db inside the flatten window, which

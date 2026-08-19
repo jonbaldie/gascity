@@ -413,10 +413,18 @@ state_file="${GC_FAKE_DOLT_STATE_FILE:-}"
 hash_state_file="${GC_FAKE_DOLT_HASH_STATE_FILE:-}"
 query=""
 db=""
+rev=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --use-db)
       db="$2"
+      rev=""
+      case "$db" in
+        */*)
+          rev="${db#*/}"
+          db="${db%%/*}"
+          ;;
+      esac
       shift 2
       ;;
     -q)
@@ -822,11 +830,22 @@ case "$query" in
       print_cell ""
       exit 0
     fi
-    if { [ "$mode" = "row_count_and_hash_diverges" ] || [ "$mode" = "same_table_replacement_with_row_gain" ] || [ "$mode" = "mixed_row_count_gain_and_same_count_hash_drift" ] || [ "$mode" = "writer_race_before_flatten" ] || [ "$mode" = "remote_writer_race_before_flatten" ] || [ "$mode" = "writer_race_during_verify" ] || [ "$mode" = "writer_race_with_mixed_same_count_hash_drift" ] || [ "$mode" = "row_count_decreases_with_writer_race" ] || [ "$mode" = "row_count_decreases_with_hash_change" ]; } && [ "$(current_head)" = "compactcommit" ]; then
+    # Concurrent inserts in the live working set after flatten. The flatten
+    # snapshot (rev=compactcommit / headcommit) keeps the pre-flight hash;
+    # only an unpinned live probe sees the writer.
+    if [ "$mode" = "live_inserts_during_verify" ]; then
+      if [ -z "$rev" ] && [ "$(current_head)" = "compactcommit" ]; then
+        print_cell hash-beads-after-writer
+        exit 0
+      fi
+      print_cell hash-beads-before
+      exit 0
+    fi
+    if { [ "$mode" = "row_count_and_hash_diverges" ] || [ "$mode" = "same_table_replacement_with_row_gain" ] || [ "$mode" = "mixed_row_count_gain_and_same_count_hash_drift" ] || [ "$mode" = "writer_race_before_flatten" ] || [ "$mode" = "remote_writer_race_before_flatten" ] || [ "$mode" = "writer_race_during_verify" ] || [ "$mode" = "writer_race_with_mixed_same_count_hash_drift" ] || [ "$mode" = "row_count_decreases_with_writer_race" ] || [ "$mode" = "row_count_decreases_with_hash_change" ]; } && { [ "$rev" = "compactcommit" ] || { [ -z "$rev" ] && [ "$(current_head)" = "compactcommit" ]; }; }; then
       print_cell hash-beads-after-writer
       exit 0
     fi
-    if [ "$mode" = "same_row_count_writer" ] && [ "$(current_head)" = "compactcommit" ]; then
+    if [ "$mode" = "same_row_count_writer" ] && { [ "$rev" = "compactcommit" ] || { [ -z "$rev" ] && [ "$(current_head)" = "compactcommit" ]; }; }; then
       print_cell hash-beads-after-writer
       exit 0
     fi
@@ -834,7 +853,7 @@ case "$query" in
     exit 0
     ;;
   *"DOLT_HASHOF_TABLE('notes')"*)
-    if { [ "$mode" = "mixed_row_count_gain_and_same_count_hash_drift" ] || [ "$mode" = "writer_race_with_mixed_same_count_hash_drift" ] || [ "$mode" = "same_count_hash_drift_then_probe_failure" ] || [ "$mode" = "probe_failure_then_same_count_hash_drift" ]; } && [ "$(current_head)" = "compactcommit" ]; then
+    if { [ "$mode" = "mixed_row_count_gain_and_same_count_hash_drift" ] || [ "$mode" = "writer_race_with_mixed_same_count_hash_drift" ] || [ "$mode" = "same_count_hash_drift_then_probe_failure" ] || [ "$mode" = "probe_failure_then_same_count_hash_drift" ]; } && { [ "$rev" = "compactcommit" ] || { [ -z "$rev" ] && [ "$(current_head)" = "compactcommit" ]; }; }; then
       print_cell hash-notes-after-writer
       exit 0
     fi
@@ -1012,6 +1031,14 @@ case "$query" in
       printf 'row count exploded\n' >&2
       exit 47
     fi
+    if [ "$mode" = "live_inserts_during_verify" ]; then
+      if [ -z "$rev" ] && [ "$(current_head)" = "compactcommit" ]; then
+        print_cell 11
+        exit 0
+      fi
+      print_cell 10
+      exit 0
+    fi
     calls=0
     if [ -n "$count_file" ] && [ -f "$count_file" ]; then
       calls="$(cat "$count_file")"
@@ -1024,9 +1051,9 @@ case "$query" in
       printf 'row count exploded after flatten\n' >&2
       exit 47
     fi
-    if { [ "$mode" = "row_count_gain_with_stable_hashes" ] || [ "$mode" = "row_count_gain_with_db_hash_drift" ] || [ "$mode" = "row_count_and_hash_diverges" ] || [ "$mode" = "same_table_replacement_with_row_gain" ] || [ "$mode" = "mixed_row_count_gain_and_same_count_hash_drift" ] || [ "$mode" = "writer_race_before_flatten" ] || [ "$mode" = "remote_writer_race_before_flatten" ] || [ "$mode" = "writer_race_during_verify" ] || [ "$mode" = "writer_race_db_hash_during_verify" ] || [ "$mode" = "writer_race_with_mixed_same_count_hash_drift" ]; } && [ "$calls" -gt 1 ]; then
+    if { [ "$mode" = "row_count_gain_with_stable_hashes" ] || [ "$mode" = "row_count_gain_with_db_hash_drift" ] || [ "$mode" = "row_count_and_hash_diverges" ] || [ "$mode" = "same_table_replacement_with_row_gain" ] || [ "$mode" = "mixed_row_count_gain_and_same_count_hash_drift" ] || [ "$mode" = "writer_race_before_flatten" ] || [ "$mode" = "remote_writer_race_before_flatten" ] || [ "$mode" = "writer_race_during_verify" ] || [ "$mode" = "writer_race_db_hash_during_verify" ] || [ "$mode" = "writer_race_with_mixed_same_count_hash_drift" ]; } && { [ "$rev" = "compactcommit" ] || [ "$calls" -gt 1 ]; }; then
       print_cell 11
-    elif { [ "$mode" = "row_count_decreases" ] || [ "$mode" = "row_count_decreases_with_writer_race" ] || [ "$mode" = "row_count_decreases_with_hash_change" ]; } && [ "$calls" -gt 1 ]; then
+    elif { [ "$mode" = "row_count_decreases" ] || [ "$mode" = "row_count_decreases_with_writer_race" ] || [ "$mode" = "row_count_decreases_with_hash_change" ]; } && { [ "$rev" = "compactcommit" ] || [ "$calls" -gt 1 ]; }; then
       print_cell 9
     else
       print_cell 10
@@ -2610,6 +2637,40 @@ func TestCompactScriptStillQuarantinesGainAndHashDriftWithStableHead(t *testing.
 	}
 	if strings.Contains(string(data), "DOLT_GC") {
 		t.Fatalf("stable-HEAD gain+drift must block full GC:\n%s", string(data))
+	}
+}
+
+// gastownhall/gascity#3341: a busy city's beads/mail writers insert during the
+// flatten window. Those rows land in the live working set (and maybe the next
+// commit) but the flatten commit itself still holds every pre-flight row.
+// Integrity must pin COUNT/HASHOF to that flatten snapshot so captured churn
+// cannot write a durable quarantine that disables GC until a human deletes it.
+func TestCompactScriptIgnoresLiveInsertsDuringVerify(t *testing.T) {
+	fixture := newCompactScriptFixture(t)
+	out, err := fixture.run(t, "live_inserts_during_verify", "GC_DOLT_COMPACT_THRESHOLD_COMMITS=500")
+	if err != nil {
+		t.Fatalf("live inserts during flatten must not fail compaction: %v\n%s", err, out)
+	}
+	if strings.Contains(out, "gained rows during flatten") {
+		t.Fatalf("pinned flatten snapshot must not observe live working-set inserts as row-count gain:\n%s", out)
+	}
+	if strings.Contains(out, "post-flatten INTEGRITY check failed") {
+		t.Fatalf("live inserts must not fail flatten integrity:\n%s", out)
+	}
+	quarantine := filepath.Join(fixture.cityPath, ".gc", "runtime", "packs", "dolt", "compact-quarantine", "beads")
+	if _, statErr := os.Stat(quarantine); !os.IsNotExist(statErr) {
+		t.Fatalf("concurrent inserts must NOT write a durable quarantine marker; stat=%v\n%s", statErr, out)
+	}
+	data, readErr := os.ReadFile(fixture.doltLog)
+	if readErr != nil {
+		t.Fatalf("read dolt log: %v", readErr)
+	}
+	log := string(data)
+	if !strings.Contains(log, "--use-db") && !strings.Contains(log, "DOLT_HASHOF_TABLE('beads')") {
+		t.Fatalf("compact should still hash-verify beads:\n%s", log)
+	}
+	if !strings.Contains(log, "DOLT_GC") {
+		t.Fatalf("flatten snapshot that preserved pre-flight rows must still run full GC:\n%s", log)
 	}
 }
 
