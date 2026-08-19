@@ -20,7 +20,7 @@ none requires per-city configuration.
 | `spawn-storm-detect` | cooldown | Detect beads repeatedly bouncing back to pool |
 | `prune-branches` | cooldown | Clean stale `gc/*` branches from all rigs |
 | `wisp-compact` | cooldown | TTL-based cleanup of expired ephemeral beads (wisps) |
-| **`nudge-on-route`** | **event `bead.updated`** | **Nudge the target session when a bead is routed to it** |
+| **`nudge-on-route`** | **event `bead.updated,bead.created`** | **Nudge the target session when a bead is routed to it** |
 | **`cascade-nudge-on-blocker-close`** | **event `bead.closed`** | **Nudge dependents' assignees when a blocker bead closes** |
 | **`notify-on-human-gate-creation`** | **event `bead.created`** | **Mail + nudge the addressee when a human gate bead is created** |
 | **`renudge-stale-human-gates`** | **cooldown 5m** | **Re-mail + re-nudge the addressee of a human gate left open past a staleness threshold** |
@@ -36,9 +36,10 @@ set"*). Without that nudge, a bead whose `metadata.gc.routed_to` is newly set
 or changed sits unclaimed against any worker not currently in an active turn
 cycle. This order ships that workaround.
 
-**Event contract.** Triggers on `bead.updated`. For each event whose bead
-carries a non-empty `metadata.gc.routed_to`, nudges that target with
-`check for assigned work`.
+**Event contract.** Triggers on `bead.updated` and `bead.created`. Formula
+steps stamp `gc.routed_to` in the creation payload, so a `bead.updated`-only
+trigger never sees them. For each event whose bead carries a non-empty
+`metadata.gc.routed_to`, nudges that target with `check for assigned work`.
 
 `routed_to` may be a concrete session **or** a pool base. Sling collapses a
 multi-session slot to the pool base (`NormalizePoolRouteTarget`), so a

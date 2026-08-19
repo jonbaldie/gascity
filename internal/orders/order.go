@@ -50,6 +50,8 @@ type Order struct {
 	// Check is a shell command that returns exit 0 when the formula should run (for condition triggers).
 	Check string `toml:"check,omitempty"`
 	// On is the event type to match (for event triggers). E.g., "bead.closed".
+	// Comma-separated types are OR'd: "bead.updated,bead.created" fires when
+	// either type appears after the order's cursor.
 	On string `toml:"on,omitempty"`
 	// Pool is the target agent/pool for dispatching the wisp.
 	Pool string `toml:"pool,omitempty"`

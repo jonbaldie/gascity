@@ -81,9 +81,11 @@ func assertEventExecOrder(t *testing.T, orderFile, eventType, scriptBase string)
 }
 
 // TestNudgeOnRouteOrder pins the nudge-on-route order's event contract: it wakes
-// on bead.updated and runs the nudge-on-route script.
+// on bead.updated AND bead.created (formula steps stamp gc.routed_to at
+// creation, so a bead.updated-only trigger structurally misses them) and runs
+// the nudge-on-route script.
 func TestNudgeOnRouteOrder(t *testing.T) {
-	assertEventExecOrder(t, "nudge-on-route.toml", "bead.updated", "nudge-on-route.sh")
+	assertEventExecOrder(t, "nudge-on-route.toml", "bead.updated,bead.created", "nudge-on-route.sh")
 }
 
 // TestCascadeNudgeOnBlockerCloseOrder pins the cascade-nudge order's event
@@ -134,6 +136,25 @@ func TestNudgeOnRouteResolvesPoolMembers(t *testing.T) {
 	for _, want := range []string{"gc session list", "--template"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("nudge-on-route.sh must resolve pool members; missing %q", want)
+		}
+	}
+}
+
+// TestNudgeOnRouteScriptReadsCreatedAlreadyRouted pins the #4382 trigger gap:
+// formula step beads stamp gc.routed_to in the creation payload, so the only
+// lifecycle event is bead.created. A bead.updated-only read never sees them.
+func TestNudgeOnRouteScriptReadsCreatedAlreadyRouted(t *testing.T) {
+	data, err := fs.ReadFile(PackFS, "assets/scripts/nudge-on-route.sh")
+	if err != nil {
+		t.Fatalf("reading nudge-on-route.sh: %v", err)
+	}
+	body := string(data)
+	for _, want := range []string{
+		"--type bead.updated",
+		"--type bead.created",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("nudge-on-route.sh must query %q so creation-stamped routes are visible", want)
 		}
 	}
 }

@@ -379,26 +379,48 @@ func checkEvent(a Order, ep events.Provider, cursorFn CursorFunc) TriggerResult 
 		cursor = cursorFn(a.ScopedName())
 	}
 
-	matched, err := ep.List(events.Filter{
-		Type:     a.On,
-		AfterSeq: cursor,
-	})
-	if err != nil {
-		return TriggerResult{Due: false, Reason: fmt.Sprintf("event: read error: %v", err)}
-	}
+	types := eventTriggerTypes(a.On)
 	var count int
-	for _, e := range matched {
-		// Exclude the dispatcher's own order-tracking bookkeeping beads so an
-		// event order never self-fires on lifecycle events emitted by those
-		// beads (upstream #3720; idle CPU storm #2463/#4133).
-		if !payloadHasLabel(e.Payload, labelOrderTracking) {
-			count++
+	for _, eventType := range types {
+		matched, err := ep.List(events.Filter{
+			Type:     eventType,
+			AfterSeq: cursor,
+		})
+		if err != nil {
+			return TriggerResult{Due: false, Reason: fmt.Sprintf("event: read error: %v", err)}
+		}
+		for _, e := range matched {
+			// Exclude the dispatcher's own order-tracking bookkeeping beads so an
+			// event order never self-fires on lifecycle events emitted by those
+			// beads (upstream #3720; idle CPU storm #2463/#4133).
+			if !payloadHasLabel(e.Payload, labelOrderTracking) {
+				count++
+			}
 		}
 	}
 	if count == 0 {
 		return TriggerResult{Due: false, Reason: "event: no matching events"}
 	}
-	return TriggerResult{Due: true, Reason: fmt.Sprintf("event: %d %s event(s)", count, a.On)}
+	if len(types) == 1 {
+		return TriggerResult{Due: true, Reason: fmt.Sprintf("event: %d %s event(s)", count, types[0])}
+	}
+	return TriggerResult{Due: true, Reason: fmt.Sprintf("event: %d matching event(s)", count)}
+}
+
+// eventTriggerTypes splits a comma-separated order `on` field into event types.
+// A single type is the common case; nudge-on-route listens for both
+// bead.updated and bead.created so creation-stamped gc.routed_to is visible.
+func eventTriggerTypes(on string) []string {
+	parts := strings.Split(on, ",")
+	types := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		types = append(types, part)
+	}
+	return types
 }
 
 // payloadHasLabel reports whether a JSON bead payload contains the given label.
