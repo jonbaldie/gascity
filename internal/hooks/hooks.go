@@ -18,11 +18,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/bootstrap/packs/core"
-	"github.com/gastownhall/gascity/internal/citylayout"
-	"github.com/gastownhall/gascity/internal/fsys"
-	"github.com/gastownhall/gascity/internal/overlay"
-	"github.com/gastownhall/gascity/internal/shellquote"
+	"github.com/jonbaldie/gascity/internal/bootstrap/packs/core"
+	"github.com/jonbaldie/gascity/internal/citylayout"
+	"github.com/jonbaldie/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/overlay"
+	"github.com/jonbaldie/gascity/internal/shellquote"
 )
 
 //go:embed config/*

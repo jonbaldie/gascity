@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/events"
 )
 
 const (

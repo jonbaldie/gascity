@@ -3,7 +3,7 @@ package auto
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
 // livenessObserverStub is a Fake that also reports a fixed LivenessObserver

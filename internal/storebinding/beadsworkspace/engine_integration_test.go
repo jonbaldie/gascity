@@ -18,7 +18,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // makeWorkspace creates the workspace a binding names and configures the id

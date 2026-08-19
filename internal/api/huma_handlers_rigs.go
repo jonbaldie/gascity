@@ -10,14 +10,14 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/gastownhall/gascity/internal/api/apierr"
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/configedit"
-	"github.com/gastownhall/gascity/internal/rig"
-	"github.com/gastownhall/gascity/internal/runtime"
-	"github.com/gastownhall/gascity/internal/ssrf"
-	workdirutil "github.com/gastownhall/gascity/internal/workdir"
+	"github.com/jonbaldie/gascity/internal/api/apierr"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/configedit"
+	"github.com/jonbaldie/gascity/internal/rig"
+	"github.com/jonbaldie/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/ssrf"
+	workdirutil "github.com/jonbaldie/gascity/internal/workdir"
 )
 
 // rigVisibilityTimeout / rigVisibilityPoll bound the G17 post-provision

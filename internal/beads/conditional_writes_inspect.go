@@ -1,6 +1,6 @@
 package beads
 
-import "github.com/gastownhall/gascity/internal/rollout/gate"
+import "github.com/jonbaldie/gascity/internal/rollout/gate"
 
 // Verdict vocabulary for conditional-writes inspection (§12.5). Probe reports
 // the memoized capability probe; Latch reports the runtime unsupported latch.

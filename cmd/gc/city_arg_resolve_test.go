@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/supervisor"
+	"github.com/jonbaldie/gascity/internal/supervisor"
 )
 
 // failingPathResolve returns a pathResolve closure that fails the test if it is

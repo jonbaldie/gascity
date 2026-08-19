@@ -415,11 +415,11 @@ boundaries.
   beads, wisp instantiation via MolCook, and label-based queries
 - [Config architecture](config.md) -- FormulaLayers resolution,
   pack expansion, and OrdersConfig
-- [Trigger evaluation logic](https://github.com/gastownhall/gascity/blob/main/internal/orders/triggers.go) --
+- [Trigger evaluation logic](https://github.com/jonbaldie/gascity/blob/main/internal/orders/triggers.go) --
   CheckTrigger implementation for all five trigger types
-- [Order discovery](https://github.com/gastownhall/gascity/blob/main/internal/orders/scanner.go) --
+- [Order discovery](https://github.com/jonbaldie/gascity/blob/main/internal/orders/scanner.go) --
   Scan function for formula layer traversal
-- [Controller dispatch](https://github.com/gastownhall/gascity/blob/main/cmd/gc/order_dispatch.go) --
+- [Controller dispatch](https://github.com/jonbaldie/gascity/blob/main/cmd/gc/order_dispatch.go) --
   production dispatcher wiring exec and formula orders
-- [Event type constants](https://github.com/gastownhall/gascity/blob/main/internal/events/events.go) --
+- [Event type constants](https://github.com/jonbaldie/gascity/blob/main/internal/events/events.go) --
   order.fired, order.completed, order.failed event types

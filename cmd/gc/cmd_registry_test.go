@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/credentialprovider"
+	"github.com/jonbaldie/gascity/internal/credentialprovider"
 )
 
 func TestBuildRegistryPublishRequestUsesCleanPushedGitHubHead(t *testing.T) {

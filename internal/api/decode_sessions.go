@@ -1,6 +1,6 @@
 package api
 
-import "github.com/gastownhall/gascity/internal/api/genclient"
+import "github.com/jonbaldie/gascity/internal/api/genclient"
 
 // SessionView is the CLI-facing shape for `gc session list` rows and
 // `gc session peek` output. It mirrors the subset of server-side

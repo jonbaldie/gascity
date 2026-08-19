@@ -7,8 +7,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/remotesource"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/remotesource"
 )
 
 // StaleLocalPackDirCheck warns when a remote pack binding has a same-named

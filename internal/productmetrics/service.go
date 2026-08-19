@@ -15,7 +15,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/gchome"
+	"github.com/jonbaldie/gascity/internal/gchome"
 	"github.com/google/uuid"
 	"golang.org/x/term"
 )

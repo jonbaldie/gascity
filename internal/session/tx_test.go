@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // sessionTxSpy separates the ways a write can reach the store: inside the one

@@ -34,7 +34,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beadmeta"
+	"github.com/jonbaldie/gascity/internal/beadmeta"
 )
 
 // errTallyRemoved rejects the removed [steps.tally] authoring surface. The

@@ -8,8 +8,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 func TestCollectAssignedWorkBeads_UsesCachedReadyEventStateForAssignedOpenHandoff(t *testing.T) {

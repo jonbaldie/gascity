@@ -10,14 +10,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/builtinpacks"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/deps"
-	"github.com/gastownhall/gascity/internal/fsys"
-	"github.com/gastownhall/gascity/internal/packman"
-	"github.com/gastownhall/gascity/internal/packregistry"
-	"github.com/gastownhall/gascity/internal/remotesource"
-	helpers "github.com/gastownhall/gascity/test/acceptance/helpers"
+	"github.com/jonbaldie/gascity/internal/builtinpacks"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/deps"
+	"github.com/jonbaldie/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/packman"
+	"github.com/jonbaldie/gascity/internal/packregistry"
+	"github.com/jonbaldie/gascity/internal/remotesource"
+	helpers "github.com/jonbaldie/gascity/test/acceptance/helpers"
 )
 
 func TestPackRegistryMainIsPreRegisteredOnVanillaInstall(t *testing.T) {

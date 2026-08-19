@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/runtime"
-	"github.com/gastownhall/gascity/internal/session"
-	storebindingsqlite "github.com/gastownhall/gascity/internal/storebinding/sqlite"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/session"
+	storebindingsqlite "github.com/jonbaldie/gascity/internal/storebinding/sqlite"
 	_ "modernc.org/sqlite"
 )
 

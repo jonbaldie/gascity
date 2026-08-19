@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	worker "github.com/gastownhall/gascity/internal/worker"
+	worker "github.com/jonbaldie/gascity/internal/worker"
 )
 
 func writeMalformedHistoryTranscript(t *testing.T, profile Profile) string {

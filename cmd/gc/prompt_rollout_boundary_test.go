@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/rollout"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/rollout"
 )
 
 // This file is PR-1a: the structural guarantee that feature-flag values (from
@@ -63,7 +63,7 @@ import (
 // init clause (which could leak x into the body) and NOT as an argument to
 // another call in the condition.
 
-const rolloutPkgPath = "github.com/gastownhall/gascity/internal/rollout"
+const rolloutPkgPath = "github.com/jonbaldie/gascity/internal/rollout"
 
 // promptRenderAnchors are the identifiers whose presence marks a file as part of
 // the prompt-render path. The render set is derived from these (not hardcoded),

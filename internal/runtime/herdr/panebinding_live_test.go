@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
 // TestProviderLiveOccupantSwapKeepsLiveness models the herdr ≥0.7.4 breakage

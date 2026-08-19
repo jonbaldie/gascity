@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // ra-59207: the session-close WORK-RELEASE sweep (releaseWorkFromClosedSessionBead)

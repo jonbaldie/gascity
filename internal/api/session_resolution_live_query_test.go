@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 func TestReassignOpenWorkAssignedToSession_UsesLiveOpenOwnership(t *testing.T) {

@@ -3,7 +3,7 @@ package session
 import (
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // ExactMetadataSessionCandidates returns session beads matching any exact

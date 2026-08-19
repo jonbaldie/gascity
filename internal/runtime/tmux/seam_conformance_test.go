@@ -6,7 +6,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
 // TestTmuxSeamsLifecycle proves the split Runtime/Transport contracts compose

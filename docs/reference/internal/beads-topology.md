@@ -75,7 +75,7 @@ ever see two of them:
 
 The two remaining values, `city_canonical` and `explicit`, are for cities and
 rigs that point at an external Dolt server. See the [Beads Dolt Contract
-design note](https://github.com/gastownhall/gascity/blob/main/engdocs/design/beads-dolt-contract-redesign.md)
+design note](https://github.com/jonbaldie/gascity/blob/main/engdocs/design/beads-dolt-contract-redesign.md)
 for the full matrix.
 
 ## One server, many logical scopes
@@ -158,7 +158,7 @@ overhead of running a second Dolt server per rig.
 The `gc bd --rig <name> ...` command is a small wrapper that changes directory
 into the named rig and runs `bd` there. It does not add a federation layer or
 do any cross-rig joining. The implementation
-([`cmd/gc/cmd_bd.go`](https://github.com/gastownhall/gascity/blob/main/cmd/gc/cmd_bd.go))
+([`cmd/gc/cmd_bd.go`](https://github.com/jonbaldie/gascity/blob/main/cmd/gc/cmd_bd.go))
 resolves the rig path, sets `cmd.Dir = target.ScopeRoot`, and exec's `bd` with
 your arguments. Anything `bd` cannot do from inside the rig, `gc bd` cannot
 do either.
@@ -176,6 +176,6 @@ for that — its job is to enforce per-scope namespacing.
   beads as Gas City's universal work primitive.
 - [Reference: Config](/reference/config) — every config key, including
   `rig.dolt_port` for advanced topologies.
-- [Beads Dolt Contract Redesign](https://github.com/gastownhall/gascity/blob/main/engdocs/design/beads-dolt-contract-redesign.md)
+- [Beads Dolt Contract Redesign](https://github.com/jonbaldie/gascity/blob/main/engdocs/design/beads-dolt-contract-redesign.md)
   — the full contributor-side design doc covering all four endpoint origins,
   validation rules, and migration history.

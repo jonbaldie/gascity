@@ -643,11 +643,11 @@ func matchedResourcesForCall(call *ast.CallExpr, key packageKey, bindings bindin
 		names      []string
 	}{
 		{
-			importPath: "github.com/gastownhall/gascity/test/tmuxtest",
+			importPath: "github.com/jonbaldie/gascity/test/tmuxtest",
 			names:      []string{"ConfigureProcessEnv", "KillAllTestSessions", "NewGuard", "NewGuardWithSocket", "RequireTmux"},
 		},
 		{
-			importPath: "github.com/gastownhall/gascity/internal/runtime/tmux",
+			importPath: "github.com/jonbaldie/gascity/internal/runtime/tmux",
 			names:      []string{"NewProvider", "NewProviderWithConfig", "NewSeamBackedWithConfig", "NewTmux", "NewTmuxWithConfig"},
 		},
 	} {

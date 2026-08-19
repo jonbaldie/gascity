@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/api"
-	"github.com/gastownhall/gascity/internal/api/dashboardbff"
+	"github.com/jonbaldie/gascity/internal/api"
+	"github.com/jonbaldie/gascity/internal/api/dashboardbff"
 )
 
 type fakeDashResolver struct{ cities []api.CityInfo }

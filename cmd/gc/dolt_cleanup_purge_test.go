@@ -13,7 +13,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
 
 // putFakeDirTree adds a directory tree with given file sizes to the fake FS.

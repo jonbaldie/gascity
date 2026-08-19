@@ -8,12 +8,12 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/doctor"
-	"github.com/gastownhall/gascity/internal/fsys"
-	"github.com/gastownhall/gascity/internal/suspensionstate"
-	"github.com/gastownhall/gascity/internal/testpolicy/resourcecensus"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/doctor"
+	"github.com/jonbaldie/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/suspensionstate"
+	"github.com/jonbaldie/gascity/internal/testpolicy/resourcecensus"
 )
 
 // censusOwnerLivenessCheck detects resource-census ledger rows

@@ -3,8 +3,8 @@ package worker
 import (
 	"context"
 
-	"github.com/gastownhall/gascity/internal/runtime"
-	sessionpkg "github.com/gastownhall/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/runtime"
+	sessionpkg "github.com/jonbaldie/gascity/internal/session"
 )
 
 // Pending surfaces any current blocking interaction.

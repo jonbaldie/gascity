@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/events"
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
 // TestRuntimeHandleExcludedFromInvocationTelemetry enforces the RuntimeHandle

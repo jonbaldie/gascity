@@ -3,7 +3,7 @@ package session
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
 func TestEncodeMCPServersSnapshotRedactsSecrets(t *testing.T) {

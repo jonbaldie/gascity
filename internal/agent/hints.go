@@ -1,7 +1,7 @@
 // Package agent defines agent-level types shared across Gas City subsystems.
 package agent
 
-import "github.com/gastownhall/gascity/internal/runtime"
+import "github.com/jonbaldie/gascity/internal/runtime"
 
 // StartupHints carries provider startup behavior from config resolution
 // through to runtime.Config. All fields are optional — zero values mean

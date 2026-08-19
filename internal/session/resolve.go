@@ -6,7 +6,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // Resolution errors returned by ResolveSessionID.

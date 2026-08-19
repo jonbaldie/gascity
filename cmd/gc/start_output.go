@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/gastownhall/gascity/internal/logutil"
+	"github.com/jonbaldie/gascity/internal/logutil"
 	"golang.org/x/term"
 )
 

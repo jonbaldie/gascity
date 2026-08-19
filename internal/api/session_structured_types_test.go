@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/worker"
+	"github.com/jonbaldie/gascity/internal/worker"
 )
 
 func TestHistorySnapshotStructuredMessagesPreferWorkerCarriedStructuredData(t *testing.T) {

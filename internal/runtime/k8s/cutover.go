@@ -3,7 +3,7 @@ package k8s
 import (
 	"context"
 
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
 // seamBackedProvider serves the legacy [runtime.Provider] through the

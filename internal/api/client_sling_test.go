@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/citywriteauth"
+	"github.com/jonbaldie/gascity/internal/citywriteauth"
 )
 
 // Client.Sling posts the mutation to /v0/city/{city}/sling, carrying the CSRF

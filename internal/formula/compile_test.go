@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beadmeta"
-	"github.com/gastownhall/gascity/internal/testfixtures/reviewworkflows"
+	"github.com/jonbaldie/gascity/internal/beadmeta"
+	"github.com/jonbaldie/gascity/internal/testfixtures/reviewworkflows"
 )
 
 func TestCompileSimpleFormula(t *testing.T) {

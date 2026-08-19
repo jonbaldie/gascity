@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/shellquote"
+	"github.com/jonbaldie/gascity/internal/shellquote"
 )
 
 // AgentSliceEnv names the environment variable that, when set to a systemd

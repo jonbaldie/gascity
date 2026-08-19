@@ -3,8 +3,8 @@ package config
 import (
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/shellquote"
-	workerbuiltin "github.com/gastownhall/gascity/internal/worker/builtin"
+	"github.com/jonbaldie/gascity/internal/shellquote"
+	workerbuiltin "github.com/jonbaldie/gascity/internal/worker/builtin"
 )
 
 // ProviderOption declares a single configurable option for a provider.

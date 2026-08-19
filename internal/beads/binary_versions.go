@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/doltversion"
+	"github.com/jonbaldie/gascity/internal/doltversion"
 )
 
 // binaryVersionProbeTimeout bounds each `<binary> version` subprocess so a

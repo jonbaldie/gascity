@@ -4,7 +4,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // countingStore wraps a Store and counts SetMetadataBatch calls so a test can

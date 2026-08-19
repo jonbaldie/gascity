@@ -359,7 +359,7 @@ Each source file has a companion `_test.go`:
 | `internal/config/field_sync_test.go` | TestAgentFieldSync: reflection-based struct field parity between Agent, AgentPatch, AgentOverride |
 
 All tests are unit tests using `t.TempDir()` and `fsys.MemFS` (no
-integration tags needed). See [TESTING.md](https://github.com/gastownhall/gascity/blob/main/TESTING.md) for
+integration tags needed). See [TESTING.md](https://github.com/jonbaldie/gascity/blob/main/TESTING.md) for
 overall testing philosophy.
 
 ## Known Limitations
@@ -393,9 +393,9 @@ overall testing philosophy.
 
 - [Glossary](glossary.md) -- authoritative definitions of all Gas City
   terms, including Config, Pack, Rig, and Provider
-- [CLAUDE.md](https://github.com/gastownhall/gascity/blob/main/CLAUDE.md) -- progressive capability model (Levels
+- [CLAUDE.md](https://github.com/jonbaldie/gascity/blob/main/CLAUDE.md) -- progressive capability model (Levels
   0-8), design principles (keep judgment out of Go; a primitive must
   become more useful as models improve), and the "Adding agent
   config fields" convention
-- [TESTING.md](https://github.com/gastownhall/gascity/blob/main/TESTING.md) -- testing philosophy and tier
+- [TESTING.md](https://github.com/jonbaldie/gascity/blob/main/TESTING.md) -- testing philosophy and tier
   boundaries for config tests

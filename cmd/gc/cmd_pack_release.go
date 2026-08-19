@@ -13,11 +13,11 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
-	"github.com/gastownhall/gascity/internal/fsys"
-	"github.com/gastownhall/gascity/internal/git"
-	"github.com/gastownhall/gascity/internal/gitcred"
-	"github.com/gastownhall/gascity/internal/packregistry"
-	"github.com/gastownhall/gascity/internal/remotesource"
+	"github.com/jonbaldie/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/git"
+	"github.com/jonbaldie/gascity/internal/gitcred"
+	"github.com/jonbaldie/gascity/internal/packregistry"
+	"github.com/jonbaldie/gascity/internal/remotesource"
 	"github.com/spf13/cobra"
 )
 

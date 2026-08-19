@@ -19,7 +19,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/storebinding"
+	"github.com/jonbaldie/gascity/internal/storebinding"
 )
 
 func TestGraphSuiteRejectsBrokenGraphStores(t *testing.T) {

@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
 // validTmuxName mirrors the local tmux provider's guard: a session name must be

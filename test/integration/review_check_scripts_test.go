@@ -14,7 +14,7 @@ import (
 
 	gascitypacks "github.com/gastownhall/gascity-packs"
 
-	"github.com/gastownhall/gascity/internal/builtinpacks"
+	"github.com/jonbaldie/gascity/internal/builtinpacks"
 )
 
 type reviewCheckCase struct {

@@ -13,7 +13,7 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/gchome"
+	"github.com/jonbaldie/gascity/internal/gchome"
 )
 
 // TesthookPauseKey is a tagged-only signed-pause trust entry.

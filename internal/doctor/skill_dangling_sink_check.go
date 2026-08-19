@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/materialize"
+	"github.com/jonbaldie/gascity/internal/materialize"
 )
 
 // SkillDanglingSinkCheck surfaces dangling symlinks in agent skill

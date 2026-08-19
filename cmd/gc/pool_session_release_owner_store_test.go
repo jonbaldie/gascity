@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // seedOwnerStoreReleaseFixture builds the two-store shape these tests share: a

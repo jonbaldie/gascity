@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beadmeta"
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beadmeta"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // The golden tests pin one graph.v2 adopt-pr run byte-for-byte. These parity

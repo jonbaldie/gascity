@@ -1,8 +1,8 @@
 package api
 
 import (
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/worker"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/worker"
 )
 
 func (s *Server) workerFactory(store beads.Store) (*worker.Factory, error) {

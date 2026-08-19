@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/gastownhall/gascity/internal/orderdispatch"
-	"github.com/gastownhall/gascity/internal/orders"
+	"github.com/jonbaldie/gascity/internal/orderdispatch"
+	"github.com/jonbaldie/gascity/internal/orders"
 )
 
 // memoryOrderDispatcher is the controller's live order dispatcher and the

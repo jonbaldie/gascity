@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
 // Compile-time checks that both Tmux and Provider implement InteractionProvider.

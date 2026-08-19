@@ -9,9 +9,9 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beadmeta"
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/formula"
+	"github.com/jonbaldie/gascity/internal/beadmeta"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/formula"
 )
 
 func TestRecipeNativeStepDependenciesStampCanonicalRecipeTopology(t *testing.T) {

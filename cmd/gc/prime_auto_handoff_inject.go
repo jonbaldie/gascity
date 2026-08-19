@@ -6,8 +6,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/mail"
-	"github.com/gastownhall/gascity/internal/mail/beadmail"
+	"github.com/jonbaldie/gascity/internal/mail"
+	"github.com/jonbaldie/gascity/internal/mail/beadmail"
 )
 
 type primeHookContextInjection struct {

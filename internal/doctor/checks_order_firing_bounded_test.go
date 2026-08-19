@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/events"
-	"github.com/gastownhall/gascity/internal/orders"
+	"github.com/jonbaldie/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/orders"
 )
 
 // eventReadCall records one event-log read issued by the check.

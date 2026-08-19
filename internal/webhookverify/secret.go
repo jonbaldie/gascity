@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 // OperatorSecretEnvPrefix is the environment-variable namespace an operator

@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/convergence"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/convergence"
 )
 
 func TestConvergeCreateGateTimeoutDefaultMatchesSharedDefault(t *testing.T) {

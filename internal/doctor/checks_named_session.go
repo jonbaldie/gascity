@@ -3,7 +3,7 @@ package doctor
 import (
 	"fmt"
 
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 // NamedAlwaysMinConflictCheck warns when an agent both backs a mode="always"

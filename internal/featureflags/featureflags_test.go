@@ -3,8 +3,8 @@ package featureflags_test
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/featureflags"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/featureflags"
 )
 
 func boolPtr(v bool) *bool { return &v }

@@ -12,8 +12,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/storebinding"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/storebinding"
 )
 
 func TestReferenceGraphStoreConforms(t *testing.T) {

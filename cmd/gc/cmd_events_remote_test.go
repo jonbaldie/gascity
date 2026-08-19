@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	gcapi "github.com/gastownhall/gascity/internal/api"
-	"github.com/gastownhall/gascity/internal/clientcontext"
+	gcapi "github.com/jonbaldie/gascity/internal/api"
+	"github.com/jonbaldie/gascity/internal/clientcontext"
 )
 
 // G7: the shared stream-status classifier decides reconnect/reauth/permanent

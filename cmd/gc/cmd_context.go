@@ -5,7 +5,7 @@ import (
 	"io"
 	"text/tabwriter"
 
-	"github.com/gastownhall/gascity/internal/clientcontext"
+	"github.com/jonbaldie/gascity/internal/clientcontext"
 	"github.com/spf13/cobra"
 )
 

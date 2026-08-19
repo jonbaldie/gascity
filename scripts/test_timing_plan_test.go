@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/testpolicy/timingplan"
-	"github.com/gastownhall/gascity/internal/testpolicy/timingplancli"
-	"github.com/gastownhall/gascity/internal/testpolicy/timingsummary"
+	"github.com/jonbaldie/gascity/internal/testpolicy/timingplan"
+	"github.com/jonbaldie/gascity/internal/testpolicy/timingplancli"
+	"github.com/jonbaldie/gascity/internal/testpolicy/timingsummary"
 )
 
 type timingPlanInventoryDocument struct {

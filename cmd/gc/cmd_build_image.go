@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/buildimage"
+	"github.com/jonbaldie/gascity/internal/buildimage"
 	"github.com/spf13/cobra"
 )
 

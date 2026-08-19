@@ -19,7 +19,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/gchome"
+	"github.com/jonbaldie/gascity/internal/gchome"
 	"github.com/spf13/cobra"
 )
 

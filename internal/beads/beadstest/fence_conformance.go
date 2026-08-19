@@ -3,7 +3,7 @@ package beadstest
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // RunFenceConformance exercises the ownership-fence bump contract that GC's

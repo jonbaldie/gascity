@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/orders"
+	"github.com/jonbaldie/gascity/internal/orders"
 )
 
 // errOrderNotFound / errOrderAmbiguous are sentinel errors so callers

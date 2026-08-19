@@ -21,9 +21,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/storebinding/beadsworkspace"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/storebinding/beadsworkspace"
 )
 
 // workspaceSplitConfig is infraSplitConfig's spelling for a city whose

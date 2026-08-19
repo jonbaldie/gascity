@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/citylayout"
+	"github.com/jonbaldie/gascity/internal/citylayout"
 )
 
 type managedDoltRuntimeLayout struct {

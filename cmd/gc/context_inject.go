@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/modelwindow"
+	"github.com/jonbaldie/gascity/internal/modelwindow"
 )
 
 // Context-usage injection — the context-pressure sibling of clock_inject.go.

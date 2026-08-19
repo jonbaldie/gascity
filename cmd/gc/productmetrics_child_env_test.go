@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/execenv"
+	"github.com/jonbaldie/gascity/internal/execenv"
 )
 
 func TestProductMetricsChildEnvAdapterCanonicalizesExplicitEnvironment(t *testing.T) {

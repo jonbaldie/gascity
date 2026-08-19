@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
 
 // fileData is the on-disk JSON format for the bead store.

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/materialize"
+	"github.com/jonbaldie/gascity/internal/materialize"
 )
 
 // TestInternalMaterializeSkillsMaterializesClaude exercises the happy

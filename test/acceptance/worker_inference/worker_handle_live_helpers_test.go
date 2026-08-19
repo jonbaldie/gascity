@@ -16,16 +16,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/fsys"
-	"github.com/gastownhall/gascity/internal/hooks"
-	"github.com/gastownhall/gascity/internal/runtime"
-	runtimetmux "github.com/gastownhall/gascity/internal/runtime/tmux"
-	sessionpkg "github.com/gastownhall/gascity/internal/session"
-	"github.com/gastownhall/gascity/internal/shellquote"
-	workerpkg "github.com/gastownhall/gascity/internal/worker"
-	helpers "github.com/gastownhall/gascity/test/acceptance/helpers"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/hooks"
+	"github.com/jonbaldie/gascity/internal/runtime"
+	runtimetmux "github.com/jonbaldie/gascity/internal/runtime/tmux"
+	sessionpkg "github.com/jonbaldie/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/shellquote"
+	workerpkg "github.com/jonbaldie/gascity/internal/worker"
+	helpers "github.com/jonbaldie/gascity/test/acceptance/helpers"
 )
 
 const workerHandleProbeInstructions = `

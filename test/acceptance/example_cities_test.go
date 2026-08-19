@@ -14,8 +14,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/config"
-	helpers "github.com/gastownhall/gascity/test/acceptance/helpers"
+	"github.com/jonbaldie/gascity/internal/config"
+	helpers "github.com/jonbaldie/gascity/test/acceptance/helpers"
 )
 
 // TestExampleInit_AllCities_Succeed is a table-driven test that verifies

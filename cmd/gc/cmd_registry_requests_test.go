@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/credentialprovider"
+	"github.com/jonbaldie/gascity/internal/credentialprovider"
 )
 
 const registryRequestsListJSON = `{"publishRequests":[{"id":"prq_one","status":"pending_review","nextStep":"respond_to_feedback","actionRequiredBy":"submitter","requestedName":"demo-pack","requestedVersion":"1.2.0","unread":true,"submitterUnreadAt":"2026-07-26T11:00:00Z","updatedAt":"2026-07-26T11:00:00Z"}],"unreadCount":2}`

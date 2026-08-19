@@ -3,7 +3,7 @@ package sqlite
 import (
 	"fmt"
 
-	"github.com/gastownhall/gascity/internal/storebinding"
+	"github.com/jonbaldie/gascity/internal/storebinding"
 )
 
 // validateSQLiteMigrationGuardClaim confirms that the generic coordinator's

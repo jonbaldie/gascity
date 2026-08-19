@@ -3,7 +3,7 @@ package main
 import (
 	"os/exec"
 
-	"github.com/gastownhall/gascity/internal/execenv"
+	"github.com/jonbaldie/gascity/internal/execenv"
 )
 
 // disableProductMetricsForChild applies the Gas City usage-metrics recursion

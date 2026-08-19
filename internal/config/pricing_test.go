@@ -3,8 +3,8 @@ package config
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/fsys"
-	"github.com/gastownhall/gascity/internal/pricing"
+	"github.com/jonbaldie/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/pricing"
 )
 
 func TestMergePricingByKey_EmptyBase(t *testing.T) {

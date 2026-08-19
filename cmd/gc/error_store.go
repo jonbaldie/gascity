@@ -1,6 +1,6 @@
 package main
 
-import "github.com/gastownhall/gascity/internal/beads"
+import "github.com/jonbaldie/gascity/internal/beads"
 
 type unavailableStore struct {
 	err error

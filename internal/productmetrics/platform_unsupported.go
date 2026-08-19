@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"runtime"
 
-	"github.com/gastownhall/gascity/internal/gchome"
+	"github.com/jonbaldie/gascity/internal/gchome"
 )
 
 var errStorageUnsupported = errors.New("productmetrics: durable storage is unsupported on this platform")

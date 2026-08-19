@@ -1,37 +1,42 @@
 ---
 title: Installation
-description: Install Gas City from Homebrew, a release tarball, or source.
+description: Install Gas City with go install, or build from source.
 ---
 
 ## Which method should I use?
 
 | Method | Best for | Installs deps? | Auto-upgrades? |
 |--------|----------|----------------|----------------|
-| [Homebrew](#homebrew-recommended) | macOS / Linux daily use | Yes (runtime deps) | `brew upgrade` |
-| [Direct download](#direct-download) | CI, containers, air-gapped hosts | No | Manual |
-| [Source build](#build-from-source) | Contributors, bleeding-edge | No | Manual |
+| [go install](#go-install-recommended) | Daily use | No | Re-run `go install` |
+| [Source build](#build-from-source) | Contributors, local checkouts | No | Manual |
 
-**Most users should use Homebrew.** It installs all runtime dependencies
-automatically and keeps `gc` on your PATH. Choose direct download when you
-cannot use Homebrew (CI images, Docker layers, machines without package
-managers). Choose source when you need unreleased changes or plan to contribute.
+**Most users should use `go install`.** It builds `gc` from this repository
+and puts it on your PATH. Choose source when you already cloned this repo
+and want `make install` from that checkout.
+
+This fork does not publish a Homebrew tap or GitHub release tarballs. Do not
+install from `gastownhall/gascity` if you want this project.
 
 ## Prerequisites
 
-Gas City requires a small set of runtime tools. Homebrew installs all of them
-for you; the other methods require manual installation.
+Gas City requires a small set of runtime tools. `go install` installs only
+the `gc` binary; install the tools below separately.
 
 | Tool | Required | Min version | macOS | Linux | Notes |
 |------|----------|-------------|-------|-------|-------|
 | tmux | Yes | — | `brew install tmux` | `apt install tmux` | Session management |
 | jq | Yes | — | `brew install jq` | `apt install jq` | JSON processing |
 | git | Yes | — | (built-in) | (built-in) | Version control |
-| dolt | Yes | 2.1.0 or newer | `brew install dolt` | [releases](https://github.com/dolthub/dolt/releases) | Beads data plane |
-| bd (Beads CLI) | Yes | 1.0.0 | `brew install beads` | [releases](https://github.com/gastownhall/beads/releases) | Issue tracking |
-| flock | Yes | — | `brew install flock` | (built-in via util-linux) | File locking |
+| Go 1.26+ | Yes | 1.26 | `brew install go` | [golang.org](https://go.dev/dl/) | Compiler (`go install` and source) |
+| dolt | Beads provider `bd` | 2.1.0 or newer | `brew install dolt` | [releases](https://github.com/dolthub/dolt/releases) | Beads data plane |
+| bd (Beads CLI) | Beads provider `bd` | 1.0.0 | `brew install beads` | [releases](https://github.com/gastownhall/beads/releases) | Issue tracking |
+| flock | Beads provider `bd` | — | `brew install flock` | (built-in via util-linux) | File locking |
 | gh | Optional | — | `brew install gh` | [cli.github.com](https://cli.github.com/) | GitHub gate checks |
-| Go 1.26+ | Source only | 1.26 | `brew install go` | [golang.org](https://go.dev/dl/) | Compiler |
 | make | Source only | — | (built-in) | `apt install make` (or `build-essential`) | Drives `make install` |
+
+The `bd` (beads) provider is the default. To use a file-based store instead
+(no dolt/bd/flock needed), set `GC_BEADS=file` or add `[beads] provider = "file"`
+to your `city.toml`.
 
 Use a final Dolt 2.1.0 or newer. Gas City's managed Dolt checks reject older
 and pre-release builds because they are below the managed bd/Dolt compatibility
@@ -39,27 +44,19 @@ floor; releases before 1.86.2 can also miss the upstream GC/writer deadlock
 fix in dolthub/dolt commit `ccf7bde206`, which can hang `dolt_backup sync`
 under heavy write load.
 
-The exact versions CI pins are in [`deps.env`](https://github.com/gastownhall/gascity/blob/main/deps.env).
+The exact versions CI pins are in [`deps.env`](https://github.com/jonbaldie/gascity/blob/main/deps.env).
 
-## Homebrew (recommended)
+## go install (recommended)
 
-```bash
-brew install gascity
-```
-
-This taps the `gastownhall/gascity` formula, downloads the matching `gc`
-release asset, and installs all six runtime dependencies (tmux, jq, git, dolt,
-flock, beads).
-
-Once Gas City is accepted into homebrew-core, the normal install path will be
-`brew install gascity`; the `gastownhall/gascity` tap remains available for
-emergency updates.
-
-Verify the installation:
+Requires Go 1.26+ (the version is pinned in `go.mod`).
 
 ```bash
+go install github.com/jonbaldie/gascity/cmd/gc@latest
 gc version
 ```
+
+`go install` places `gc` in `$(go env GOPATH)/bin` (often `~/go/bin`). Put
+that directory on your PATH if `gc version` is not found.
 
 <Warning>
 If you use Oh My Zsh with the `git` plugin, `gc` may already be an alias for
@@ -70,117 +67,26 @@ a persistent fix, add `unalias gc 2>/dev/null` or
 `~/.oh-my-zsh/custom/gascity.zsh`.
 </Warning>
 
-### Upgrading via Homebrew
+### Upgrading a go-install install
 
-```bash
-brew update
-brew upgrade gascity
-```
-
-After upgrading, restart any running city so the supervisor picks up the new
-binary:
+Re-run the same `go install` command. After upgrading, restart any running
+city so the supervisor picks up the new binary:
 
 ```bash
 gc service restart     # restarts the launchd/systemd service
 ```
 
 `gc start` auto-regenerates the service file on each invocation, so a
-`brew upgrade` followed by `gc start` always picks up template changes
-(see [v0.13.3 release notes](https://github.com/gastownhall/gascity/releases/tag/v0.13.3)).
-
-### Uninstalling via Homebrew
-
-```bash
-gc stop <city-path>                        # stop running city first
-brew uninstall gascity
-brew untap gastownhall/gascity             # remove the tap
-```
-
-## Direct download
-
-Release tarballs are published for every tagged version. Supported platforms:
-
-| OS | Architecture | Archive name |
-|----|-------------|--------------|
-| macOS (darwin) | Apple Silicon (arm64) | `gascity_VERSION_darwin_arm64.tar.gz` |
-| macOS (darwin) | Intel (amd64) | `gascity_VERSION_darwin_amd64.tar.gz` |
-| Linux | x86_64 (amd64) | `gascity_VERSION_linux_amd64.tar.gz` |
-| Linux | ARM (arm64) | `gascity_VERSION_linux_arm64.tar.gz` |
-
-### Download and install
-
-```bash
-# Set the version you want (check https://github.com/gastownhall/gascity/releases)
-VERSION=1.4.0
-
-# Detect platform
-OS=$(uname -s | tr '[:upper:]' '[:lower:]')
-ARCH=$(uname -m)
-case "$ARCH" in
-  x86_64)         ARCH=amd64 ;;
-  aarch64|arm64)  ARCH=arm64 ;;
-esac
-
-# Download and extract
-curl -fsSLO "https://github.com/gastownhall/gascity/releases/download/v${VERSION}/gascity_${VERSION}_${OS}_${ARCH}.tar.gz"
-tar -xzf "gascity_${VERSION}_${OS}_${ARCH}.tar.gz"
-
-# Move to a directory on your PATH
-sudo install -m 755 gc /usr/local/bin/gc
-
-# Verify
-gc version
-```
-
-### Verify release artifacts
-
-Homebrew verifies release checksums from the formula automatically. For direct
-downloads, verify the archive before installing it:
-
-```bash
-ARCHIVE="gascity_${VERSION}_${OS}_${ARCH}.tar.gz"
-CHECKSUMS="gascity_${VERSION}_checksums.txt"
-
-curl -fsSLO "https://github.com/gastownhall/gascity/releases/download/v${VERSION}/${CHECKSUMS}"
-grep "  ${ARCHIVE}$" "${CHECKSUMS}" > "${ARCHIVE}.sha256"
-
-if command -v sha256sum >/dev/null 2>&1; then
-  sha256sum -c "${ARCHIVE}.sha256"
-else
-  shasum -a 256 -c "${ARCHIVE}.sha256"
-fi
-```
-
-Release archives are also published with GitHub artifact attestations. If you
-have the GitHub CLI installed, verify the downloaded archive against the
-`gastownhall/gascity` repository:
-
-```bash
-gh attestation verify "${ARCHIVE}" --repo gastownhall/gascity
-```
-
-Each release also includes an SPDX SBOM asset:
-
-```bash
-curl -fsSLO "https://github.com/gastownhall/gascity/releases/download/v${VERSION}/gascity-v${VERSION}.spdx.json"
-```
-
-### Upgrading a direct-download install
-
-Repeat the download steps above with the new version number. The `gc` binary is
-a single static file — overwriting it is safe.
-
-<Tip>
-You still need to install the [prerequisites](#prerequisites) separately when
-using direct download. Homebrew handles this automatically.
-</Tip>
+reinstall followed by `gc start` always picks up template changes.
 
 ## Build from source
 
-Requires `make` and Go 1.26+ (pinned in `go.mod` as 1.26.4).
+Requires `make` and Go 1.26+ (pinned in `go.mod`). This is the contributor
+path for a clone of this repository; daily installs should use
+`go install` above.
 
 ```bash
-git clone https://github.com/gastownhall/gascity.git
+git clone https://github.com/jonbaldie/gascity.git
 cd gascity
 make install        # builds and installs to $(GOPATH)/bin/gc
 gc version
@@ -202,6 +108,10 @@ separate local TCC identity, or `GC_ADHOC_SIGN=1` to opt into ad-hoc signing
 for a local experiment. Successful local signing also removes stale
 `com.apple.provenance` metadata when present.
 
+On macOS, `make build` needs ICU for a transitive Dolt CGO dependency —
+`brew install icu4c`. On Linux, `apt install libicu-dev`. On macOS the
+Makefile auto-detects the keg-only `icu4c` paths.
+
 ### Contributor setup
 
 After building, install the dev toolchain and pre-commit hooks:
@@ -211,7 +121,7 @@ make setup
 make check          # runs fmt, lint, vet, and unit tests
 ```
 
-See [CONTRIBUTING.md](https://github.com/gastownhall/gascity/blob/main/CONTRIBUTING.md)
+See [CONTRIBUTING.md](https://github.com/jonbaldie/gascity/blob/main/CONTRIBUTING.md)
 for the full contributor workflow.
 
 ## Verify your installation

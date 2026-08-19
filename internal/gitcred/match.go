@@ -4,7 +4,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/remotesource"
+	"github.com/jonbaldie/gascity/internal/remotesource"
 )
 
 // transport classifies a clone URL so the matcher can gate rule pointer types

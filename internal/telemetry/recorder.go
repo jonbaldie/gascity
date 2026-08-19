@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	meterRecorderName = "github.com/gastownhall/gascity"
+	meterRecorderName = "github.com/jonbaldie/gascity"
 	loggerName        = "gascity"
 )
 

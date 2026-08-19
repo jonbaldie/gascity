@@ -18,7 +18,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/gchome"
+	"github.com/jonbaldie/gascity/internal/gchome"
 )
 
 // StorePathEnv overrides the credential file location; when unset the store

@@ -20,7 +20,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/gastownhall/gascity/internal/docgen"
+	"github.com/jonbaldie/gascity/internal/docgen"
 	"github.com/invopop/jsonschema"
 )
 

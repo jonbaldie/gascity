@@ -19,7 +19,7 @@ import (
 	"testing"
 	"time"
 
-	helpers "github.com/gastownhall/gascity/test/acceptance/helpers"
+	helpers "github.com/jonbaldie/gascity/test/acceptance/helpers"
 )
 
 type tutorialWorkspace struct {

@@ -3,7 +3,7 @@ package storeref
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // classFixture is the shape every case below routes over: a relocated class

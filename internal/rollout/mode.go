@@ -1,6 +1,6 @@
 package rollout
 
-import "github.com/gastownhall/gascity/internal/rollout/gate"
+import "github.com/jonbaldie/gascity/internal/rollout/gate"
 
 // Mode is the tri-state value kind for a correctness/migration rollout gate.
 // The definition lives in the dependency-leaf gate package (see its package

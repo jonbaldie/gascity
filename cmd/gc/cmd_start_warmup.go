@@ -4,7 +4,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/mail"
+	"github.com/jonbaldie/gascity/internal/mail"
 )
 
 // defaultMailProvider builds the mailer `gc start` hands the warm-up runner,

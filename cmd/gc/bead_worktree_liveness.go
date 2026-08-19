@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/git"
-	"github.com/gastownhall/gascity/internal/pathutil"
-	sessionpkg "github.com/gastownhall/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/git"
+	"github.com/jonbaldie/gascity/internal/pathutil"
+	sessionpkg "github.com/jonbaldie/gascity/internal/session"
 )
 
 // A per-bead worktree is protected from reaping when a process is actively

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/productmetrics"
+	"github.com/jonbaldie/gascity/internal/productmetrics"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/convergence"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/convergence"
 )
 
 // This file holds the order-class typed READ surface plus the mixed

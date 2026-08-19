@@ -14,12 +14,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/coordclass"
-	"github.com/gastownhall/gascity/internal/storebinding"
-	"github.com/gastownhall/gascity/internal/storebinding/beadsworkspace"
-	sqlitebinding "github.com/gastownhall/gascity/internal/storebinding/sqlite"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/coordclass"
+	"github.com/jonbaldie/gascity/internal/storebinding"
+	"github.com/jonbaldie/gascity/internal/storebinding/beadsworkspace"
+	sqlitebinding "github.com/jonbaldie/gascity/internal/storebinding/sqlite"
 )
 
 // configRefEngineProviderID is the foreign provider the fixtures below serve

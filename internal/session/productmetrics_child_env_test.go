@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/execenv"
-	"github.com/gastownhall/gascity/internal/testutil"
+	"github.com/jonbaldie/gascity/internal/execenv"
+	"github.com/jonbaldie/gascity/internal/testutil"
 )
 
 func TestProductMetricsDirectChildEnvSessionSubmitPoller(t *testing.T) {

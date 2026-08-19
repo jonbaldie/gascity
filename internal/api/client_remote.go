@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/api/genclient"
-	"github.com/gastownhall/gascity/internal/citywriteauth"
+	"github.com/jonbaldie/gascity/internal/api/genclient"
+	"github.com/jonbaldie/gascity/internal/citywriteauth"
 )
 
 // Remote-client transport budgets. A remote city is reached over a WAN, so the

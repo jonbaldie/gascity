@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/extmsg"
+	"github.com/jonbaldie/gascity/internal/extmsg"
 )
 
 func TestCmdExtMsgBindRejectsInvalidTargetFlags(t *testing.T) {

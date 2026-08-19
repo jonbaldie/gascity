@@ -109,12 +109,12 @@ func TestSourceRecognitionVariants(t *testing.T) {
 		want bool
 	}{
 		{name: "canonical", src: coreSource, want: true},
-		{name: "short github form", src: "github.com/gastownhall/gascity//internal/bootstrap/packs/core", want: true},
-		{name: "without git suffix", src: "https://github.com/gastownhall/gascity//internal/bootstrap/packs/core", want: true},
+		{name: "short github form", src: "github.com/jonbaldie/gascity//internal/bootstrap/packs/core", want: true},
+		{name: "without git suffix", src: "https://github.com/jonbaldie/gascity//internal/bootstrap/packs/core", want: true},
 		{name: "trailing slash", src: coreSource + "/", want: true},
 		{name: "with ref", src: coreSource + "#main", want: true},
-		{name: "github tree form", src: "https://github.com/gastownhall/gascity/tree/main/internal/bootstrap/packs/core", want: true},
-		{name: "github blob form", src: "https://github.com/gastownhall/gascity/blob/main/internal/bootstrap/packs/core/pack.toml", want: true},
+		{name: "github tree form", src: "https://github.com/jonbaldie/gascity/tree/main/internal/bootstrap/packs/core", want: true},
+		{name: "github blob form", src: "https://github.com/jonbaldie/gascity/blob/main/internal/bootstrap/packs/core/pack.toml", want: true},
 		{name: "legacy dolt subpath", src: Repository + "//examples/dolt", want: true},
 		{name: "different repo", src: "https://github.com/example/gascity.git//internal/bootstrap/packs/core", want: false},
 		{name: "unknown subpath", src: Repository + "//internal/bootstrap/packs/missing", want: false},

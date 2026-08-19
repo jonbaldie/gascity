@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/coordclass"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/coordclass"
 )
 
 // ReservedWorkBinding is the immutable synthesized binding backed by the pinned

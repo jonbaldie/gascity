@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/usage"
+	"github.com/jonbaldie/gascity/internal/usage"
 )
 
 func usageLine(t *testing.T, fact usage.Fact) string {

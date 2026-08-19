@@ -18,7 +18,7 @@ import (
 	"testing"
 	"time"
 
-	runtimepkg "github.com/gastownhall/gascity/internal/runtime"
+	runtimepkg "github.com/jonbaldie/gascity/internal/runtime"
 )
 
 // testSocketName is the dedicated tmux socket used by this integration test

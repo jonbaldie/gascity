@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // Phase 0 spec coverage from engdocs/design/session-model-unification.md:

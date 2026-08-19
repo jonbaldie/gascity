@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 func writeStandaloneBdPID(t *testing.T, cityPath string, contents string) {

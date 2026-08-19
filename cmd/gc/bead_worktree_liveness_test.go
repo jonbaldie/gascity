@@ -6,8 +6,8 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/pathutil"
-	sessionpkg "github.com/gastownhall/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/pathutil"
+	sessionpkg "github.com/jonbaldie/gascity/internal/session"
 )
 
 func TestWorktreeIsLive_ProcessCWDEqualsWorktree(t *testing.T) {

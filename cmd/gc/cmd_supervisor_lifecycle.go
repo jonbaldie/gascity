@@ -24,12 +24,12 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/citylayout"
-	"github.com/gastownhall/gascity/internal/execenv"
-	"github.com/gastownhall/gascity/internal/processenv"
-	"github.com/gastownhall/gascity/internal/processgroup"
-	"github.com/gastownhall/gascity/internal/searchpath"
-	"github.com/gastownhall/gascity/internal/supervisor"
+	"github.com/jonbaldie/gascity/internal/citylayout"
+	"github.com/jonbaldie/gascity/internal/execenv"
+	"github.com/jonbaldie/gascity/internal/processenv"
+	"github.com/jonbaldie/gascity/internal/processgroup"
+	"github.com/jonbaldie/gascity/internal/searchpath"
+	"github.com/jonbaldie/gascity/internal/supervisor"
 	"github.com/spf13/cobra"
 )
 

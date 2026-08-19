@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/events"
 	"github.com/google/uuid"
 )
 

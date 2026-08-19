@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	sessionpkg "github.com/gastownhall/gascity/internal/session"
+	sessionpkg "github.com/jonbaldie/gascity/internal/session"
 )
 
 // S19 Stage 3 shadow-comparison harness (steps 3a–3c, OBSERVATION-ONLY).

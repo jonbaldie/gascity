@@ -1,6 +1,6 @@
 package api
 
-import "github.com/gastownhall/gascity/internal/api/genclient"
+import "github.com/jonbaldie/gascity/internal/api/genclient"
 
 // RigView is the CLI-facing shape for `gc rig list` rows. It mirrors the
 // subset of fields the CLI formatter reads so cmd/gc/ never imports genclient

@@ -5,9 +5,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/gitcred"
-	"github.com/gastownhall/gascity/internal/remotesource"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/gitcred"
+	"github.com/jonbaldie/gascity/internal/remotesource"
 )
 
 // PackCredentialsCheck validates the city's pack-source credential rules: it

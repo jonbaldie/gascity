@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/clock"
-	"github.com/gastownhall/gascity/internal/doltorphan"
+	"github.com/jonbaldie/gascity/internal/clock"
+	"github.com/jonbaldie/gascity/internal/doltorphan"
 )
 
 // TestSweep_ReapsRealDoltDataDirAfterSIGKILL exercises acceptance criterion 3

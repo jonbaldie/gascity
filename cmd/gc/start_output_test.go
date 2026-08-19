@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/logutil"
+	"github.com/jonbaldie/gascity/internal/logutil"
 )
 
 func TestStartOutputProxyDedupsWarningsAndDefersFatal(t *testing.T) {

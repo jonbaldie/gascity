@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/runproj"
-	"github.com/gastownhall/gascity/internal/testutil"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/runproj"
+	"github.com/jonbaldie/gascity/internal/testutil"
 )
 
 // sseFrame is one parsed SSE frame: its id (empty when the frame carried none),

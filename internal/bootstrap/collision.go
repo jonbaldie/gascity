@@ -3,7 +3,7 @@ package bootstrap
 import (
 	"sort"
 
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 // CollidesWithBootstrapPack reports whether any bootstrap pack name is

@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/events"
-	"github.com/gastownhall/gascity/internal/telemetry"
+	"github.com/jonbaldie/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/telemetry"
 )
 
 // problemBody is a pre-serialized RFC 9457 Problem Details response emitted

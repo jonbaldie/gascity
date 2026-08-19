@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/runtime"
 	corev1 "k8s.io/api/core/v1"
 )
 

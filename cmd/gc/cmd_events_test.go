@@ -14,9 +14,9 @@ import (
 	"testing"
 	"time"
 
-	gcapi "github.com/gastownhall/gascity/internal/api"
-	"github.com/gastownhall/gascity/internal/api/genclient"
-	"github.com/gastownhall/gascity/internal/events"
+	gcapi "github.com/jonbaldie/gascity/internal/api"
+	"github.com/jonbaldie/gascity/internal/api/genclient"
+	"github.com/jonbaldie/gascity/internal/events"
 )
 
 func TestDoEventsCityDefaultUsesJSONLItems(t *testing.T) {

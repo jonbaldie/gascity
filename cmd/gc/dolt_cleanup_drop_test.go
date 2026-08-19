@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/doltauth"
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/doltauth"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
 
 // fakeCleanupDoltClient is an injectable implementation of

@@ -15,8 +15,8 @@ func TestVerifyReleaseBinaryMetadata(t *testing.T) {
 
 	cleanBuildInfo := strings.Join([]string{
 		"/tmp/gc: go1.26.5",
-		"\tpath\tgithub.com/gastownhall/gascity/cmd/gc",
-		"\tmod\tgithub.com/gastownhall/gascity\tv1.2.3",
+		"\tpath\tgithub.com/jonbaldie/gascity/cmd/gc",
+		"\tmod\tgithub.com/jonbaldie/gascity\tv1.2.3",
 		"\tbuild\tvcs.revision=" + expectedCommit,
 		"\tbuild\tvcs.modified=false",
 	}, "\n")

@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/runtime"
-	workertest "github.com/gastownhall/gascity/internal/worker/workertest"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/runtime"
+	workertest "github.com/jonbaldie/gascity/internal/worker/workertest"
 )
 
 func newPhase2Reporter(t *testing.T, suite string) *workertest.SuiteReporter {

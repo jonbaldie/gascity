@@ -6,7 +6,7 @@
 #
 # gascity is the MIT open-core. Multi-tenant / commercial concerns — org_id
 # tenancy, the hosted control plane — live in a SEPARATE module
-# (github.com/gastownhall/gascity-hosted), never in this one. The OSS module
+# (github.com/jonbaldie/gascity-hosted), never in this one. The OSS module
 # must build and run standalone with no commercial dependency. This check fails
 # if the OSS module starts to leak commercial coupling:
 #
@@ -47,7 +47,7 @@ set -uo pipefail # intentionally NOT -e: run every check and aggregate.
 
 # Known commercial module paths that must never appear in the OSS module.
 # Space-separated; add new commercial modules here as they are created.
-COMMERCIAL_MODULES="github.com/gastownhall/gascity-hosted"
+COMMERCIAL_MODULES="github.com/jonbaldie/gascity-hosted"
 
 failed=0
 note() { echo "check-core-boundary: $*" >&2; }

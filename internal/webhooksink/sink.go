@@ -43,9 +43,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/orderdispatch"
-	"github.com/gastownhall/gascity/internal/orders"
-	"github.com/gastownhall/gascity/internal/webhookmatch"
+	"github.com/jonbaldie/gascity/internal/orderdispatch"
+	"github.com/jonbaldie/gascity/internal/orders"
+	"github.com/jonbaldie/gascity/internal/webhookmatch"
 )
 
 // OrderResolver looks up a resolved order by name and effective rig. rig is

@@ -18,7 +18,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
 // Factory creates a (provider, config, sessionName) tuple for a single test.

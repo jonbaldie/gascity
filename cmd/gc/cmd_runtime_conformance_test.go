@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/runtime/runtimecontract"
+	"github.com/jonbaldie/gascity/internal/runtime/runtimecontract"
 )
 
 func TestRuntimeConformanceCmd_ConformantExecutablePasses(t *testing.T) {

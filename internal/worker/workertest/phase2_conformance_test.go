@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/runtime"
-	worker "github.com/gastownhall/gascity/internal/worker"
+	"github.com/jonbaldie/gascity/internal/runtime"
+	worker "github.com/jonbaldie/gascity/internal/worker"
 )
 
 func TestPhase2Catalog(t *testing.T) {

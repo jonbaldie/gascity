@@ -5,8 +5,8 @@ import (
 	"io"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/dispatch"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/dispatch"
 )
 
 // TestDrainWorkflowServeWorkQuietRetryDoesNotReportPending is the backoff-pin

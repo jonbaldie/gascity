@@ -12,7 +12,7 @@ raw artifacts so they work in both local preview and production.
 The supervisor HTTP and SSE control plane is published as a raw OpenAPI
 document:
 
-- <a href="https://raw.githubusercontent.com/gastownhall/gascity/main/docs/reference/schema/openapi.json" target="_blank" rel="noopener"><code>openapi.json</code></a>
+- <a href="https://raw.githubusercontent.com/jonbaldie/gascity/main/docs/reference/schema/openapi.json" target="_blank" rel="noopener"><code>openapi.json</code></a>
 
 Use this file with Swagger UI, Stoplight, Postman, or client generators. To
 regenerate it from the live supervisor schema:
@@ -29,7 +29,7 @@ the [Supervisor REST API](/reference/api) page.
 `gc events` list/watch/follow output is published as a small JSON Schema that
 references the OpenAPI DTO components instead of duplicating their fields:
 
-- <a href="https://raw.githubusercontent.com/gastownhall/gascity/main/docs/reference/schema/events.json" target="_blank" rel="noopener"><code>events.json</code></a>
+- <a href="https://raw.githubusercontent.com/jonbaldie/gascity/main/docs/reference/schema/events.json" target="_blank" rel="noopener"><code>events.json</code></a>
 
 Use this file to validate one JSON object line emitted by `gc events`,
 `gc events --watch`, or `gc events --follow`. Cursor mode is intentionally
@@ -45,7 +45,7 @@ behavior, heartbeat suppression, and cursor formats, see
 The `city.toml` configuration schema is also published as a raw JSON Schema
 document:
 
-- <a href="https://raw.githubusercontent.com/gastownhall/gascity/main/docs/reference/schema/city-schema.json" target="_blank" rel="noopener"><code>city-schema.json</code></a>
+- <a href="https://raw.githubusercontent.com/jonbaldie/gascity/main/docs/reference/schema/city-schema.json" target="_blank" rel="noopener"><code>city-schema.json</code></a>
 
 Use this file for validation, editor integration, and external tooling. To
 regenerate it:

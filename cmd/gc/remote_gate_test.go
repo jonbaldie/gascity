@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/clientcontext"
+	"github.com/jonbaldie/gascity/internal/clientcontext"
 )
 
 // setProdContextFlag points the persistent --context global at the "prod"

@@ -42,7 +42,7 @@ A small portfolio of journeys proves that the major boundaries compose.
 
 Merged PR [#4193](https://github.com/gastownhall/gascity/pull/4193) established
 the immediate latency baseline. Its exact-main Actions run
-[29220498625](https://github.com/gastownhall/gascity/actions/runs/29220498625)
+[29220498625](https://github.com/jonbaldie/gascity/actions/runs/29220498625)
 completed green in 4m59s workflow wall time, including queueing, and 4m15s from
 runner-policy start to `CI / required`. It removed repeated broad suites, used
 a hermetic provider executable, narrowed the external `bd` contract, shortened
@@ -988,7 +988,7 @@ contract proves that the Make target cannot silently drop that suite.
 
 **Owner/status:** `ga-80po0c.21`; active implementation slice. The measured
 baseline is PR #4336 Actions run
-[29483623514](https://github.com/gastownhall/gascity/actions/runs/29483623514):
+[29483623514](https://github.com/jonbaldie/gascity/actions/runs/29483623514):
 the static job took 257 seconds, including 120 seconds of full lint, 19 seconds
 of full formatting, and 13 seconds of standalone vet. Qualifying ordinary PRs
 therefore remove 152 seconds of broad static work from the critical path before

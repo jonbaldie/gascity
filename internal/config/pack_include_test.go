@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/builtinpacks"
+	"github.com/jonbaldie/gascity/internal/builtinpacks"
 )
 
 func TestIsRemoteInclude(t *testing.T) {

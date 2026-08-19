@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/materialize"
+	"github.com/jonbaldie/gascity/internal/materialize"
 )
 
 func resetSkillCatalogCache() {

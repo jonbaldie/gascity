@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/builtinpacks"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/builtinpacks"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
 
 func TestSyncLockFromLockWalksTransitiveImports(t *testing.T) {
@@ -922,7 +922,7 @@ func TestEnsureBundledPacksCurrentRepairsStaleSyntheticCache(t *testing.T) {
 	// the CONTENT-HASH skew branch, and a stale schema would trip the earlier
 	// schema check instead, leaving the skew case unexercised.
 	staleData := `schema = 2
-repository = "https://github.com/gastownhall/gascity.git"
+repository = "https://github.com/jonbaldie/gascity.git"
 commit = "` + commit + `"
 content_hash = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
 `

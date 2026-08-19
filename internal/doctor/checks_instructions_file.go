@@ -9,8 +9,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/config"
-	workdirutil "github.com/gastownhall/gascity/internal/workdir"
+	"github.com/jonbaldie/gascity/internal/config"
+	workdirutil "github.com/jonbaldie/gascity/internal/workdir"
 )
 
 // instructionsFileFallbacks lists the common project-instruction filenames

@@ -9,10 +9,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/builtinpacks"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/fsys"
-	gitutil "github.com/gastownhall/gascity/internal/git"
+	"github.com/jonbaldie/gascity/internal/builtinpacks"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/fsys"
+	gitutil "github.com/jonbaldie/gascity/internal/git"
 )
 
 // CheckSeverity classifies an import state validation issue.

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/doctor"
+	"github.com/jonbaldie/gascity/internal/doctor"
 )
 
 func TestCommandDoctorChecksWarmupEligibleDefaultsFalse(t *testing.T) {

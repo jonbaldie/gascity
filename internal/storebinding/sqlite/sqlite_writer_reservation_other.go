@@ -6,7 +6,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/gastownhall/gascity/internal/storebinding"
+	"github.com/jonbaldie/gascity/internal/storebinding"
 )
 
 func sqliteWriterFencingSupported() bool { return false }

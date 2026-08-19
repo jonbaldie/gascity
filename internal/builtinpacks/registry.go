@@ -16,17 +16,17 @@ import (
 	"github.com/BurntSushi/toml"
 	gascitypacks "github.com/gastownhall/gascity-packs"
 
-	"github.com/gastownhall/gascity/examples/bd"
-	"github.com/gastownhall/gascity/examples/bd/dolt"
-	"github.com/gastownhall/gascity/internal/bootstrap/packs/core"
-	"github.com/gastownhall/gascity/internal/fsys"
-	gitutil "github.com/gastownhall/gascity/internal/git"
-	"github.com/gastownhall/gascity/internal/remotesource"
+	"github.com/jonbaldie/gascity/examples/bd"
+	"github.com/jonbaldie/gascity/examples/bd/dolt"
+	"github.com/jonbaldie/gascity/internal/bootstrap/packs/core"
+	"github.com/jonbaldie/gascity/internal/fsys"
+	gitutil "github.com/jonbaldie/gascity/internal/git"
+	"github.com/jonbaldie/gascity/internal/remotesource"
 )
 
 const (
 	// Repository is the canonical clone URL for bundled pack imports.
-	Repository = "https://github.com/gastownhall/gascity.git"
+	Repository = "https://github.com/jonbaldie/gascity.git"
 
 	// PublicRepository is the wave-one public pack repository. The gc binary
 	// can serve its bundled public-pack aliases from the embedded pack set
@@ -763,7 +763,7 @@ func normalizeRepository(repo string) string {
 	if strings.HasPrefix(repo, "github.com/") {
 		repo = "https://" + repo
 	}
-	if repo == "https://github.com/gastownhall/gascity" {
+	if repo == "https://github.com/jonbaldie/gascity" {
 		return Repository
 	}
 	if repo == "https://github.com/gastownhall/gascity-packs" {

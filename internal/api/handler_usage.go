@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/api/apierr"
-	"github.com/gastownhall/gascity/internal/usage"
+	"github.com/jonbaldie/gascity/internal/api/apierr"
+	"github.com/jonbaldie/gascity/internal/usage"
 )
 
 const (

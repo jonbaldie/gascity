@@ -5,7 +5,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/orders"
+	"github.com/jonbaldie/gascity/internal/orders"
 )
 
 // TestCachedOrderHistoryStoresResolverIsConcurrencySafe guards the contract the

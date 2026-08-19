@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 // ResolveOptions carries the injected seams. The zero value is production

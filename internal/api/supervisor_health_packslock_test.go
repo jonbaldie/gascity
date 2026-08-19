@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/packman"
+	"github.com/jonbaldie/gascity/internal/packman"
 )
 
 // TestSupervisorHealthIncludesPacksLockSHA256 asserts /health surfaces

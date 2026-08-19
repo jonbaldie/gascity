@@ -1,6 +1,6 @@
 package rollout
 
-import "github.com/gastownhall/gascity/internal/config"
+import "github.com/jonbaldie/gascity/internal/config"
 
 // keyDaemonFormulaV2 is the registry Key for the formula_v2 migration gate.
 const keyDaemonFormulaV2 = "daemon.formula_v2"

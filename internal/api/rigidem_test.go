@@ -7,7 +7,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // fixedCursor returns a cursor func that always yields v. A distinct value per

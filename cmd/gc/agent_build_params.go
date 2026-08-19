@@ -6,14 +6,14 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/agentutil"
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/fsys"
-	"github.com/gastownhall/gascity/internal/materialize"
-	"github.com/gastownhall/gascity/internal/poolplan"
-	"github.com/gastownhall/gascity/internal/runtime"
-	workdirutil "github.com/gastownhall/gascity/internal/workdir"
+	"github.com/jonbaldie/gascity/internal/agentutil"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/materialize"
+	"github.com/jonbaldie/gascity/internal/poolplan"
+	"github.com/jonbaldie/gascity/internal/runtime"
+	workdirutil "github.com/jonbaldie/gascity/internal/workdir"
 )
 
 // agentBuildParams holds shared, per-city parameters for building agents.

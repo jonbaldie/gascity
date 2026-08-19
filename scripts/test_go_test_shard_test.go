@@ -58,7 +58,7 @@ case "${1:-}" in
   list)
     [ "${2:-}" = "-m" ] || exit 99
     printf 'go-list-module\n' >> %q
-    printf '%%s\n' 'github.com/gastownhall/gascity'
+    printf '%%s\n' 'github.com/jonbaldie/gascity'
     ;;
   test)
     printf '%%s\n' "$@" >> %q
@@ -69,18 +69,18 @@ case "${1:-}" in
       [ "$arg" != "-json" ] || is_json=1
     done
     if [ "$is_list" = 1 ]; then
-      printf '%%s\n' TestAlpha TestBeta TestGamma 'ok  github.com/gastownhall/gascity/example  0.001s'
+      printf '%%s\n' TestAlpha TestBeta TestGamma 'ok  github.com/jonbaldie/gascity/example  0.001s'
       exit 0
     fi
     printf '%%s\n' "$@" >> %q
     env | LC_ALL=C sort >> %q
     if [ "$is_json" = 1 ]; then
       printf '%%s\n' \
-        '{"Action":"run","Package":"github.com/gastownhall/gascity/example","Test":"TestAlpha"}' \
-        '{"Action":"fail","Package":"github.com/gastownhall/gascity/example","Test":"TestAlpha","Elapsed":0.25}' \
-        '{"Action":"run","Package":"github.com/gastownhall/gascity/example","Test":"TestGamma"}' \
-        '{"Action":"pass","Package":"github.com/gastownhall/gascity/example","Test":"TestGamma","Elapsed":0.125}' \
-        '{"Action":"fail","Package":"github.com/gastownhall/gascity/example","Elapsed":0.3}'
+        '{"Action":"run","Package":"github.com/jonbaldie/gascity/example","Test":"TestAlpha"}' \
+        '{"Action":"fail","Package":"github.com/jonbaldie/gascity/example","Test":"TestAlpha","Elapsed":0.25}' \
+        '{"Action":"run","Package":"github.com/jonbaldie/gascity/example","Test":"TestGamma"}' \
+        '{"Action":"pass","Package":"github.com/jonbaldie/gascity/example","Test":"TestGamma","Elapsed":0.125}' \
+        '{"Action":"fail","Package":"github.com/jonbaldie/gascity/example","Elapsed":0.3}'
     fi
     exit %d
     ;;
@@ -625,11 +625,11 @@ func TestGoTestShardTimingUsesObservableMetadataWithoutChangingProductStatus(t *
 	}
 	wantUnits := []observableTimingUnit{
 		{
-			UnitID: "example:TestAlpha", Kind: "test", Package: "github.com/gastownhall/gascity/example",
+			UnitID: "example:TestAlpha", Kind: "test", Package: "github.com/jonbaldie/gascity/example",
 			Test: "TestAlpha", Outcome: "fail", DurationSeconds: 0.25,
 		},
 		{
-			UnitID: "example:TestGamma", Kind: "test", Package: "github.com/gastownhall/gascity/example",
+			UnitID: "example:TestGamma", Kind: "test", Package: "github.com/jonbaldie/gascity/example",
 			Test: "TestGamma", Outcome: "pass", DurationSeconds: 0.125,
 		},
 	}

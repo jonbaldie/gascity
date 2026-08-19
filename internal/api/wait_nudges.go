@@ -1,8 +1,8 @@
 package api
 
 import (
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/nudgequeue"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/nudgequeue"
 )
 
 // withdrawQueuedWaitNudges withdraws the queued wait-nudge shadow beads with the

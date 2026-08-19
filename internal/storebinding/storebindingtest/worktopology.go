@@ -16,7 +16,7 @@ package storebindingtest
 import (
 	"errors"
 
-	"github.com/gastownhall/gascity/internal/storebinding"
+	"github.com/jonbaldie/gascity/internal/storebinding"
 )
 
 // WorkTopologySuite configures one Work topology conformance run.

@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/storehealth"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/storehealth"
 )
 
 // storeHealthCacheTTL is the refresh interval for the /v0/status

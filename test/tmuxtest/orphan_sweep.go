@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/pidutil"
+	"github.com/jonbaldie/gascity/internal/pidutil"
 )
 
 // SocketParentDirPrefix is the shared prefix for the tmux Unix-socket parent

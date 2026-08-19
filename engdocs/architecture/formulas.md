@@ -41,7 +41,7 @@ The important current-state boundary is this:
   `Store.MolCookOn`.
 - **Convergence formula subset**: The subset of formula metadata used by the
   convergence subsystem, validated in
-  [`internal/convergence/formula.go`](https://github.com/gastownhall/gascity/blob/main/internal/convergence/formula.go).
+  [`internal/convergence/formula.go`](https://github.com/jonbaldie/gascity/blob/main/internal/convergence/formula.go).
 
 ## Architecture
 
@@ -107,7 +107,7 @@ untracked files do not count as reviewer-created mutations.
 
 `ComputeFormulaLayers()` in `internal/config/pack.go` computes the ordered
 layer set for the city and each rig. `ResolveFormulas()` in
-[`cmd/gc/formula_resolve.go`](https://github.com/gastownhall/gascity/blob/main/cmd/gc/formula_resolve.go) then:
+[`cmd/gc/formula_resolve.go`](https://github.com/jonbaldie/gascity/blob/main/cmd/gc/formula_resolve.go) then:
 
 1. Scans each layer for `*.formula.toml`
 2. Keeps the highest-priority winner for each filename
@@ -126,10 +126,10 @@ The store interface is the runtime seam:
 
 Current implementations behave as follows:
 
-- **`BdStore`** in [`internal/beads/bdstore.go`](https://github.com/gastownhall/gascity/blob/main/internal/beads/bdstore.go)
+- **`BdStore`** in [`internal/beads/bdstore.go`](https://github.com/jonbaldie/gascity/blob/main/internal/beads/bdstore.go)
   delegates to `bd mol wisp` and `bd mol bond`, then parses the returned root
   bead ID.
-- **`exec.Store`** in [`internal/beads/exec/exec.go`](https://github.com/gastownhall/gascity/blob/main/internal/beads/exec/exec.go)
+- **`exec.Store`** in [`internal/beads/exec/exec.go`](https://github.com/jonbaldie/gascity/blob/main/internal/beads/exec/exec.go)
   forwards `mol-cook` and `mol-cook-on` to a user script.
 - **`MemStore`** and **`FileStore`** create a simplified molecule root bead.
   They are suitable for tests and tutorials, not full formula execution.
@@ -138,9 +138,9 @@ Current implementations behave as follows:
 
 Formulas are consumed in two main places:
 
-- [`cmd/gc/cmd_sling.go`](https://github.com/gastownhall/gascity/blob/main/cmd/gc/cmd_sling.go) creates wisps during
+- [`cmd/gc/cmd_sling.go`](https://github.com/jonbaldie/gascity/blob/main/cmd/gc/cmd_sling.go) creates wisps during
   `gc sling --formula` and attached molecules via `--on`.
-- [`cmd/gc/order_dispatch.go`](https://github.com/gastownhall/gascity/blob/main/cmd/gc/order_dispatch.go) creates wisps
+- [`cmd/gc/order_dispatch.go`](https://github.com/jonbaldie/gascity/blob/main/cmd/gc/order_dispatch.go) creates wisps
   when formula-backed orders fire. In the current merge wave, orders are
   discovered from `orders/*.order.toml`; removal of the `.order.`
   infix is deferred to `#586`.
@@ -148,7 +148,7 @@ Formulas are consumed in two main places:
 ### Garbage Collection
 
 Closed wisps are purged by the controller's wisp GC in
-[`cmd/gc/wisp_gc.go`](https://github.com/gastownhall/gascity/blob/main/cmd/gc/wisp_gc.go). The interval and TTL come from
+[`cmd/gc/wisp_gc.go`](https://github.com/jonbaldie/gascity/blob/main/cmd/gc/wisp_gc.go). The interval and TTL come from
 `[daemon].wisp_gc_interval` and `[daemon].wisp_ttl`.
 
 ## Invariants

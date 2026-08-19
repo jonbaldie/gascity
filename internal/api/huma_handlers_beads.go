@@ -5,8 +5,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/api/apierr"
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/api/apierr"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // humaHandleBeadList is the Huma-typed handler for GET /v0/beads.

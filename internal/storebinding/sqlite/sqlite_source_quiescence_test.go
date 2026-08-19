@@ -34,7 +34,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // sourceCensus is a mutation-free inspection entry point together with the two

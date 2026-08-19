@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 // WakeReason describes why a session should be awake.

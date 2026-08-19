@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/testpolicy/timingsummary"
+	"github.com/jonbaldie/gascity/internal/testpolicy/timingsummary"
 )
 
 const (

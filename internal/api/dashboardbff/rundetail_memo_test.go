@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/events"
 )
 
 // warmRunTailer builds a plane over a temp event log for the "alpha" city,

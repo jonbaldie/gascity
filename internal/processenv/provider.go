@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/telemetry"
+	"github.com/jonbaldie/gascity/internal/telemetry"
 )
 
 // providerCredentialEnvPrefixes lists provider-specific env-var name prefixes

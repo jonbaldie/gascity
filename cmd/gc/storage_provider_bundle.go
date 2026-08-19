@@ -19,9 +19,9 @@ package main
 import (
 	"fmt"
 
-	"github.com/gastownhall/gascity/internal/storebinding"
-	"github.com/gastownhall/gascity/internal/storebinding/beadsworkspace"
-	"github.com/gastownhall/gascity/internal/storebinding/sqlite"
+	"github.com/jonbaldie/gascity/internal/storebinding"
+	"github.com/jonbaldie/gascity/internal/storebinding/beadsworkspace"
+	"github.com/jonbaldie/gascity/internal/storebinding/sqlite"
 )
 
 // newStorageProviderRegistry builds and freezes the storage provider registry

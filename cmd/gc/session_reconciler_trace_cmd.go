@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/citylayout"
+	"github.com/jonbaldie/gascity/internal/citylayout"
 	"github.com/spf13/cobra"
 )
 

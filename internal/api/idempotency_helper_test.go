@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/api/apierr"
+	"github.com/jonbaldie/gascity/internal/api/apierr"
 )
 
 // newIdemTestServer builds a Server with only the idempotency cache wired —

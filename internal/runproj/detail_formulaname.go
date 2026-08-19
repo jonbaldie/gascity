@@ -1,6 +1,6 @@
 package runproj
 
-import "github.com/gastownhall/gascity/internal/beadmeta"
+import "github.com/jonbaldie/gascity/internal/beadmeta"
 
 // resolveRunFormulaIdentityDetailState resolves a run root's formula name,
 // provenance, and target for the 'detail'/'state' modes. Port of the

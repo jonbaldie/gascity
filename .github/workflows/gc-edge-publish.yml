@@ -26,7 +26,7 @@ jobs:
     # this. The ref guard also keeps a manual workflow_dispatch from a feature
     # branch from publishing a non-main commit as edge, so "edge == a main
     # commit" stays an invariant rather than a convention.
-    if: ${{ github.repository == 'gastownhall/gascity' && github.ref == 'refs/heads/main' }}
+    if: ${{ github.repository == 'jonbaldie/gascity' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/gastownhall/gascity/internal/pathutil"
+	"github.com/jonbaldie/gascity/internal/pathutil"
 )
 
 var (

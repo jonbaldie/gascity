@@ -3,8 +3,8 @@ package storebinding
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/coordclass"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/coordclass"
 )
 
 const migrationContract ContractVersion = "gascity.storage.migration.test.v1"

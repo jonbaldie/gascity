@@ -15,7 +15,7 @@ import (
 	"syscall"
 
 	"github.com/BurntSushi/toml"
-	"github.com/gastownhall/gascity/internal/pathutil"
+	"github.com/jonbaldie/gascity/internal/pathutil"
 )
 
 // validCityName matches names safe for use in URL path segments.

@@ -15,7 +15,7 @@ import (
 	"strings"
 	"testing"
 
-	helpers "github.com/gastownhall/gascity/test/acceptance/helpers"
+	helpers "github.com/jonbaldie/gascity/test/acceptance/helpers"
 )
 
 // createGitRig creates a minimal git repo suitable for gc rig add.

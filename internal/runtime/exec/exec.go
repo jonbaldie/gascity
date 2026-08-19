@@ -14,8 +14,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/execgrace"
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/execgrace"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
 // Provider implements [runtime.Provider] by delegating each operation to

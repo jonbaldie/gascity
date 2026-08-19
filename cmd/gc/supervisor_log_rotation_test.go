@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/supervisor"
+	"github.com/jonbaldie/gascity/internal/supervisor"
 )
 
 // setSupervisorLogRotation lowers the supervisor log rotation tunables for

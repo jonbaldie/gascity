@@ -3,8 +3,8 @@ package main
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 // Phase 0 spec coverage from engdocs/design/session-model-unification.md:

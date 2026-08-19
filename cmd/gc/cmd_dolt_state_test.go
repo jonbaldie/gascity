@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/citylayout"
-	"github.com/gastownhall/gascity/internal/pidutil"
+	"github.com/jonbaldie/gascity/internal/citylayout"
+	"github.com/jonbaldie/gascity/internal/pidutil"
 )
 
 func parseDoltStateOutput(t *testing.T, out string) map[string]string {

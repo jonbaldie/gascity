@@ -24,7 +24,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/gastownhall/gascity/internal/rollout/gate"
+	"github.com/jonbaldie/gascity/internal/rollout/gate"
 )
 
 // conditionalWritesGate is the diagnostic gate label for every conditional-

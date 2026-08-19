@@ -15,7 +15,7 @@
 # doc files on its own PR branch.
 #
 # Inputs (environment):
-#   BASE_REPO    base "owner/name" (e.g. gastownhall/gascity)
+#   BASE_REPO    base "owner/name" (e.g. jonbaldie/gascity)
 #   HEAD_REPO    PR head "owner/name" (same as BASE_REPO for branch PRs;
 #                may be empty if the head fork was deleted)
 #   HEAD_BRANCH  PR head branch name

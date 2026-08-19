@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/citylayout"
-	"github.com/gastownhall/gascity/internal/testfixtures/reviewworkflows"
+	"github.com/jonbaldie/gascity/internal/citylayout"
+	"github.com/jonbaldie/gascity/internal/testfixtures/reviewworkflows"
 )
 
 // reviewWorkflowTimeout bounds waits for review-formula workflow beads to

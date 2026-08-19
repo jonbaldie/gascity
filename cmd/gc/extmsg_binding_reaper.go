@@ -6,8 +6,8 @@ import (
 	"io"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/extmsg"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/extmsg"
 )
 
 // reapStaleExtmsgBindings reconciles external-message conversation bindings

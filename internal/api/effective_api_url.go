@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/supervisor"
+	"github.com/jonbaldie/gascity/internal/supervisor"
 )
 
 var configEffectiveAPIBaseURLHook = func() (string, error) {

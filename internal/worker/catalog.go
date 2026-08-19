@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	sessionpkg "github.com/gastownhall/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/beads"
+	sessionpkg "github.com/jonbaldie/gascity/internal/session"
 )
 
 type (

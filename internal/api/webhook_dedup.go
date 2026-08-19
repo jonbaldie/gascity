@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/webhookverify"
+	"github.com/jonbaldie/gascity/internal/webhookverify"
 )
 
 // defaultWebhookDedupTTL bounds how long a delivery id is remembered. Providers

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/bootstrap/packs/core"
+	"github.com/jonbaldie/gascity/internal/bootstrap/packs/core"
 )
 
 // mimoCodePluginPackPath is the embedded MiMo Code plugin location inside the

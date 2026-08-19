@@ -8,11 +8,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/featureflags"
-	"github.com/gastownhall/gascity/internal/rollout"
-	"github.com/gastownhall/gascity/internal/sling"
-	"github.com/gastownhall/gascity/internal/webhookverify"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/featureflags"
+	"github.com/jonbaldie/gascity/internal/rollout"
+	"github.com/jonbaldie/gascity/internal/sling"
+	"github.com/jonbaldie/gascity/internal/webhookverify"
 	"golang.org/x/sync/singleflight"
 )
 

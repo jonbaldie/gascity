@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/formula"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/formula"
 )
 
 // makeWorkflowRecipe builds a minimal formula recipe with a root and N task steps.

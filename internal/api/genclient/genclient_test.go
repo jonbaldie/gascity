@@ -9,7 +9,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/api/genclient"
+	"github.com/jonbaldie/gascity/internal/api/genclient"
 )
 
 // TestGeneratedClientInSync regenerates client_gen.go from the live spec

@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/testutil"
+	"github.com/jonbaldie/gascity/internal/testutil"
 )
 
 // These tests exercise the journal-corruption auto-recovery helpers from

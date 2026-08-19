@@ -1,7 +1,7 @@
 package api
 
 import (
-	"github.com/gastownhall/gascity/internal/mail"
+	"github.com/jonbaldie/gascity/internal/mail"
 )
 
 // Per-domain Huma input/output types for the mail handler

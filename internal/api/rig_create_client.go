@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/api/genclient"
-	"github.com/gastownhall/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/api/genclient"
+	"github.com/jonbaldie/gascity/internal/events"
 )
 
 // Rig-create wait tuning (gate G21). These are deliberately distinct from the

@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/clock"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/clock"
 )
 
 func seedDeadBacklog(t *testing.T, cityPath string, now time.Time, n int) map[string]string {

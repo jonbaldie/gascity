@@ -3,8 +3,8 @@ package runproj
 import (
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/beadmeta"
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beadmeta"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // CanonicalRunStatus is the closed lifecycle vocabulary shared by the typed

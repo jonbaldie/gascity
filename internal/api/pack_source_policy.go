@@ -6,8 +6,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/importsvc"
-	"github.com/gastownhall/gascity/internal/ssrf"
+	"github.com/jonbaldie/gascity/internal/importsvc"
+	"github.com/jonbaldie/gascity/internal/ssrf"
 )
 
 // validateHTTPPackSource is the HTTP-layer SSRF fence for POST /packs. The

@@ -3,7 +3,7 @@ package config
 import (
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/agent"
+	"github.com/jonbaldie/gascity/internal/agent"
 )
 
 // FindNamedSession returns the configured named session for the provided

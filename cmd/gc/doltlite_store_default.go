@@ -2,7 +2,7 @@
 
 package main
 
-import "github.com/gastownhall/gascity/internal/beads"
+import "github.com/jonbaldie/gascity/internal/beads"
 
 func openOptimizedDoltliteStore(_ string, _ *beads.BdStore) (beads.Store, bool) {
 	return nil, false

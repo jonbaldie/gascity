@@ -8,8 +8,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/gastownhall/gascity/internal/runtime/runtimecapability"
-	"github.com/gastownhall/gascity/internal/runtime/runtimecontract"
+	"github.com/jonbaldie/gascity/internal/runtime/runtimecapability"
+	"github.com/jonbaldie/gascity/internal/runtime/runtimecontract"
 	"github.com/spf13/cobra"
 )
 

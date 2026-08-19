@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/config"
-	workdirutil "github.com/gastownhall/gascity/internal/workdir"
+	"github.com/jonbaldie/gascity/internal/config"
+	workdirutil "github.com/jonbaldie/gascity/internal/workdir"
 )
 
 type agentCreateContext struct {

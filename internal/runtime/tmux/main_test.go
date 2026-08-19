@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/gastownhall/gascity/test/tmuxtest"
+	"github.com/jonbaldie/gascity/test/tmuxtest"
 )
 
 // TestMain neutralizes ambient tmux/session state for the whole package.

@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/citywriteauth"
+	"github.com/jonbaldie/gascity/internal/citywriteauth"
 )
 
 // Write-auth gates per-city write mutations on a signed, single-use,

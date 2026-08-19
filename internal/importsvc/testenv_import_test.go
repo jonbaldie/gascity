@@ -2,4 +2,4 @@
 
 package importsvc
 
-import _ "github.com/gastownhall/gascity/internal/testenv"
+import _ "github.com/jonbaldie/gascity/internal/testenv"

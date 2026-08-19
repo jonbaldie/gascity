@@ -16,7 +16,7 @@ Then install the Gas City CLI and put it on the PATH:
 
 ```shell
 ~
-$ brew install gascity
+$ go install github.com/jonbaldie/gascity/cmd/gc@latest
 ...
 
 ~
@@ -24,12 +24,11 @@ $ gc version
 1.1.1
 ```
 
-> NOTE: the gascity installation is a great way to get the right dependencies in
-> place, but may not be enough to keep up with the changes we're making on the
-> way to 1.0. Best practice right now is to build your own `gc` binary from HEAD
-> on the `main` branch of [the gascity
-> repo](https://github.com/gastownhall/gascity) to get the latest and greatest
-> bits before running these tutorials.
+> NOTE: `go install` is the default way to get `gc` from this repository. You
+> still need the runtime tools from the [installation
+> guide](/getting-started/installation) (tmux, git, jq, and beads/dolt unless
+> you use the file provider). Contributors can also clone [the gascity
+> repo](https://github.com/jonbaldie/gascity) and run `make install` from HEAD.
 
 New to the vocabulary? Read [How Gas City Works](/getting-started/how-gas-city-works) first — the
 canonical model for the six primitives (Agent, Bead, Formula, Rig, Pack, Event)
@@ -139,11 +138,11 @@ name = "my-city"
 schema = 2
 
 [imports.core]
-source = "https://github.com/gastownhall/gascity.git//internal/bootstrap/packs/core"
+source = "https://github.com/jonbaldie/gascity.git//internal/bootstrap/packs/core"
 version = "sha:<pinned commit>"
 
 [imports.bd]
-source = "https://github.com/gastownhall/gascity.git//examples/bd"
+source = "https://github.com/jonbaldie/gascity.git//examples/bd"
 version = "sha:<pinned commit>"
 
 [imports.gascity]

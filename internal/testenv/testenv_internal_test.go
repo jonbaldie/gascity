@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads/contract"
+	"github.com/jonbaldie/gascity/internal/beads/contract"
 )
 
 // localDoltHostCases classifies every isLocalDoltHost branch: empty values,

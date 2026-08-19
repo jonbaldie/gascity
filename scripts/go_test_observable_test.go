@@ -109,11 +109,11 @@ func TestGoTestObservableWritesDeterministicNormalizedTiming(t *testing.T) {
 	t.Parallel()
 
 	events := strings.Join([]string{
-		`{"Time":"2026-07-14T00:00:01Z","Action":"run","Package":"github.com/gastownhall/gascity/internal/example","Test":"TestZulu"}`,
-		`{"Time":"2026-07-14T00:00:04Z","Action":"pass","Package":"github.com/gastownhall/gascity/internal/example","Test":"TestZulu","Elapsed":0.2}`,
-		`{"Time":"2026-07-14T00:00:02Z","Action":"skip","Package":"github.com/gastownhall/gascity/internal/example","Test":"TestAlpha/case","Elapsed":0.1}`,
-		`{"Time":"2026-07-14T00:00:05Z","Action":"pass","Package":"github.com/gastownhall/gascity/internal/example","Elapsed":0.5}`,
-		`{"Time":"2026-07-14T00:00:03Z","Action":"pass","Package":"github.com/gastownhall/gascity/internal/example","Test":"TestAlpha","Elapsed":0.3}`,
+		`{"Time":"2026-07-14T00:00:01Z","Action":"run","Package":"github.com/jonbaldie/gascity/internal/example","Test":"TestZulu"}`,
+		`{"Time":"2026-07-14T00:00:04Z","Action":"pass","Package":"github.com/jonbaldie/gascity/internal/example","Test":"TestZulu","Elapsed":0.2}`,
+		`{"Time":"2026-07-14T00:00:02Z","Action":"skip","Package":"github.com/jonbaldie/gascity/internal/example","Test":"TestAlpha/case","Elapsed":0.1}`,
+		`{"Time":"2026-07-14T00:00:05Z","Action":"pass","Package":"github.com/jonbaldie/gascity/internal/example","Elapsed":0.5}`,
+		`{"Time":"2026-07-14T00:00:03Z","Action":"pass","Package":"github.com/jonbaldie/gascity/internal/example","Test":"TestAlpha","Elapsed":0.3}`,
 	}, "\n") + "\n"
 
 	first, firstOutput := runObservableWithFakeGo(t, events, 0)
@@ -124,7 +124,7 @@ func TestGoTestObservableWritesDeterministicNormalizedTiming(t *testing.T) {
 	for _, want := range []string{
 		"2026-07-14T00:00:01Z run TestZulu\n",
 		"2026-07-14T00:00:02Z skip TestAlpha/case\n",
-		"2026-07-14T00:00:05Z pass github.com/gastownhall/gascity/internal/example\n",
+		"2026-07-14T00:00:05Z pass github.com/jonbaldie/gascity/internal/example\n",
 	} {
 		if !strings.Contains(string(firstOutput), want) {
 			t.Fatalf("observable output does not contain %q:\n%s", want, firstOutput)
@@ -145,10 +145,10 @@ func TestGoTestObservableWritesDeterministicNormalizedTiming(t *testing.T) {
 		t.Fatalf("runner metadata = %+v", artifact.Runner)
 	}
 	wantUnits := []observableTimingUnit{
-		{UnitID: "internal/example", Kind: "package", Package: "github.com/gastownhall/gascity/internal/example", Outcome: "pass", DurationSeconds: 0.5},
-		{UnitID: "internal/example:TestAlpha", Kind: "test", Package: "github.com/gastownhall/gascity/internal/example", Test: "TestAlpha", Outcome: "pass", DurationSeconds: 0.3},
-		{UnitID: "internal/example:TestAlpha/case", Kind: "test", Package: "github.com/gastownhall/gascity/internal/example", Test: "TestAlpha", Subtest: "case", Outcome: "skip", DurationSeconds: 0.1},
-		{UnitID: "internal/example:TestZulu", Kind: "test", Package: "github.com/gastownhall/gascity/internal/example", Test: "TestZulu", Outcome: "pass", DurationSeconds: 0.2},
+		{UnitID: "internal/example", Kind: "package", Package: "github.com/jonbaldie/gascity/internal/example", Outcome: "pass", DurationSeconds: 0.5},
+		{UnitID: "internal/example:TestAlpha", Kind: "test", Package: "github.com/jonbaldie/gascity/internal/example", Test: "TestAlpha", Outcome: "pass", DurationSeconds: 0.3},
+		{UnitID: "internal/example:TestAlpha/case", Kind: "test", Package: "github.com/jonbaldie/gascity/internal/example", Test: "TestAlpha", Subtest: "case", Outcome: "skip", DurationSeconds: 0.1},
+		{UnitID: "internal/example:TestZulu", Kind: "test", Package: "github.com/jonbaldie/gascity/internal/example", Test: "TestZulu", Outcome: "pass", DurationSeconds: 0.2},
 	}
 	if !slices.Equal(artifact.Units, wantUnits) {
 		t.Fatalf("timing units = %+v, want %+v", artifact.Units, wantUnits)
@@ -159,13 +159,13 @@ func TestGoTestObservableRecordsValidFailureWithoutChangingProductStatus(t *test
 	t.Parallel()
 
 	events := strings.Join([]string{
-		`{"Action":"fail","Package":"github.com/gastownhall/gascity/internal/example","Test":"TestBroken","Elapsed":0.4}`,
-		`{"Action":"fail","Package":"github.com/gastownhall/gascity/internal/example","Elapsed":0.7}`,
+		`{"Action":"fail","Package":"github.com/jonbaldie/gascity/internal/example","Test":"TestBroken","Elapsed":0.4}`,
+		`{"Action":"fail","Package":"github.com/jonbaldie/gascity/internal/example","Elapsed":0.7}`,
 	}, "\n") + "\n"
 	data, output := runObservableWithFakeGo(t, events, 17)
 	for _, want := range []string{
 		" fail TestBroken\n",
-		" fail github.com/gastownhall/gascity/internal/example\n",
+		" fail github.com/jonbaldie/gascity/internal/example\n",
 	} {
 		if !strings.Contains(string(output), want) {
 			t.Fatalf("observable output does not contain %q:\n%s", want, output)
@@ -177,8 +177,8 @@ func TestGoTestObservableRecordsValidFailureWithoutChangingProductStatus(t *test
 		t.Fatalf("decode timing artifact: %v\n%s", err, data)
 	}
 	wantUnits := []observableTimingUnit{
-		{UnitID: "internal/example", Kind: "package", Package: "github.com/gastownhall/gascity/internal/example", Outcome: "fail", DurationSeconds: 0.7},
-		{UnitID: "internal/example:TestBroken", Kind: "test", Package: "github.com/gastownhall/gascity/internal/example", Test: "TestBroken", Outcome: "fail", DurationSeconds: 0.4},
+		{UnitID: "internal/example", Kind: "package", Package: "github.com/jonbaldie/gascity/internal/example", Outcome: "fail", DurationSeconds: 0.7},
+		{UnitID: "internal/example:TestBroken", Kind: "test", Package: "github.com/jonbaldie/gascity/internal/example", Test: "TestBroken", Outcome: "fail", DurationSeconds: 0.4},
 	}
 	if !slices.Equal(artifact.Units, wantUnits) {
 		t.Fatalf("timing units = %+v, want %+v", artifact.Units, wantUnits)
@@ -190,7 +190,7 @@ func TestGoTestObservableSkipsTimingWhenModuleIdentityIsUnavailable(t *testing.T
 
 	tmpDir := t.TempDir()
 	timingFile := filepath.Join(tmpDir, "timing.json")
-	events := `{"Action":"pass","Package":"github.com/gastownhall/gascity/internal/example","Test":"TestAlpha","Elapsed":0.3}` + "\n"
+	events := `{"Action":"pass","Package":"github.com/jonbaldie/gascity/internal/example","Test":"TestAlpha","Elapsed":0.3}` + "\n"
 	status, output := runObservableCommandWithModuleStatus(t, tmpDir, timingFile, events, 0, 23)
 	if status != 0 {
 		t.Fatalf("observable exit = %d, want product exit 0:\n%s", status, output)
@@ -215,7 +215,7 @@ func TestGoTestObservableCaptureFailureNeverChangesProductStatus(t *testing.T) {
 		{name: "malformed passing output", output: "{not-json\n", productRun: 0, wantProgressWarning: true},
 		{name: "truncated passing output", output: `{"Action":"pass"`, productRun: 0, wantProgressWarning: true},
 		{name: "missing passing output", output: "", productRun: 0},
-		{name: "terminal event missing elapsed", output: `{"Action":"pass","Package":"github.com/gastownhall/gascity/internal/example","Test":"TestIncomplete"}` + "\n", productRun: 0},
+		{name: "terminal event missing elapsed", output: `{"Action":"pass","Package":"github.com/jonbaldie/gascity/internal/example","Test":"TestIncomplete"}` + "\n", productRun: 0},
 		{name: "malformed failing output", output: "{not-json\n", productRun: 17, wantProgressWarning: true},
 		{name: "large malformed failing output", output: strings.Repeat("{not-json\n", 1<<18), productRun: 17, wantProgressWarning: true},
 	} {
@@ -282,7 +282,7 @@ func runObservableCommandWithModuleStatus(t *testing.T, tmpDir, timingFile, outp
 set -e
 if [ "$1" = "list" ] && [ "$2" = "-m" ]; then
   if [ %d -eq 0 ]; then
-    printf '%%s\n' 'github.com/gastownhall/gascity'
+    printf '%%s\n' 'github.com/jonbaldie/gascity'
   fi
   exit %d
 fi

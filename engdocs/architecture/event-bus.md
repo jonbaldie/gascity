@@ -372,7 +372,7 @@ lifetime via `sync.Once`.
 ## Testing
 
 The event bus has a layered testing strategy aligned with
-[TESTING.md](https://github.com/gastownhall/gascity/blob/main/TESTING.md):
+[TESTING.md](https://github.com/jonbaldie/gascity/blob/main/TESTING.md):
 
 **Conformance suite** (`internal/events/eventstest/conformance.go`):
 `RunProviderTests` runs 20+ subtests against any Provider
@@ -462,7 +462,7 @@ suite against a stateful jq-based mock script.
   events and beads together provide persistence + observation
 - [Config architecture](config.md) -- how `[events].provider` is
   resolved and how progressive activation works
-- [TESTING.md](https://github.com/gastownhall/gascity/blob/main/TESTING.md) -- testing philosophy and tier
+- [TESTING.md](https://github.com/jonbaldie/gascity/blob/main/TESTING.md) -- testing philosophy and tier
   boundaries for the conformance suite approach
-- [CLAUDE.md](https://github.com/gastownhall/gascity/blob/main/CLAUDE.md) -- design principles including "Event
+- [CLAUDE.md](https://github.com/jonbaldie/gascity/blob/main/CLAUDE.md) -- design principles including "Event
   Bus is the universal observation substrate" (layering invariant 3)

@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/supervisor"
+	"github.com/jonbaldie/gascity/internal/supervisor"
 )
 
 func TestDoRegister(t *testing.T) {

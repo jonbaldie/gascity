@@ -3,7 +3,7 @@ package main
 import (
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // executionEmitWorkStore is the work-store leg an execution-fact projection

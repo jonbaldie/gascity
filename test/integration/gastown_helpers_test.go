@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	gcevents "github.com/gastownhall/gascity/internal/events"
-	"github.com/gastownhall/gascity/test/tmuxtest"
+	gcevents "github.com/jonbaldie/gascity/internal/events"
+	"github.com/jonbaldie/gascity/test/tmuxtest"
 )
 
 // gasTownAgent describes an agent for Gas Town integration tests.

@@ -6,7 +6,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/gchome"
+	"github.com/jonbaldie/gascity/internal/gchome"
 )
 
 func TestUnsupportedStorageFailsClosed(t *testing.T) {

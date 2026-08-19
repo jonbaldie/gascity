@@ -22,11 +22,11 @@ import (
 // config→orders→beads cycle that forced the split.
 func TestRolloutImportBoundary(t *testing.T) {
 	t.Parallel()
-	const self = "github.com/gastownhall/gascity/internal/rollout"
+	const self = "github.com/jonbaldie/gascity/internal/rollout"
 	const gatePkg = self + "/gate"
 	allowedInternal := map[string]bool{
-		"github.com/gastownhall/gascity/internal/config": true,
-		"github.com/gastownhall/gascity/internal/deps":   true,
+		"github.com/jonbaldie/gascity/internal/config": true,
+		"github.com/jonbaldie/gascity/internal/deps":   true,
 		gatePkg: true,
 	}
 

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	sessionpkg "github.com/gastownhall/gascity/internal/session"
+	sessionpkg "github.com/jonbaldie/gascity/internal/session"
 )
 
 // defaultOnDemandIdleTimeout is the fallback idle timeout for on-demand

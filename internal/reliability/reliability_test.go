@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/events"
 )
 
 func mustEncode(t *testing.T, v any) json.RawMessage {

@@ -1,6 +1,6 @@
 package api
 
-import "github.com/gastownhall/gascity/internal/api/genclient"
+import "github.com/jonbaldie/gascity/internal/api/genclient"
 
 // OrderHistoryView is the CLI-facing shape for `gc order history` rows. It
 // mirrors the subset of fields the CLI formatter reads so cmd/gc/ never

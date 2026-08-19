@@ -17,7 +17,7 @@ package orderdispatch
 import (
 	"context"
 
-	"github.com/gastownhall/gascity/internal/orders"
+	"github.com/jonbaldie/gascity/internal/orders"
 )
 
 // Source identifies what triggered a dispatch routed through the seam. It is

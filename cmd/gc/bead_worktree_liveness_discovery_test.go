@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/pathutil"
+	"github.com/jonbaldie/gascity/internal/pathutil"
 )
 
 // TestDiscoverWorktreeLiveness_ReportsWorktreeOutsideGcOwnedRoot is the RED

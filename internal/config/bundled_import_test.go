@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/builtinpacks"
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/builtinpacks"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
 
 func TestResolveLockedRemoteImportAcceptsBundledSyntheticCache(t *testing.T) {
@@ -242,7 +242,7 @@ func TestResolveLockedRemoteImportSurfacesInvalidBundledMarker(t *testing.T) {
 	cacheDir := bundledRepoCacheDir(home, source, commit)
 	writeTestFile(t, cacheDir, ".gc-bundled-pack-cache.toml", `
 schema = 99
-repository = "https://github.com/gastownhall/gascity.git"
+repository = "https://github.com/jonbaldie/gascity.git"
 commit = "abc123def456abc123def456abc123def456abc123de"
 content_hash = "sha256:deadbeef"
 `)
@@ -287,7 +287,7 @@ func TestResolveLockedRemoteImportPrefersGitCacheOverInvalidBundledMarker(t *tes
 	mustMkdirAll(t, filepath.Join(cacheDir, ".git"), 0o755)
 	writeTestFile(t, cacheDir, ".gc-bundled-pack-cache.toml", `
 schema = 99
-repository = "https://github.com/gastownhall/gascity.git"
+repository = "https://github.com/jonbaldie/gascity.git"
 commit = "different"
 content_hash = "sha256:deadbeef"
 `)

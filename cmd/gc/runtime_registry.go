@@ -5,17 +5,17 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/runtime"
-	sessionacp "github.com/gastownhall/gascity/internal/runtime/acp"
-	sessionexec "github.com/gastownhall/gascity/internal/runtime/exec"
-	sessionherdr "github.com/gastownhall/gascity/internal/runtime/herdr"
-	sessionk8s "github.com/gastownhall/gascity/internal/runtime/k8s"
-	"github.com/gastownhall/gascity/internal/runtime/registry"
-	sessionssh "github.com/gastownhall/gascity/internal/runtime/ssh"
-	sessionsubprocess "github.com/gastownhall/gascity/internal/runtime/subprocess"
-	sessiont3bridge "github.com/gastownhall/gascity/internal/runtime/t3bridge"
-	sessiontmux "github.com/gastownhall/gascity/internal/runtime/tmux"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/runtime"
+	sessionacp "github.com/jonbaldie/gascity/internal/runtime/acp"
+	sessionexec "github.com/jonbaldie/gascity/internal/runtime/exec"
+	sessionherdr "github.com/jonbaldie/gascity/internal/runtime/herdr"
+	sessionk8s "github.com/jonbaldie/gascity/internal/runtime/k8s"
+	"github.com/jonbaldie/gascity/internal/runtime/registry"
+	sessionssh "github.com/jonbaldie/gascity/internal/runtime/ssh"
+	sessionsubprocess "github.com/jonbaldie/gascity/internal/runtime/subprocess"
+	sessiont3bridge "github.com/jonbaldie/gascity/internal/runtime/t3bridge"
+	sessiontmux "github.com/jonbaldie/gascity/internal/runtime/tmux"
 )
 
 // runtimeRegistry resolves session provider selection names. Builtins

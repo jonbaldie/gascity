@@ -4,9 +4,9 @@ import (
 	"context"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/events"
-	"github.com/gastownhall/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/session"
 )
 
 func (s *Server) watchSessionWorkerOperationSignals(ctx context.Context, info session.Info) <-chan struct{} {

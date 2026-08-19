@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/transcriptmeta"
+	"github.com/jonbaldie/gascity/internal/transcriptmeta"
 )
 
 const (

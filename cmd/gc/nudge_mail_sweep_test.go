@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/nudgequeue"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/nudgequeue"
 )
 
 // nudgeSeed builds a seed Bead for NewMemStoreFrom representing an open nudge bead.

@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/bootstrap/packs/core"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/fsys"
-	"github.com/gastownhall/gascity/internal/hooks"
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/bootstrap/packs/core"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/hooks"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
 // seedCodexOverlay writes the real embedded core codex hooks overlay into a

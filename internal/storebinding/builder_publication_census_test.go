@@ -55,7 +55,7 @@ const (
 	censusRegistryFile    = "internal/storebinding/provider.go"
 	censusPlannerFile     = "internal/storebinding/plan_resolve.go"
 	censusPackageDir      = "internal/storebinding"
-	censusImportPath      = "github.com/gastownhall/gascity/internal/storebinding"
+	censusImportPath      = "github.com/jonbaldie/gascity/internal/storebinding"
 	censusMinimumFiles    = 500
 )
 

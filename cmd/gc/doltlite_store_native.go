@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 const nativeDoltliteBeadsEnv = "GC_NATIVE_DOLTLITE_BEADS"

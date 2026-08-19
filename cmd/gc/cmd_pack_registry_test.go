@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/packregistry"
+	"github.com/jonbaldie/gascity/internal/packregistry"
 )
 
 const packRegistryTestCatalog = `schema = 1

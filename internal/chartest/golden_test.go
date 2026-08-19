@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/chartest"
+	"github.com/jonbaldie/gascity/internal/chartest"
 )
 
 func TestCapture_GoldenIsDeterministicAndSectioned(t *testing.T) {

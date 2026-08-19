@@ -5,7 +5,7 @@ import (
 	"sync"
 	"testing"
 
-	sessionpkg "github.com/gastownhall/gascity/internal/session"
+	sessionpkg "github.com/jonbaldie/gascity/internal/session"
 )
 
 // TestConvergeShadowRecorderOwnershipIsolatesConcurrentTicks proves the

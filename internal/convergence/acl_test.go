@@ -3,7 +3,7 @@ package convergence
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/processenv"
+	"github.com/jonbaldie/gascity/internal/processenv"
 )
 
 func TestRequiresToken(t *testing.T) {

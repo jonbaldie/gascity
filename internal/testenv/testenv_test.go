@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/testenv"
+	"github.com/jonbaldie/gascity/internal/testenv"
 )
 
 // TestInitScrubsLeakVectors verifies init() unsets every var in

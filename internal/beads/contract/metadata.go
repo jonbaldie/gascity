@@ -3,7 +3,7 @@ package contract
 import (
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/beadmeta"
+	"github.com/jonbaldie/gascity/internal/beadmeta"
 )
 
 // Canonical bead-metadata keys for the worker-path / artifact-path split

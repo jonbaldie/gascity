@@ -2,7 +2,7 @@
 
 package proctable
 
-import "github.com/gastownhall/gascity/internal/runtime"
+import "github.com/jonbaldie/gascity/internal/runtime"
 
 // ScanBySessionID is unavailable on platforms without process environment
 // scanning support.

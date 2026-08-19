@@ -17,10 +17,10 @@ import (
 
 	"github.com/BurntSushi/toml"
 
-	"github.com/gastownhall/gascity/internal/builtinpacks"
-	"github.com/gastownhall/gascity/internal/packman"
-	"github.com/gastownhall/gascity/internal/remotesource"
-	helpers "github.com/gastownhall/gascity/test/acceptance/helpers"
+	"github.com/jonbaldie/gascity/internal/builtinpacks"
+	"github.com/jonbaldie/gascity/internal/packman"
+	"github.com/jonbaldie/gascity/internal/remotesource"
+	helpers "github.com/jonbaldie/gascity/test/acceptance/helpers"
 )
 
 // packsLockFile mirrors the on-disk packs.lock schema written by gc init.

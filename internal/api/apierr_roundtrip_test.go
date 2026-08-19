@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/gastownhall/gascity/internal/api/apierr"
+	"github.com/jonbaldie/gascity/internal/api/apierr"
 )
 
 // The huma.NewError override is the load-bearing seam for the error contract:

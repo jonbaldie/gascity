@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/shellquote"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/shellquote"
 )
 
 // promptDeliveryResult is the resolved plan for delivering a rendered startup

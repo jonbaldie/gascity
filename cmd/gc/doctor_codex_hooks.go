@@ -7,12 +7,12 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/doctor"
-	"github.com/gastownhall/gascity/internal/fsys"
-	"github.com/gastownhall/gascity/internal/hooks"
-	"github.com/gastownhall/gascity/internal/suspensionstate"
-	workdirutil "github.com/gastownhall/gascity/internal/workdir"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/doctor"
+	"github.com/jonbaldie/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/hooks"
+	"github.com/jonbaldie/gascity/internal/suspensionstate"
+	workdirutil "github.com/jonbaldie/gascity/internal/workdir"
 )
 
 type codexHooksDriftCheck struct {

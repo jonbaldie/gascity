@@ -3,7 +3,7 @@ package worker
 import (
 	"errors"
 
-	"github.com/gastownhall/gascity/internal/sessionlog"
+	"github.com/jonbaldie/gascity/internal/sessionlog"
 )
 
 type (

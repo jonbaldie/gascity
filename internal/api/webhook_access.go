@@ -9,7 +9,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 // webhookSourceAllowed enforces a hook's operator-declared allowed_cidrs source

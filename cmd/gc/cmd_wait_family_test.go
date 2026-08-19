@@ -3,8 +3,8 @@ package main
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	sessionpkg "github.com/gastownhall/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/beads"
+	sessionpkg "github.com/jonbaldie/gascity/internal/session"
 )
 
 // familyInfo projects a bead's metadata into the session.Info the wait-nudge

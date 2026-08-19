@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 
-	"github.com/gastownhall/gascity/internal/doctor"
-	"github.com/gastownhall/gascity/internal/rollout"
+	"github.com/jonbaldie/gascity/internal/doctor"
+	"github.com/jonbaldie/gascity/internal/rollout"
 )
 
 // rolloutGateCheck renders one registered rollout gate — its resolved value,

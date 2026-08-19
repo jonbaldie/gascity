@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/mail"
+	"github.com/jonbaldie/gascity/internal/mail"
 )
 
 func TestNormalizeMessageErrorRequiresProtocolMarker(t *testing.T) {

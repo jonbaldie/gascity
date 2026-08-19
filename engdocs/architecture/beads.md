@@ -305,7 +305,7 @@ BdStore-specific admin operations (not on the Store interface):
 ## Testing
 
 The bead store has a layered testing strategy aligned with
-[TESTING.md](https://github.com/gastownhall/gascity/blob/main/TESTING.md):
+[TESTING.md](https://github.com/jonbaldie/gascity/blob/main/TESTING.md):
 
 **Conformance suite** (`internal/beads/beadstest/conformance.go`):
 `RunStoreTests` runs 25+ subtests against any Store implementation,
@@ -366,10 +366,10 @@ beads_rust (br) binary as a real external provider (build tag:
   bead, molecule, convoy, label, and other terms used in this document
 - [Formula spec (v2)](../../docs/reference/specs/formula-spec-v2.md) -- formula file layout,
   layer resolution, and how stores instantiate molecules from formulas
-- [Beadmail provider](https://github.com/gastownhall/gascity/tree/main/internal/mail/beadmail/) -- how inter-agent
+- [Beadmail provider](https://github.com/jonbaldie/gascity/tree/main/internal/mail/beadmail/) -- how inter-agent
   messaging composes on top of bead store (mail = beads with type
   `"message"`)
-- [TESTING.md](https://github.com/gastownhall/gascity/blob/main/TESTING.md) -- testing philosophy and tier
+- [TESTING.md](https://github.com/jonbaldie/gascity/blob/main/TESTING.md) -- testing philosophy and tier
   boundaries for the conformance suite approach
-- [CLAUDE.md](https://github.com/gastownhall/gascity/blob/main/CLAUDE.md) -- design principles including "Beads is
+- [CLAUDE.md](https://github.com/jonbaldie/gascity/blob/main/CLAUDE.md) -- design principles including "Beads is
   the universal persistence substrate" (layering invariant 2)

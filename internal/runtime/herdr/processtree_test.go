@@ -3,7 +3,7 @@ package herdr
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/runtime/proctable"
+	"github.com/jonbaldie/gascity/internal/runtime/proctable"
 )
 
 // TestProcessTreeAliveFindsDescendantBehindWrapper reproduces the

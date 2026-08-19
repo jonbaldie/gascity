@@ -17,7 +17,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/telemetry"
+	"github.com/jonbaldie/gascity/internal/telemetry"
 )
 
 const (

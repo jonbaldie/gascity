@@ -35,7 +35,7 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // graphBeadCache is the cache state behind the Graph wrapper. It is not a

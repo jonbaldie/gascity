@@ -1131,7 +1131,7 @@ func TestForkVerifyRunsOnlyInForks(t *testing.T) {
 		t.Fatal("fork-verify workflow has no verify job")
 	}
 
-	const want = "${{ github.repository != 'gastownhall/gascity' }}"
+	const want = "${{ github.repository != 'jonbaldie/gascity' }}"
 	if strings.TrimSpace(job.If) != want {
 		t.Fatalf("fork verify job condition = %q, want %q so canonical PRs do not duplicate CI", job.If, want)
 	}

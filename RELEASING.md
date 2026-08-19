@@ -9,7 +9,7 @@
 | **Homebrew tap** (`gastownhall/gascity`) | `release.yml` writes an asset-based formula after archives upload | Yes |
 | **Homebrew core** (`Homebrew/homebrew-core`) | BrewTestBot autobump, once listed | Yes (~3h delay) |
 
-The homebrew-core submission is [in progress](https://github.com/Homebrew/homebrew-core). Until it lands and is added to the autobump list, users install via `brew install gascity`.
+This fork's documented install path is `go install github.com/jonbaldie/gascity/cmd/gc@latest`. Do not send users to the upstream Homebrew tap or release tarballs.
 
 ## How to Release
 
@@ -80,7 +80,7 @@ runs, in order:
 4. **Release attestations** — downloads the published checksum manifest, uploads an SPDX SBOM asset, and creates GitHub artifact attestations for the release archives.
 5. **Homebrew tap update** — downloads the published checksums and writes an asset-based formula to `gastownhall/homebrew-gascity`.
 
-Forks skip publish/announce steps automatically via the `--skip=publish --skip=announce` flag (the workflow checks `github.repository != 'gastownhall/gascity'`).
+Forks skip publish/announce steps automatically via the `--skip=publish --skip=announce` flag (the workflow checks `github.repository != 'jonbaldie/gascity'`).
 
 ### Running checks locally before pushing the tag
 
@@ -92,21 +92,14 @@ goreleaser check          # also enforced by CI
 
 ## Homebrew tap (`gastownhall/gascity`)
 
-The release workflow automatically overwrites `Formula/gascity.rb` in the `gastownhall/homebrew-gascity` repo on every tag push. Publishing is GitHub App only: `HOMEBREW_TAP_APP_ID` and `HOMEBREW_TAP_APP_PRIVATE_KEY` must be configured in repository secrets for an app installed on `gastownhall/homebrew-gascity` with contents write.
+This fork's user-facing install path is
+`go install github.com/jonbaldie/gascity/cmd/gc@latest`. The tap below is
+upstream release machinery still in the tree; it is not how to install this
+project.
 
-The tap formula installs prebuilt release assets, so users do not need Go or a source build:
-
-```bash
-brew install gascity
-```
-
-The intended long-term user-facing Homebrew path is homebrew-core:
-
-```bash
-brew install gascity
-```
-
-Until the core formula lands, the tap is the public install path. After core lands, keep the tap available for emergency updates while normal releases flow through homebrew-core.
+The release workflow can overwrite `Formula/gascity.rb` in the
+`gastownhall/homebrew-gascity` repo on tag push. That tap is not published
+for this fork.
 
 ## Homebrew core (planned)
 

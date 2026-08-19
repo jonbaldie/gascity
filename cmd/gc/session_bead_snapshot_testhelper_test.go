@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/session"
 )
 
 // newSessionBeadSnapshot builds a snapshot from fixture beads, mirroring the store

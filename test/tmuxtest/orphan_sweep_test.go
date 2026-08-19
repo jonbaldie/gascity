@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/pidutil"
+	"github.com/jonbaldie/gascity/internal/pidutil"
 )
 
 // testNonLivePID is a PID value that will not correspond to a live process

@@ -3,7 +3,7 @@ package sessionlog
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/modelwindow"
+	"github.com/jonbaldie/gascity/internal/modelwindow"
 )
 
 // TestOpus5IsNativelyOneMillion pins the regression behind ra-jbbv0 at the

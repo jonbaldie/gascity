@@ -19,7 +19,7 @@ import (
 	"sort"
 	"sync/atomic"
 
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
 // nextID is a package-level counter for JSON-RPC request IDs.

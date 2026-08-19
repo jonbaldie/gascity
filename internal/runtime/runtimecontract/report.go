@@ -1,6 +1,6 @@
 package runtimecontract
 
-import "github.com/gastownhall/gascity/internal/runtime"
+import "github.com/jonbaldie/gascity/internal/runtime"
 
 // Status is the outcome of a single requirement check.
 type Status string

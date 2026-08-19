@@ -61,7 +61,7 @@ set -euo pipefail
 
 ARCH="${GC_ARCH:-arm64}"
 VERSION="${GC_VERSION:-latest}"
-REPO="gastownhall/gascity"
+REPO="jonbaldie/gascity"
 NO_SANDBOX="${GC_NO_SANDBOX:-}"
 
 # --- Platform gate ---

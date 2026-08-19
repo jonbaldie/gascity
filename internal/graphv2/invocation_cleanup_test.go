@@ -3,7 +3,7 @@ package graphv2
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 func TestCloseSyntheticInputConvoy(t *testing.T) {

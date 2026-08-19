@@ -27,9 +27,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/storebinding"
-	"github.com/gastownhall/gascity/internal/storebinding/storebindingtest"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/storebinding"
+	"github.com/jonbaldie/gascity/internal/storebinding/storebindingtest"
 )
 
 // beadsOverSQLiteCapability is what this binding declares for every class it

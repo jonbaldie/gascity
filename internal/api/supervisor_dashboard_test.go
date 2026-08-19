@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/api"
-	"github.com/gastownhall/gascity/internal/api/dashboardbff"
-	"github.com/gastownhall/gascity/internal/api/dashboardspa"
+	"github.com/jonbaldie/gascity/internal/api"
+	"github.com/jonbaldie/gascity/internal/api/dashboardbff"
+	"github.com/jonbaldie/gascity/internal/api/dashboardspa"
 )
 
 type dashTestResolver struct{ cities []api.CityInfo }

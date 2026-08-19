@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/productmetrics"
+	"github.com/jonbaldie/gascity/internal/productmetrics"
 )
 
 const disclosedMetricsInstallationID = "3cf9fd4e-3337-4c29-a0ab-2858cd8a1f21"

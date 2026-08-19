@@ -11,17 +11,17 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/api/dashboardbff"
-	"github.com/gastownhall/gascity/internal/api/dashboardspa"
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/events"
-	"github.com/gastownhall/gascity/internal/extmsg"
-	"github.com/gastownhall/gascity/internal/mail"
-	"github.com/gastownhall/gascity/internal/orders"
-	"github.com/gastownhall/gascity/internal/runtime"
-	"github.com/gastownhall/gascity/internal/usage"
-	"github.com/gastownhall/gascity/internal/workspacesvc"
+	"github.com/jonbaldie/gascity/internal/api/dashboardbff"
+	"github.com/jonbaldie/gascity/internal/api/dashboardspa"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/extmsg"
+	"github.com/jonbaldie/gascity/internal/mail"
+	"github.com/jonbaldie/gascity/internal/orders"
+	"github.com/jonbaldie/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/usage"
+	"github.com/jonbaldie/gascity/internal/workspacesvc"
 )
 
 // SeededCityDeps carries the pre-seeded stores and providers a single city is

@@ -18,11 +18,11 @@ func TestUpdateHistoryCreateCanonical(t *testing.T) {
 	databasePath := filepath.Join(t.TempDir(), "timing-history.json")
 	envelope := historyRunEnvelope("10", "sha-10", "2026-07-15T10:00:00Z")
 	item := historyArtifact(envelope, "cmd-gc-process-1-of-12", []timingUnit{
-		{UnitID: "internal/example:TestWarm/child", Kind: "test", Package: "github.com/gastownhall/gascity/internal/example", Test: "TestWarm", Subtest: "child", Outcome: "pass", DurationSeconds: 2},
-		{UnitID: "internal/example:TestSkipped", Kind: "test", Package: "github.com/gastownhall/gascity/internal/example", Test: "TestSkipped", Outcome: "skip", DurationSeconds: 0},
-		{UnitID: "github.com/gastownhall/gascity/internal/example", Kind: "package", Package: "github.com/gastownhall/gascity/internal/example", Outcome: "pass", DurationSeconds: 9},
-		{UnitID: "internal/example:TestWarm", Kind: "test", Package: "github.com/gastownhall/gascity/internal/example", Test: "TestWarm", Outcome: "pass", DurationSeconds: 1.5},
-		{UnitID: "internal/example:TestCold", Kind: "test", Package: "github.com/gastownhall/gascity/internal/example", Test: "TestCold", Outcome: "fail", DurationSeconds: 3},
+		{UnitID: "internal/example:TestWarm/child", Kind: "test", Package: "github.com/jonbaldie/gascity/internal/example", Test: "TestWarm", Subtest: "child", Outcome: "pass", DurationSeconds: 2},
+		{UnitID: "internal/example:TestSkipped", Kind: "test", Package: "github.com/jonbaldie/gascity/internal/example", Test: "TestSkipped", Outcome: "skip", DurationSeconds: 0},
+		{UnitID: "github.com/jonbaldie/gascity/internal/example", Kind: "package", Package: "github.com/jonbaldie/gascity/internal/example", Outcome: "pass", DurationSeconds: 9},
+		{UnitID: "internal/example:TestWarm", Kind: "test", Package: "github.com/jonbaldie/gascity/internal/example", Test: "TestWarm", Outcome: "pass", DurationSeconds: 1.5},
+		{UnitID: "internal/example:TestCold", Kind: "test", Package: "github.com/jonbaldie/gascity/internal/example", Test: "TestCold", Outcome: "fail", DurationSeconds: 3},
 	})
 	writeArtifact(t, root, "shuffled.json", item)
 
@@ -36,11 +36,11 @@ func TestUpdateHistoryCreateCanonical(t *testing.T) {
 	}
 	const want = `{"schema":1,"runs":[{"schema":1,"repository":"gastownhall/gascity","event":"push","ref":"refs/heads/main","workflow":"CI","run_id":"10","run_attempt":"1","tested_sha":"sha-10","conclusion":"success","completed_at":"2026-07-15T10:00:00Z"}],` +
 		`"artifacts":[{"run_index":0,"job":"cmd-gc-process","shard_id":"cmd-gc-process-1-of-12","variant":"linux-default","runner":{"label":"blacksmith-32vcpu","name":"ephemeral-10-cmd-gc-process-1-of-12","os":"Linux","arch":"X64","cpu_count":32}}],` +
-		`"units":[{"unit_id":"github.com/gastownhall/gascity/internal/example","kind":"package","package":"github.com/gastownhall/gascity/internal/example","test":"","subtest":"","samples":[{"artifact_index":0,"outcome":"pass","duration_seconds":9}]},` +
-		`{"unit_id":"internal/example:TestCold","kind":"test","package":"github.com/gastownhall/gascity/internal/example","test":"TestCold","subtest":"","samples":[{"artifact_index":0,"outcome":"fail","duration_seconds":3}]},` +
-		`{"unit_id":"internal/example:TestSkipped","kind":"test","package":"github.com/gastownhall/gascity/internal/example","test":"TestSkipped","subtest":"","samples":[{"artifact_index":0,"outcome":"skip","duration_seconds":0}]},` +
-		`{"unit_id":"internal/example:TestWarm","kind":"test","package":"github.com/gastownhall/gascity/internal/example","test":"TestWarm","subtest":"","samples":[{"artifact_index":0,"outcome":"pass","duration_seconds":1.5}]},` +
-		`{"unit_id":"internal/example:TestWarm/child","kind":"test","package":"github.com/gastownhall/gascity/internal/example","test":"TestWarm","subtest":"child","samples":[{"artifact_index":0,"outcome":"pass","duration_seconds":2}]}]}` + "\n"
+		`"units":[{"unit_id":"github.com/jonbaldie/gascity/internal/example","kind":"package","package":"github.com/jonbaldie/gascity/internal/example","test":"","subtest":"","samples":[{"artifact_index":0,"outcome":"pass","duration_seconds":9}]},` +
+		`{"unit_id":"internal/example:TestCold","kind":"test","package":"github.com/jonbaldie/gascity/internal/example","test":"TestCold","subtest":"","samples":[{"artifact_index":0,"outcome":"fail","duration_seconds":3}]},` +
+		`{"unit_id":"internal/example:TestSkipped","kind":"test","package":"github.com/jonbaldie/gascity/internal/example","test":"TestSkipped","subtest":"","samples":[{"artifact_index":0,"outcome":"skip","duration_seconds":0}]},` +
+		`{"unit_id":"internal/example:TestWarm","kind":"test","package":"github.com/jonbaldie/gascity/internal/example","test":"TestWarm","subtest":"","samples":[{"artifact_index":0,"outcome":"pass","duration_seconds":1.5}]},` +
+		`{"unit_id":"internal/example:TestWarm/child","kind":"test","package":"github.com/jonbaldie/gascity/internal/example","test":"TestWarm","subtest":"child","samples":[{"artifact_index":0,"outcome":"pass","duration_seconds":2}]}]}` + "\n"
 	if string(got) != want {
 		t.Fatalf("canonical history database changed\ngot:  %q\nwant: %q", got, want)
 	}
@@ -66,11 +66,11 @@ func TestUpdateHistoryIsIdempotentForOverlappingPassFailSkipArtifacts(t *testing
 	envelope := historyRunEnvelope("20", "sha-20", "2026-07-15T11:00:00Z")
 	initialRoot := t.TempDir()
 	firstArtifact := historyArtifact(envelope, "shard-a", []timingUnit{
-		{UnitID: "internal/example:TestPass", Kind: "test", Package: "github.com/gastownhall/gascity/internal/example", Test: "TestPass", Outcome: "pass", DurationSeconds: 1},
-		{UnitID: "internal/example:TestFail", Kind: "test", Package: "github.com/gastownhall/gascity/internal/example", Test: "TestFail", Outcome: "fail", DurationSeconds: 2},
+		{UnitID: "internal/example:TestPass", Kind: "test", Package: "github.com/jonbaldie/gascity/internal/example", Test: "TestPass", Outcome: "pass", DurationSeconds: 1},
+		{UnitID: "internal/example:TestFail", Kind: "test", Package: "github.com/jonbaldie/gascity/internal/example", Test: "TestFail", Outcome: "fail", DurationSeconds: 2},
 	})
 	secondArtifact := historyArtifact(envelope, "shard-b", []timingUnit{
-		{UnitID: "internal/example:TestSkip", Kind: "test", Package: "github.com/gastownhall/gascity/internal/example", Test: "TestSkip", Outcome: "skip", DurationSeconds: 0},
+		{UnitID: "internal/example:TestSkip", Kind: "test", Package: "github.com/jonbaldie/gascity/internal/example", Test: "TestSkip", Outcome: "skip", DurationSeconds: 0},
 	})
 	writeArtifact(t, initialRoot, "b.json", secondArtifact)
 	writeArtifact(t, initialRoot, "a.json", firstArtifact)
@@ -130,7 +130,7 @@ func TestUpdateHistoryPreservesDuplicateRowsWithinOneArtifact(t *testing.T) {
 	envelope := historyRunEnvelope("25", "sha-25", "2026-07-15T11:30:00Z")
 	duplicate := timingUnit{
 		UnitID: "internal/example:TestRepeated", Kind: "test",
-		Package: "github.com/gastownhall/gascity/internal/example", Test: "TestRepeated",
+		Package: "github.com/jonbaldie/gascity/internal/example", Test: "TestRepeated",
 		Outcome: "pass", DurationSeconds: 1.25,
 	}
 	root := t.TempDir()
@@ -224,7 +224,7 @@ func TestUpdateHistoryRejectsConflictsAndEnvelopeMismatchesAtomically(t *testing
 			envelope := historyRunEnvelope("30", "sha-30", "2026-07-15T12:00:00Z")
 			item := historyArtifact(envelope, "shard-a", []timingUnit{{
 				UnitID: "internal/example:TestAtomic", Kind: "test",
-				Package: "github.com/gastownhall/gascity/internal/example", Test: "TestAtomic",
+				Package: "github.com/jonbaldie/gascity/internal/example", Test: "TestAtomic",
 				Outcome: "pass", DurationSeconds: 3,
 			}})
 			seedRoot := t.TempDir()
@@ -262,7 +262,7 @@ func TestUpdateHistoryRejectsCrossRepositoryUpdateAtomically(t *testing.T) {
 	envelope := historyRunEnvelope("35", "sha-35", "2026-07-15T12:30:00Z")
 	item := historyArtifact(envelope, "shard-a", []timingUnit{{
 		UnitID: "internal/example:TestRepository", Kind: "test",
-		Package: "github.com/gastownhall/gascity/internal/example", Test: "TestRepository",
+		Package: "github.com/jonbaldie/gascity/internal/example", Test: "TestRepository",
 		Outcome: "pass", DurationSeconds: 1,
 	}})
 	seedRoot := t.TempDir()
@@ -311,7 +311,7 @@ func TestUpdateHistoryRejectsStoredEnvelopeMetadataChangesAtomically(t *testing.
 			seedRoot := t.TempDir()
 			writeArtifact(t, seedRoot, "seed.json", historyArtifact(envelope, "shard-a", []timingUnit{{
 				UnitID: "internal/example:TestEnvelope", Kind: "test",
-				Package: "github.com/gastownhall/gascity/internal/example", Test: "TestEnvelope",
+				Package: "github.com/jonbaldie/gascity/internal/example", Test: "TestEnvelope",
 				Outcome: "pass", DurationSeconds: 1,
 			}}))
 			if _, err := UpdateHistory(databasePath, envelope, 10, []string{seedRoot}); err != nil {
@@ -327,7 +327,7 @@ func TestUpdateHistoryRejectsStoredEnvelopeMetadataChangesAtomically(t *testing.
 			incomingRoot := t.TempDir()
 			writeArtifact(t, incomingRoot, "changed.json", historyArtifact(changed, "shard-a", []timingUnit{{
 				UnitID: "internal/example:TestEnvelope", Kind: "test",
-				Package: "github.com/gastownhall/gascity/internal/example", Test: "TestEnvelope",
+				Package: "github.com/jonbaldie/gascity/internal/example", Test: "TestEnvelope",
 				Outcome: "pass", DurationSeconds: 1,
 			}}))
 			_, err = UpdateHistory(databasePath, changed, 10, []string{incomingRoot})
@@ -388,7 +388,7 @@ func TestUpdateHistoryRejectsInvalidStoredDatabaseWithoutRewriting(t *testing.T)
 			root := t.TempDir()
 			writeArtifact(t, root, "run.json", historyArtifact(envelope, "shard-a", []timingUnit{{
 				UnitID: "internal/example:TestStoredDatabase", Kind: "test",
-				Package: "github.com/gastownhall/gascity/internal/example", Test: "TestStoredDatabase",
+				Package: "github.com/jonbaldie/gascity/internal/example", Test: "TestStoredDatabase",
 				Outcome: "pass", DurationSeconds: 1,
 			}}))
 			if _, err := UpdateHistory(databasePath, envelope, 10, []string{root}); err != nil {
@@ -431,11 +431,11 @@ func TestUpdateHistoryPrunesWholeCohortsByCompletedAtNotLexicalRunID(t *testing.
 	for _, envelope := range runs {
 		root := t.TempDir()
 		writeArtifact(t, root, "z.json", historyArtifact(envelope, "shard-z", []timingUnit{{
-			UnitID: "internal/example:TestZ", Kind: "test", Package: "github.com/gastownhall/gascity/internal/example",
+			UnitID: "internal/example:TestZ", Kind: "test", Package: "github.com/jonbaldie/gascity/internal/example",
 			Test: "TestZ", Outcome: "pass", DurationSeconds: 2,
 		}}))
 		writeArtifact(t, root, "a.json", historyArtifact(envelope, "shard-a", []timingUnit{{
-			UnitID: "internal/example:TestA", Kind: "test", Package: "github.com/gastownhall/gascity/internal/example",
+			UnitID: "internal/example:TestA", Kind: "test", Package: "github.com/jonbaldie/gascity/internal/example",
 			Test: "TestA", Outcome: "fail", DurationSeconds: 1,
 		}}))
 		var err error
@@ -500,12 +500,12 @@ func TestUpdateHistoryRetainsColdUnitAbsentFromNewestCohort(t *testing.T) {
 	var snapshot Snapshot
 	for _, run := range runs {
 		units := []timingUnit{{
-			UnitID: "internal/example:TestHot", Kind: "test", Package: "github.com/gastownhall/gascity/internal/example",
+			UnitID: "internal/example:TestHot", Kind: "test", Package: "github.com/jonbaldie/gascity/internal/example",
 			Test: "TestHot", Outcome: "pass", DurationSeconds: 1,
 		}}
 		if run.cold {
 			units = append(units, timingUnit{
-				UnitID: "internal/example:TestCold", Kind: "test", Package: "github.com/gastownhall/gascity/internal/example",
+				UnitID: "internal/example:TestCold", Kind: "test", Package: "github.com/jonbaldie/gascity/internal/example",
 				Test: "TestCold", Outcome: "pass", DurationSeconds: 5,
 			})
 		}
@@ -532,12 +532,12 @@ func TestUpdateHistoryRetainsAndRecomputesFiveAndTwentySampleAuthority(t *testin
 	for run := 1; run <= 20; run++ {
 		envelope := historyRunEnvelope(fmt.Sprintf("%03d", run), fmt.Sprintf("sha-%02d", run), fmt.Sprintf("2026-07-15T00:%02d:00Z", run))
 		units := []timingUnit{{
-			UnitID: "internal/example:TestP95", Kind: "test", Package: "github.com/gastownhall/gascity/internal/example",
+			UnitID: "internal/example:TestP95", Kind: "test", Package: "github.com/jonbaldie/gascity/internal/example",
 			Test: "TestP95", Outcome: "pass", DurationSeconds: float64(run),
 		}}
 		if run <= 5 {
 			units = append(units, timingUnit{
-				UnitID: "internal/example:TestP75", Kind: "test", Package: "github.com/gastownhall/gascity/internal/example",
+				UnitID: "internal/example:TestP75", Kind: "test", Package: "github.com/jonbaldie/gascity/internal/example",
 				Test: "TestP75", Outcome: "pass", DurationSeconds: float64(run),
 			})
 		}
@@ -563,7 +563,7 @@ func TestUpdateHistoryRetainsAndRecomputesFiveAndTwentySampleAuthority(t *testin
 	newest := historyRunEnvelope("999-new", "sha-new", "2026-07-15T00:21:30Z")
 	root := t.TempDir()
 	writeArtifact(t, root, "run.json", historyArtifact(newest, "shard-a", []timingUnit{{
-		UnitID: "internal/example:TestNewest", Kind: "test", Package: "github.com/gastownhall/gascity/internal/example",
+		UnitID: "internal/example:TestNewest", Kind: "test", Package: "github.com/jonbaldie/gascity/internal/example",
 		Test: "TestNewest", Outcome: "pass", DurationSeconds: 1,
 	}}))
 	var err error

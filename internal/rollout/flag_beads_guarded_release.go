@@ -1,6 +1,6 @@
 package rollout
 
-import "github.com/gastownhall/gascity/internal/config"
+import "github.com/jonbaldie/gascity/internal/config"
 
 // KeyBeadsGuardedRelease is the exported registry Key for the beads
 // guarded-release rollout gate, so composition-root code (cmd/gc, internal/api)

@@ -15,9 +15,9 @@ import (
 	"testing"
 	"time"
 
-	gcruntime "github.com/gastownhall/gascity/internal/runtime"
-	runtimeexec "github.com/gastownhall/gascity/internal/runtime/exec"
-	"github.com/gastownhall/gascity/internal/testutil"
+	gcruntime "github.com/jonbaldie/gascity/internal/runtime"
+	runtimeexec "github.com/jonbaldie/gascity/internal/runtime/exec"
+	"github.com/jonbaldie/gascity/internal/testutil"
 )
 
 const (

@@ -20,7 +20,7 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
 
 // Suffix is appended to a transcript's resolved path to form its sidecar path.

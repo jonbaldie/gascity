@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/clock"
-	sessionpkg "github.com/gastownhall/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/clock"
+	sessionpkg "github.com/jonbaldie/gascity/internal/session"
 )
 
 // TestCheckStability_RateLimitScreen_DoesNotCountAsCrash pins the desired

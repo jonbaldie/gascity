@@ -1,7 +1,7 @@
 package main
 
 import (
-	sessionpkg "github.com/gastownhall/gascity/internal/session"
+	sessionpkg "github.com/jonbaldie/gascity/internal/session"
 )
 
 // reconcileTick owns the reconciler's coherent typed snapshot (infoByID) for a

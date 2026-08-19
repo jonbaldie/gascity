@@ -32,8 +32,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/citywriteauth"
-	"github.com/gastownhall/gascity/internal/clientgrant"
+	"github.com/jonbaldie/gascity/internal/citywriteauth"
+	"github.com/jonbaldie/gascity/internal/clientgrant"
 )
 
 // defaultAud is the audience the capstone hardened city expects. It matches the

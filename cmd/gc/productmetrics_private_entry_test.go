@@ -5,7 +5,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/productmetrics"
+	"github.com/jonbaldie/gascity/internal/productmetrics"
 )
 
 const productMetricsPrivateUploaderSentinelFixture = "__gc-product-metrics-uploader-v1"

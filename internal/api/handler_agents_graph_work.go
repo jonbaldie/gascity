@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // graphSessionAssigneeInfix is the literal separating an agent's session name

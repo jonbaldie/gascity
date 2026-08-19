@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	gascity "github.com/gastownhall/gascity"
-	"github.com/gastownhall/gascity/internal/config"
+	gascity "github.com/jonbaldie/gascity"
+	"github.com/jonbaldie/gascity/internal/config"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/spf13/cobra"
 )

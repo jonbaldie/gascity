@@ -1,6 +1,6 @@
 package api
 
-import "github.com/gastownhall/gascity/internal/api/apierr"
+import "github.com/jonbaldie/gascity/internal/api/apierr"
 
 // withIdempotency runs create() at most once per (scoped key, request body),
 // giving create endpoints safe retries via the Idempotency-Key header.

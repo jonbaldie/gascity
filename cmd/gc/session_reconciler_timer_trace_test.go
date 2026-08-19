@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	sessionpkg "github.com/gastownhall/gascity/internal/session"
+	sessionpkg "github.com/jonbaldie/gascity/internal/session"
 )
 
 // TestTimerTraceCodesTotal drives every reachable TimerDecision from

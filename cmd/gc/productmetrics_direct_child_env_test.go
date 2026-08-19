@@ -12,11 +12,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/execenv"
-	"github.com/gastownhall/gascity/internal/githubmonitor"
-	"github.com/gastownhall/gascity/internal/shellquote"
-	"github.com/gastownhall/gascity/internal/testutil"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/execenv"
+	"github.com/jonbaldie/gascity/internal/githubmonitor"
+	"github.com/jonbaldie/gascity/internal/shellquote"
+	"github.com/jonbaldie/gascity/internal/testutil"
 )
 
 const productMetricsDirectChildEnvSpyPath = "GC_TEST_PRODUCT_METRICS_DIRECT_CHILD_ENV_SPY_PATH"

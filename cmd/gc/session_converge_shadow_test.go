@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	sessionpkg "github.com/gastownhall/gascity/internal/session"
+	sessionpkg "github.com/jonbaldie/gascity/internal/session"
 )
 
 // convergeFixture is one row of the shadow harness's golden corpus. Each fixture

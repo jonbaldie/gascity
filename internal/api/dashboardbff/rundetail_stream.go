@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/runproj"
+	"github.com/jonbaldie/gascity/internal/runproj"
 )
 
 // runDetailStreamHeartbeat is how often an idle detail stream emits a comment

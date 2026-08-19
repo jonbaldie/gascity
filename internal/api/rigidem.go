@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // Durable-record metadata keys and enum values (G13 §3.2). The record is a

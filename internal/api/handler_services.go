@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/workspacesvc"
+	"github.com/jonbaldie/gascity/internal/workspacesvc"
 )
 
 func (s *Server) handleServiceProxy(w http.ResponseWriter, r *http.Request) {

@@ -6,8 +6,8 @@ import (
 	iofs "io/fs"
 	"path/filepath"
 
-	"github.com/gastownhall/gascity/internal/citylayout"
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/citylayout"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
 
 // InitConventionDirs returns the convention-discovered directories created by

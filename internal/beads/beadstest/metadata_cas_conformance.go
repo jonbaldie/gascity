@@ -5,7 +5,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // MetadataCASOptions controls legs of the narrow CAS suite that not every

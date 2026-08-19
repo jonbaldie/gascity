@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/sessionlog"
+	"github.com/jonbaldie/gascity/internal/sessionlog"
 )
 
 // TestAttachStructuredToolDataWithContextPairsOffPageToolUse pins Finding 5: a

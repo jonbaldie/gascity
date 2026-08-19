@@ -6,7 +6,7 @@ import (
 	"io"
 	"sort"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // ListAllSessionBeads returns every session bead from the store using a

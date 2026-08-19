@@ -9,9 +9,9 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/gastownhall/gascity/internal/agent"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/pathutil"
+	"github.com/jonbaldie/gascity/internal/agent"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/pathutil"
 )
 
 // PathContext holds template variables for work_dir expansion.

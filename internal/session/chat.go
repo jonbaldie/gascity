@@ -10,12 +10,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/promptsafe"
-	"github.com/gastownhall/gascity/internal/runtime"
-	"github.com/gastownhall/gascity/internal/sessionlog"
-	"github.com/gastownhall/gascity/internal/telemetry"
-	workertranscript "github.com/gastownhall/gascity/internal/worker/transcript"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/promptsafe"
+	"github.com/jonbaldie/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/sessionlog"
+	"github.com/jonbaldie/gascity/internal/telemetry"
+	workertranscript "github.com/jonbaldie/gascity/internal/worker/transcript"
 )
 
 // staleKeyDetectDelay is the immutable production window between a keyed

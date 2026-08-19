@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // requireConditionalReleaseEnv is set by the one CI cell that installs a bd

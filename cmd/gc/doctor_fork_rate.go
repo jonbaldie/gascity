@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/doctor"
+	"github.com/jonbaldie/gascity/internal/doctor"
 )
 
 // forkRateCheck reports the host's process-creation (fork) rate — the dominant,

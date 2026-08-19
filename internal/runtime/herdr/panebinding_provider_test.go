@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
 // ── provider-level pane-binding behavior against a fake herdr 0.7.5 ──────────

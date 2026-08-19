@@ -79,7 +79,7 @@ case "${1:-}" in
     esac
     ;;
   list)
-    printf '%%s\n' 'github.com/gastownhall/gascity'
+    printf '%%s\n' 'github.com/jonbaldie/gascity'
     ;;
   test)
     for arg in "$@"; do

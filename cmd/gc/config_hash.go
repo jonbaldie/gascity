@@ -11,7 +11,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
 // canonicalConfigHash computes a SHA-256 hash over the behavioral fields of

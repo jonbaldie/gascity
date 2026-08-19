@@ -1,6 +1,6 @@
 package storebinding
 
-import "github.com/gastownhall/gascity/internal/events"
+import "github.com/jonbaldie/gascity/internal/events"
 
 // StorageBindingOutcomePayload is the shape of every storage.binding.* event.
 //

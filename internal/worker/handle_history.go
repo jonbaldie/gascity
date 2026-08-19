@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 
-	sessionpkg "github.com/gastownhall/gascity/internal/session"
+	sessionpkg "github.com/jonbaldie/gascity/internal/session"
 )
 
 // TranscriptPath resolves the provider-native transcript path for the worker.

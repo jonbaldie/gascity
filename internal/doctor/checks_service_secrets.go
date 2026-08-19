@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 // ServiceSecretsPermsCheck flags group/other-readable entries inside service

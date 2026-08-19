@@ -10,7 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	execerr "k8s.io/client-go/util/exec"
 
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
 // hasSessionAlive marks the in-box tmux session as present so IsRunning is true.

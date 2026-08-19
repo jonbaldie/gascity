@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
 
 // loadRigDoltPorts reads each rig's <rigRoot>/.beads/dolt-server.port file and

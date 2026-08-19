@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/formula"
+	"github.com/jonbaldie/gascity/internal/formula"
 )
 
 var v2Mu sync.Mutex

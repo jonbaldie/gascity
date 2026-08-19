@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/extmsg"
-	"github.com/gastownhall/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/extmsg"
+	"github.com/jonbaldie/gascity/internal/session"
 )
 
 func newExtMsgAgentBindingFixture(t *testing.T) (*fakeState, *Server, *extmsg.Services, extmsg.ConversationRef) {

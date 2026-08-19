@@ -18,7 +18,7 @@ func TestBuildSnapshotJSONIsDeterministicAndRetainsSuccessfulObservations(t *tes
 
 	artifactFor := func(runID, testedSHA, outcome string, duration float64) timingArtifactFixture {
 		item := timingArtifact(runID, defaultRunner("ephemeral-"+runID), []timingUnit{{
-			UnitID: unitID, Kind: "test", Package: "github.com/gastownhall/gascity/internal/example",
+			UnitID: unitID, Kind: "test", Package: "github.com/jonbaldie/gascity/internal/example",
 			Test: "TestHistory", Outcome: outcome, DurationSeconds: duration,
 		}})
 		item.CommitSHA = testedSHA
@@ -35,14 +35,14 @@ func TestBuildSnapshotJSONIsDeterministicAndRetainsSuccessfulObservations(t *tes
 	laterFailure := artifactFor("500", "sha-failure", "fail", 5)
 	laterFailure.Units = append(laterFailure.Units, timingUnit{
 		UnitID: "internal/example:TestOnlyFails", Kind: "test",
-		Package: "github.com/gastownhall/gascity/internal/example", Test: "TestOnlyFails",
+		Package: "github.com/jonbaldie/gascity/internal/example", Test: "TestOnlyFails",
 		Outcome: "fail", DurationSeconds: 6,
 	})
 	writeArtifact(t, firstRoot, "later-failure.json", laterFailure)
 	laterSkip := artifactFor("600", "sha-skip", "skip", 0)
 	laterSkip.Units = append(laterSkip.Units, timingUnit{
 		UnitID: "internal/example:TestOnlyFails", Kind: "test",
-		Package: "github.com/gastownhall/gascity/internal/example", Test: "TestOnlyFails",
+		Package: "github.com/jonbaldie/gascity/internal/example", Test: "TestOnlyFails",
 		Outcome: "skip", DurationSeconds: 0,
 	})
 	writeArtifact(t, secondRoot, "later-skip.json", laterSkip)
@@ -80,7 +80,7 @@ func TestBuildSnapshotJSONIsDeterministicAndRetainsSuccessfulObservations(t *tes
 		t.Fatalf("32-CPU profile units = %d, want 2: %+v", len(profile32.Units), profile32.Units)
 	}
 	unit := findHistoryUnit(t, profile32, unitID)
-	if unit.Package != "github.com/gastownhall/gascity/internal/example" || unit.Test != "TestHistory" || unit.Subtest != "" {
+	if unit.Package != "github.com/jonbaldie/gascity/internal/example" || unit.Test != "TestHistory" || unit.Subtest != "" {
 		t.Fatalf("history unit identity = %+v", unit)
 	}
 	if unit.Passes != 5 || unit.Failures != 1 || unit.Skips != 1 {
@@ -161,7 +161,7 @@ func TestBuildSnapshotJSONMarksPercentileAuthorityAtSampleThresholds(t *testing.
 			}
 			units = append(units, timingUnit{
 				UnitID: "internal/example:" + tc.name, Kind: "test",
-				Package: "github.com/gastownhall/gascity/internal/example", Test: tc.name,
+				Package: "github.com/jonbaldie/gascity/internal/example", Test: tc.name,
 				Outcome: "pass", DurationSeconds: float64(run + 1),
 			})
 		}
@@ -202,7 +202,7 @@ func TestBuildSnapshotJSONOrdersOpaqueRunIDsLexically(t *testing.T) {
 	for index, runID := range runIDs {
 		item := timingArtifact(runID, defaultRunner("ephemeral-"+runID), []timingUnit{{
 			UnitID: "internal/example:TestOpaqueID", Kind: "test",
-			Package: "github.com/gastownhall/gascity/internal/example", Test: "TestOpaqueID",
+			Package: "github.com/jonbaldie/gascity/internal/example", Test: "TestOpaqueID",
 			Outcome: "pass", DurationSeconds: float64(index + 1),
 		}})
 		item.CommitSHA = "sha-" + runID
@@ -230,7 +230,7 @@ func TestBuildSnapshotJSONRejectsConflictingDuplicate(t *testing.T) {
 	root := t.TempDir()
 	valid := timingArtifact("900", defaultRunner("ephemeral"), []timingUnit{{
 		UnitID: "internal/example:TestConflict", Kind: "test",
-		Package: "github.com/gastownhall/gascity/internal/example", Test: "TestConflict",
+		Package: "github.com/jonbaldie/gascity/internal/example", Test: "TestConflict",
 		Outcome: "pass", DurationSeconds: 1,
 	}})
 	writeArtifact(t, root, "first.json", valid)
@@ -247,11 +247,11 @@ func TestBuildSnapshotJSONRejectsConflictingStableUnitIdentity(t *testing.T) {
 
 	root := t.TempDir()
 	first := timingArtifact("910", defaultRunner("ephemeral-a"), []timingUnit{{
-		UnitID: "internal/example:TestStable", Kind: "test", Package: "github.com/gastownhall/gascity/internal/example",
+		UnitID: "internal/example:TestStable", Kind: "test", Package: "github.com/jonbaldie/gascity/internal/example",
 		Test: "TestStable", Outcome: "pass", DurationSeconds: 1,
 	}})
 	second := timingArtifact("911", defaultRunner("ephemeral-b"), []timingUnit{{
-		UnitID: "internal/example:TestStable", Kind: "test", Package: "github.com/gastownhall/gascity/internal/other",
+		UnitID: "internal/example:TestStable", Kind: "test", Package: "github.com/jonbaldie/gascity/internal/other",
 		Test: "TestStable", Outcome: "pass", DurationSeconds: 2,
 	}})
 	second.Runner.Label = "blacksmith-64vcpu"
@@ -271,7 +271,7 @@ func TestBuildSnapshotJSONPreservesHostileMetadataAsData(t *testing.T) {
 	root := t.TempDir()
 	item := timingArtifact("920", defaultRunner("ephemeral"), []timingUnit{{
 		UnitID: "internal/example:TestJSON\"\\\n", Kind: "test",
-		Package: "github.com/gastownhall/gascity/internal/example|quoted", Test: "TestJSON\"\\\n",
+		Package: "github.com/jonbaldie/gascity/internal/example|quoted", Test: "TestJSON\"\\\n",
 		Outcome: "pass", DurationSeconds: 1,
 	}})
 	item.Job = "cmd/gc\"\njob"
@@ -298,8 +298,8 @@ func TestBuildSnapshotJSONWireIsByteExact(t *testing.T) {
 
 	root := t.TempDir()
 	item := timingArtifact("940", defaultRunner("ephemeral"), []timingUnit{
-		{UnitID: "internal/example:TestWarm", Kind: "test", Package: "github.com/gastownhall/gascity/internal/example", Test: "TestWarm", Outcome: "pass", DurationSeconds: 1.5},
-		{UnitID: "internal/example:TestCold", Kind: "test", Package: "github.com/gastownhall/gascity/internal/example", Test: "TestCold", Outcome: "fail", DurationSeconds: 2},
+		{UnitID: "internal/example:TestWarm", Kind: "test", Package: "github.com/jonbaldie/gascity/internal/example", Test: "TestWarm", Outcome: "pass", DurationSeconds: 1.5},
+		{UnitID: "internal/example:TestCold", Kind: "test", Package: "github.com/jonbaldie/gascity/internal/example", Test: "TestCold", Outcome: "fail", DurationSeconds: 2},
 	})
 	item.CommitSHA = "sha-warm"
 	writeArtifact(t, root, "wire.json", item)
@@ -307,9 +307,9 @@ func TestBuildSnapshotJSONWireIsByteExact(t *testing.T) {
 	got := runJSONHistory(t, root)
 	want := `{"schema":1,"unique_artifact_count":1,"duplicate_artifact_count":0,"profiles":[` +
 		`{"job":"cmd-gc-process","variant":"linux-default","runner":{"label":"blacksmith-32vcpu","os":"Linux","arch":"X64","cpu_count":32},"units":[` +
-		`{"unit_id":"internal/example:TestCold","package":"github.com/gastownhall/gascity/internal/example","test":"TestCold","subtest":"","passes":0,"failures":1,"skips":0,` +
+		`{"unit_id":"internal/example:TestCold","package":"github.com/jonbaldie/gascity/internal/example","test":"TestCold","subtest":"","passes":0,"failures":1,"skips":0,` +
 		`"duration_seconds_p50":null,"duration_seconds_p75":null,"duration_seconds_p95":null,"duration_seconds_population_variance":null,"p75_authoritative":false,"p95_authoritative":false,"last_success_sha":null,"successful_observations":[]},` +
-		`{"unit_id":"internal/example:TestWarm","package":"github.com/gastownhall/gascity/internal/example","test":"TestWarm","subtest":"","passes":1,"failures":0,"skips":0,` +
+		`{"unit_id":"internal/example:TestWarm","package":"github.com/jonbaldie/gascity/internal/example","test":"TestWarm","subtest":"","passes":1,"failures":0,"skips":0,` +
 		`"duration_seconds_p50":1.5,"duration_seconds_p75":1.5,"duration_seconds_p95":1.5,"duration_seconds_population_variance":0,"p75_authoritative":false,"p95_authoritative":false,"last_success_sha":"sha-warm","successful_observations":[` +
 		`{"artifact_identity":{"workflow":"CI","run_id":"940","run_attempt":"1","job":"cmd-gc-process","shard_id":"cmd-gc-process-1-of-12","variant":"linux-default"},"tested_sha":"sha-warm","duration_seconds":1.5}]}]}]}` + "\n"
 	if got != want {
@@ -323,7 +323,7 @@ func TestBuildSnapshotDefaultMarkdownRemainsByteForByte(t *testing.T) {
 	root := t.TempDir()
 	writeArtifact(t, root, "one.json", timingArtifact("930", defaultRunner("ephemeral"), []timingUnit{{
 		UnitID: "internal/example:TestOne", Kind: "test",
-		Package: "github.com/gastownhall/gascity/internal/example", Test: "TestOne",
+		Package: "github.com/jonbaldie/gascity/internal/example", Test: "TestOne",
 		Outcome: "pass", DurationSeconds: 1,
 	}}))
 

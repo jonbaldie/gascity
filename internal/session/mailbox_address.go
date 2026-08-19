@@ -3,7 +3,7 @@ package session
 import (
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // This file is the session-class READ half of the mailbox-address codec

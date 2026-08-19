@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
 
 func ensureInitArtifacts(cityPath string, stderr io.Writer, commandName string) {

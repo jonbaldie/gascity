@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/events"
-	"github.com/gastownhall/gascity/internal/testutil"
-	"github.com/gastownhall/gascity/pkg/eventexport"
+	"github.com/jonbaldie/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/testutil"
+	"github.com/jonbaldie/gascity/pkg/eventexport"
 )
 
 type watchSignalProvider struct {

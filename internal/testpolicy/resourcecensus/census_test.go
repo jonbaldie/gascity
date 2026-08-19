@@ -113,8 +113,8 @@ func TestScanCountsTmuxDependenciesByImportIdentityAndLiteralCommand(t *testing.
 import (
 	"context"
 	foreign "example.test/tmuxtest"
-	runtimetmux "github.com/gastownhall/gascity/internal/runtime/tmux"
-	tmuxtest "github.com/gastownhall/gascity/test/tmuxtest"
+	runtimetmux "github.com/jonbaldie/gascity/internal/runtime/tmux"
+	tmuxtest "github.com/jonbaldie/gascity/test/tmuxtest"
 	shell "os/exec"
 	"testing"
 )
@@ -164,7 +164,7 @@ func helper(t *testing.T) {
 
 package sample
 import (
-	tmuxtest "github.com/gastownhall/gascity/test/tmuxtest"
+	tmuxtest "github.com/jonbaldie/gascity/test/tmuxtest"
 	"testing"
 )
 func TestTaggedTmux(t *testing.T) {
@@ -188,8 +188,8 @@ func TestScanRejectsTmuxResourceDotImports(t *testing.T) {
 	t.Parallel()
 
 	for _, importPath := range []string{
-		"github.com/gastownhall/gascity/internal/runtime/tmux",
-		"github.com/gastownhall/gascity/test/tmuxtest",
+		"github.com/jonbaldie/gascity/internal/runtime/tmux",
+		"github.com/jonbaldie/gascity/test/tmuxtest",
 	} {
 		importPath := importPath
 		t.Run(importPath, func(t *testing.T) {
@@ -598,8 +598,8 @@ func uncatalogedListenerHelper() {}
 `)},
 			"cmd/gc/resources_test.go": &fstest.MapFile{Data: []byte(`package main
 import (
-	capability "github.com/gastownhall/gascity/internal/runtime/runtimecapability"
-	acceptance "github.com/gastownhall/gascity/test/acceptance/helpers"
+	capability "github.com/jonbaldie/gascity/internal/runtime/runtimecapability"
+	acceptance "github.com/jonbaldie/gascity/test/acceptance/helpers"
 	foreigncap "example.test/internal/runtime/runtimecapability"
 	foreignacceptance "example.test/acceptance/helpers"
 	"testing"
@@ -665,7 +665,7 @@ func TestDashportHarness(t *testing.T) { ((newHarness))() }
 		t.Parallel()
 		got, err := ScanFS(fstest.MapFS{
 			"sample/resources_test.go": &fstest.MapFile{Data: []byte(`package sample
-import "github.com/gastownhall/gascity/test/acceptance/helpers"
+import "github.com/jonbaldie/gascity/test/acceptance/helpers"
 func TestDefaultImport() { acceptancehelpers.WriteSupervisorConfig() }
 `)},
 		})
@@ -1501,18 +1501,18 @@ func TestResource() { _ = NewServer(nil) }
 		{
 			name:       "runtime capability helper",
 			path:       "sample/dot_runtimecapability_test.go",
-			importPath: "github.com/gastownhall/gascity/internal/runtime/runtimecapability",
+			importPath: "github.com/jonbaldie/gascity/internal/runtime/runtimecapability",
 			source: `package sample
-import . "github.com/gastownhall/gascity/internal/runtime/runtimecapability"
+import . "github.com/jonbaldie/gascity/internal/runtime/runtimecapability"
 func TestResource() { Run() }
 `,
 		},
 		{
 			name:       "acceptance listener helper",
 			path:       "sample/dot_acceptance_helpers_test.go",
-			importPath: "github.com/gastownhall/gascity/test/acceptance/helpers",
+			importPath: "github.com/jonbaldie/gascity/test/acceptance/helpers",
 			source: `package sample
-import . "github.com/gastownhall/gascity/test/acceptance/helpers"
+import . "github.com/jonbaldie/gascity/test/acceptance/helpers"
 func TestResource() { WriteSupervisorConfig() }
 `,
 		},

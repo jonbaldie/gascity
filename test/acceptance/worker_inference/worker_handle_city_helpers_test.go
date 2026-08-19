@@ -8,10 +8,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/fsys"
-	workerpkg "github.com/gastownhall/gascity/internal/worker"
-	helpers "github.com/gastownhall/gascity/test/acceptance/helpers"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/fsys"
+	workerpkg "github.com/jonbaldie/gascity/internal/worker"
+	helpers "github.com/jonbaldie/gascity/test/acceptance/helpers"
 )
 
 // profileUsesHookSessionKeyPersistence reports whether a profile's provider

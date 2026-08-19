@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/shellquote"
+	"github.com/jonbaldie/gascity/internal/shellquote"
 )
 
 // launchSpec is how Start launches a session's command under herdr ≥0.7.5,

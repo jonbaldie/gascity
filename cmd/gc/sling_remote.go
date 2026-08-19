@@ -6,7 +6,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/api"
+	"github.com/jonbaldie/gascity/internal/api"
 )
 
 // cmdSlingRemote routes a sling mutation to a REMOTE city over the control

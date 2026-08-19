@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	helpers "github.com/gastownhall/gascity/test/acceptance/helpers"
+	helpers "github.com/jonbaldie/gascity/test/acceptance/helpers"
 )
 
 // TestConvoyErrors validates all error paths using a single city.

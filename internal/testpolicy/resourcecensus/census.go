@@ -762,12 +762,12 @@ var listenerHelperPackageIdentities = []listenerHelperPackageIdentity{
 		},
 	},
 	{
-		importPath: "github.com/gastownhall/gascity/internal/runtime/runtimecapability",
+		importPath: "github.com/jonbaldie/gascity/internal/runtime/runtimecapability",
 		key:        packageKey{directory: "internal/runtime/runtimecapability", packageName: "runtimecapability"},
 		names:      []string{"Run"},
 	},
 	{
-		importPath: "github.com/gastownhall/gascity/test/acceptance/helpers",
+		importPath: "github.com/jonbaldie/gascity/test/acceptance/helpers",
 		key:        packageKey{directory: "test/acceptance/helpers", packageName: "acceptancehelpers"},
 		names:      []string{"WriteSupervisorConfig"},
 	},
@@ -778,10 +778,10 @@ var listenerHelperPackageIdentities = []listenerHelperPackageIdentity{
 }
 
 var targetedDotImportPaths = map[string]struct{}{
-	"github.com/gastownhall/gascity/internal/runtime/runtimecapability": {},
-	"github.com/gastownhall/gascity/internal/runtime/tmux":              {},
-	"github.com/gastownhall/gascity/test/acceptance/helpers":            {},
-	"github.com/gastownhall/gascity/test/tmuxtest":                      {},
+	"github.com/jonbaldie/gascity/internal/runtime/runtimecapability": {},
+	"github.com/jonbaldie/gascity/internal/runtime/tmux":              {},
+	"github.com/jonbaldie/gascity/test/acceptance/helpers":            {},
+	"github.com/jonbaldie/gascity/test/tmuxtest":                      {},
 	"net":               {},
 	"net/http/httptest": {},
 	"os":                {},

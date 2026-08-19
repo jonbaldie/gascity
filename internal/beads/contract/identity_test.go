@@ -12,7 +12,7 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
 
 // expectedIdentityBody is the exact byte sequence WriteProjectIdentity must

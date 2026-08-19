@@ -5,8 +5,8 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 // readyPartialLiveStore returns its rows alongside a PartialResultError, to

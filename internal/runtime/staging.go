@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/overlay"
+	"github.com/jonbaldie/gascity/internal/overlay"
 )
 
 // HashHookSettingsContent returns a content hash for a probed hook/settings

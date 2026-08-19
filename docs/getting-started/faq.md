@@ -57,10 +57,11 @@ markdown prompt templates define what each role does. A "reviewer" or
 ## Do I need tmux? What else does it depend on?
 
 Yes — agent sessions run in tmux. The full runtime set is tmux, jq, git,
-dolt, bd (the beads CLI), and flock; `brew install gascity` installs all of
-them for you. For the lightest possible start, `GC_BEADS=file` skips the
-dolt + bd pair. [Installation](/getting-started/installation) has the exact
-versions and the non-Homebrew paths.
+dolt, bd (the beads CLI), and flock. Install `gc` with
+`go install github.com/jonbaldie/gascity/cmd/gc@latest`, then install those
+runtime tools separately. For the lightest possible start, `GC_BEADS=file`
+skips the dolt + bd pair. [Installation](/getting-started/installation) has
+the exact versions.
 
 ## What happens when an agent crashes mid-job?
 
@@ -82,7 +83,7 @@ and agent scope, so work in one project stays isolated from the others.
 ## Is it open source? What does it cost?
 
 Gas City is MIT-licensed and free —
-[github.com/gastownhall/gascity](https://github.com/gastownhall/gascity). The
+[github.com/jonbaldie/gascity](https://github.com/jonbaldie/gascity). The
 only spend is the model usage of the agents you run, billed through the
 harness credentials you already use.
 
