@@ -11,7 +11,7 @@
 # rejected. See engdocs/design/beads-gascity-contract-test-system.md.
 set -euo pipefail
 
-repo="${BD_REPO:-gastownhall/beads}"
+repo="${BD_REPO:-jonbaldie/beads}"
 tag="${BD_CORPUS_TAG:-}"
 dest="internal/beads/testdata/corpus"
 

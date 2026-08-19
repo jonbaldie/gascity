@@ -29,7 +29,7 @@ the `gc` binary; install the tools below separately.
 | git | Yes | — | (built-in) | (built-in) | Version control |
 | Go 1.26+ | Yes | 1.26 | `brew install go` | [golang.org](https://go.dev/dl/) | Compiler (`go install` and source) |
 | dolt | Beads provider `bd` | 2.1.0 or newer | `brew install dolt` | [releases](https://github.com/dolthub/dolt/releases) | Beads data plane |
-| bd (Beads CLI) | Beads provider `bd` | 1.0.0 | `brew install beads` | [releases](https://github.com/gastownhall/beads/releases) | Issue tracking |
+| bd (Beads CLI) | Beads provider `bd` | 1.0.0 | `go install github.com/jonbaldie/beads/cmd/bd@latest` | `go install github.com/jonbaldie/beads/cmd/bd@latest` | Issue tracking |
 | flock | Beads provider `bd` | — | `brew install flock` | (built-in via util-linux) | File locking |
 | gh | Optional | — | `brew install gh` | [cli.github.com](https://cli.github.com/) | GitHub gate checks |
 | make | Source only | — | (built-in) | `apt install make` (or `build-essential`) | Drives `make install` |

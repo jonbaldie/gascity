@@ -371,7 +371,7 @@ jobs:
 
   # Cross-version contract gate: the "current" cell of the bd matrix. The
   # "prev" cell is contract-acceptance-previous above (the min-supported
-  # release). This cell builds bd from gastownhall/beads source at
+  # release). This cell builds bd from jonbaldie/beads source at
   # BD_CURRENT_REF (deps.env) — the bleeding-edge rc has no release tarball —
   # and runs the same focused CLI contract, so a bd change that breaks gc's
   # decoder/classifier surface against the newer bd is caught before merge.
@@ -404,7 +404,7 @@ jobs:
         run: |
           set -euo pipefail
           src="${RUNNER_TEMP}/beads-src"
-          git clone --filter=blob:none https://github.com/gastownhall/beads "$src"
+          git clone --filter=blob:none https://github.com/jonbaldie/beads "$src"
           git -C "$src" checkout "${{ steps.bd.outputs.ref }}"
           mkdir -p "${HOME}/.local/bin"
           go -C "$src" build -tags gms_pure_go -o "${HOME}/.local/bin/bd" ./cmd/bd
@@ -444,7 +444,7 @@ jobs:
         run: |
           set -euo pipefail
           src="${RUNNER_TEMP}/beads-src"
-          git clone --depth 1 --filter=blob:none https://github.com/gastownhall/beads "$src"
+          git clone --depth 1 --filter=blob:none https://github.com/jonbaldie/beads "$src"
           mkdir -p "${HOME}/.local/bin"
           go -C "$src" build -tags gms_pure_go -o "${HOME}/.local/bin/bd" ./cmd/bd
           echo "${HOME}/.local/bin" >> "$GITHUB_PATH"

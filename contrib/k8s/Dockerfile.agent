@@ -31,7 +31,7 @@ ARG GRPC_VERSION=1.82.1
 # release identity, changing only the patched dependency version.
 RUN mkdir -p /src/bd /out \
     && curl -fsSL --retry 3 \
-       "https://github.com/gastownhall/beads/archive/${BD_SOURCE_REF}.tar.gz" \
+       "https://github.com/jonbaldie/beads/archive/${BD_SOURCE_REF}.tar.gz" \
        -o /tmp/bd-source.tar.gz \
     && echo "${BD_SOURCE_SHA256}  /tmp/bd-source.tar.gz" | sha256sum --check --strict \
     && tar -xzf /tmp/bd-source.tar.gz --strip-components=1 -C /src/bd \

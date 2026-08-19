@@ -15,19 +15,23 @@ import (
 // lockstep, the same way TestDoltVersionPins does for Dolt. Before this test the
 // bd floors drifted apart: deps.env BD_VERSION, the init hard-dependency floor
 // bdMinVersion, the ready-projection feature floor bdReadyProjectionMinVersion,
-// the bd_compatibility config enum, and the install-bd-archive.sh SHA table were
-// all hand-edited with no cross-check, so a regression like #3135 (a 1.0.5 flag
-// emitted ahead of the pinned 1.0.4 floor) could merge green. This test makes
-// deps.env the single source of truth and fails loudly the moment an anchor
-// moves without the others.
+// and the bd_compatibility config enum were all hand-edited with no cross-check,
+// so a regression like #3135 (a 1.0.5 flag emitted ahead of the pinned 1.0.4
+// floor) could merge green. This test makes deps.env the single source of truth
+// and fails loudly the moment an anchor moves without the others.
 func TestBDVersionPins(t *testing.T) {
 	root := repoRoot(t)
 	env := readDotenv(t, filepath.Join(root, "deps.env"))
 
+	bdRepo := env["BD_REPO"]               // GitHub owner/name this fork installs bd from
 	bdVersion := env["BD_VERSION"]         // installable default (v-prefixed release tag)
 	bdPrev := env["BD_PREV_VERSION"]       // min-supported matrix cell (downloadable)
 	bdCurrent := env["BD_CURRENT_VERSION"] // bleeding-edge matrix cell (built from source)
 	bdCurrentRef := env["BD_CURRENT_REF"]  // beads commit the current cell builds from
+
+	if bdRepo != "jonbaldie/beads" {
+		t.Fatalf("deps.env BD_REPO = %q, want jonbaldie/beads", bdRepo)
+	}
 
 	if bdVersion == "" {
 		t.Fatal("deps.env missing BD_VERSION")
@@ -43,7 +47,7 @@ func TestBDVersionPins(t *testing.T) {
 	// commit. A non-deterministic ref (branch name, short SHA) would make the cell
 	// irreproducible; require a full 40-char commit SHA.
 	if !regexp.MustCompile(`^[0-9a-f]{40}$`).MatchString(bdCurrentRef) {
-		t.Fatalf("deps.env BD_CURRENT_REF = %q, want a full 40-char gastownhall/beads commit SHA", bdCurrentRef)
+		t.Fatalf("deps.env BD_CURRENT_REF = %q, want a full 40-char jonbaldie/beads commit SHA", bdCurrentRef)
 	}
 	if !regexp.MustCompile(`^v?\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$`).MatchString(bdCurrent) {
 		t.Fatalf("deps.env BD_CURRENT_VERSION = %q, want a semver token", bdCurrent)
@@ -110,23 +114,20 @@ func TestBDVersionPins(t *testing.T) {
 		}
 	}
 
-	// Every released bd that the required CI paths install from a tarball must
-	// carry a pinned SHA for every os/arch, never the API fallback. That is both
-	// the minimum-supported cell (BD_PREV_VERSION) and the installable default
-	// (BD_VERSION): they are the same value today but may diverge on a promotion,
-	// and main CI installs BD_VERSION directly. Deduplicate when they are equal.
+	// This fork publishes no beads GitHub release assets, so CI must install bd
+	// from jonbaldie/beads source (`go install` / `go build`), never from an
+	// upstream release tarball URL. BD_PREV_VERSION and BD_VERSION remain the
+	// git tags the script checks out.
 	install := readFile(t, root, ".github/scripts/install-bd-archive.sh")
-	requiredReleases := []string{bdPrev}
-	if bdVersion != bdPrev {
-		requiredReleases = append(requiredReleases, bdVersion)
+	if strings.Contains(install, "github.com/gastownhall/beads/releases") ||
+		strings.Contains(install, "github.com/steveyegge/beads/releases") {
+		t.Fatal(".github/scripts/install-bd-archive.sh still downloads bd from an upstream beads release URL")
 	}
-	for _, release := range requiredReleases {
-		for _, tuple := range []string{"linux_amd64", "linux_arm64", "darwin_amd64", "darwin_arm64"} {
-			want := release + ":" + tuple
-			if !strings.Contains(install, want) {
-				t.Fatalf(".github/scripts/install-bd-archive.sh missing SHA pin %q; %s cannot install on the required path without it", want, release)
-			}
-		}
+	if !strings.Contains(install, "jonbaldie/beads") {
+		t.Fatal(".github/scripts/install-bd-archive.sh must install from jonbaldie/beads")
+	}
+	if !strings.Contains(install, "go build") && !strings.Contains(install, "go install") {
+		t.Fatal(".github/scripts/install-bd-archive.sh must build or go-install bd from the fork module")
 	}
 
 	// Every workflow that pins BD_VERSION must pin the same value as deps.env, so a

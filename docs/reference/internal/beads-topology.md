@@ -169,7 +169,7 @@ for that — its job is to enforce per-scope namespacing.
 
 ## Going further
 
-- [`bd` CLI](https://github.com/gastownhall/beads) — upstream documentation for
+- [`bd` CLI](https://github.com/jonbaldie/beads) — documentation for
   `bd create`, `bd list`, `bd ready`, and the rest of the surface `gc bd`
   forwards to.
 - [Tutorial 06: Beads](/tutorials/06-beads) — the user-model walkthrough of

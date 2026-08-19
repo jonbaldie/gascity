@@ -173,7 +173,7 @@ check.
 | Tool | Min version | macOS | Linux |
 |------|-------------|-------|-------|
 | dolt | 2.1.0 or newer | `brew install dolt` | [releases](https://github.com/dolthub/dolt/releases) |
-| bd | 1.0.4 | [releases](https://github.com/gastownhall/beads/releases) | [releases](https://github.com/gastownhall/beads/releases) |
+| bd | 1.0.4 | `go install github.com/jonbaldie/beads/cmd/bd@latest` | `go install github.com/jonbaldie/beads/cmd/bd@latest` |
 | flock | -- | `brew install flock` | `apt install util-linux` |
 
 ### Optional for GitHub gates
@@ -229,8 +229,7 @@ version:
 bd version
 ```
 
-Upgrade via Homebrew (`brew upgrade beads`) or download a newer release from
-[gastownhall/beads/releases](https://github.com/gastownhall/beads/releases).
+Upgrade with `go install github.com/jonbaldie/beads/cmd/bd@latest`.
 
 ## Native Store Falls Back Because Hooks Are Installed
 
