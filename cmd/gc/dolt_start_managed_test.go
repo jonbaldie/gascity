@@ -254,6 +254,29 @@ func TestGCBeadsBDScript_InitForcesReinitOverPreSeededMetadata(t *testing.T) {
 	}
 }
 
+func TestGCBeadsBDScript_SeedsVersionWitnessOnlyForCreatedDatabase(t *testing.T) {
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller(0) failed")
+	}
+	scriptPath := filepath.Join(filepath.Dir(thisFile), "..", "..", "examples", "bd", "assets", "scripts", "gc-beads-bd.sh")
+	data, err := os.ReadFile(scriptPath)
+	if err != nil {
+		t.Fatalf("read %s: %v", scriptPath, err)
+	}
+	script := string(data)
+
+	if !strings.Contains(script, "seed_fresh_managed_bd_version_witness()") {
+		t.Fatal("gc-beads-bd.sh must seed a bd version witness before bd init on a fresh managed-Dolt database")
+	}
+	if !strings.Contains(script, `if [ "$database_created_by_gc" = true ]; then`) {
+		t.Fatal("gc-beads-bd.sh must gate the version witness on databases created by this init invocation")
+	}
+	if !strings.Contains(script, `[ ! -e "$marker" ] || return 0`) {
+		t.Fatal("gc-beads-bd.sh must not replace a pre-existing bd version witness")
+	}
+}
+
 func TestManagedDoltStartFields(t *testing.T) {
 	report := managedDoltStartReport{
 		Ready:        true,
