@@ -1452,6 +1452,78 @@ esac
 	}
 }
 
+// Demand-spawned / API-created pool seats run with GC_SESSION_ORIGIN=ephemeral
+// (or empty for controller probes). Manual and named sessions must stay
+// origin-gated out of unassigned pool demand.
+func TestEffectiveWorkQueryOriginGateAllowsEphemeralRoutedPoolDemand(t *testing.T) {
+	a := Agent{Name: "worker", Dir: "myrig", PoolName: "myrig/worker"}
+	bdScript := `#!/bin/sh
+set -eu
+case "$*" in
+  "list --status in_progress --assignee="*|"ready --assignee="*)
+    printf '[]'
+    ;;
+  "ready --metadata-field gc.routed_to=myrig/worker --unassigned --json --limit=1")
+    printf '[{"id":"ga-routed-step"}]'
+    ;;
+  *)
+    printf '[]'
+    ;;
+esac
+`
+	for _, origin := range []string{"ephemeral", ""} {
+		t.Run("origin_"+originOrEmpty(origin), func(t *testing.T) {
+			out := runEffectiveWorkQuery(t, a, map[string]string{
+				"GC_SESSION_ID":     "sess-1",
+				"GC_SESSION_NAME":   "worker-adhoc-abc123",
+				"GC_ALIAS":          "myrig/worker-adhoc-abc123",
+				"GC_SESSION_ORIGIN": origin,
+			}, bdScript)
+			if got, want := strings.TrimSpace(out), `[{"id":"ga-routed-step"}]`; got != want {
+				t.Fatalf("routed pool demand output = %q, want %q", got, want)
+			}
+		})
+	}
+}
+
+func TestEffectiveWorkQueryOriginGateExcludesManualAndNamedFromRoutedPoolDemand(t *testing.T) {
+	a := Agent{Name: "worker", Dir: "myrig", PoolName: "myrig/worker"}
+	bdScript := `#!/bin/sh
+set -eu
+case "$*" in
+  "list --status in_progress --assignee="*|"ready --assignee="*)
+    printf '[]'
+    ;;
+  "ready --metadata-field gc.routed_to=myrig/worker --unassigned --json --limit=1")
+    printf '[{"id":"ga-routed-step"}]'
+    ;;
+  *)
+    printf '[]'
+    ;;
+esac
+`
+	for _, origin := range []string{"manual", "named", "worker", "cli"} {
+		t.Run("origin_"+origin, func(t *testing.T) {
+			out := runEffectiveWorkQuery(t, a, map[string]string{
+				"GC_SESSION_ID":     "sess-1",
+				"GC_SESSION_NAME":   "worker-adhoc-abc123",
+				"GC_ALIAS":          "myrig/worker-adhoc-abc123",
+				"GC_SESSION_ORIGIN": origin,
+			}, bdScript)
+			if got := strings.TrimSpace(out); got != "" && got != "[]" {
+				t.Fatalf("origin %q must not claim routed pool demand, got %q", origin, got)
+			}
+		})
+	}
+}
+
+func originOrEmpty(origin string) string {
+	if origin == "" {
+		return "empty"
+	}
+	return origin
+}
+
 func TestEffectiveSlingQueryPoolNameOverride(t *testing.T) {
 	a := Agent{
 		Name:              "dog-1",

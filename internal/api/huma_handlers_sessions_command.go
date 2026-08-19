@@ -129,7 +129,7 @@ func (s *Server) humaHandleSessionCreate(ctx context.Context, input *SessionCrea
 			extraMeta = make(map[string]string)
 		}
 		extraMeta["agent_name"] = workDirQualifiedName
-		extraMeta["session_origin"] = "manual"
+		extraMeta["session_origin"] = "ephemeral"
 		if transport == "acp" {
 			var mcpMetaErr error
 			extraMeta, mcpMetaErr = session.WithStoredMCPMetadata(extraMeta, workDirQualifiedName, mcpServers)

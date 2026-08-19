@@ -1688,6 +1688,10 @@ func TestHandleSessionCreateAsync_PoolTemplateWithoutAliasUsesGeneratedWorkDirId
 		if got := bead.Metadata["agent_name"]; got != "myrig/"+sessionName {
 			t.Fatalf("agent_name(%q) = %q, want %q", sessionName, got, "myrig/"+sessionName)
 		}
+		// Adhoc pool capacity must remain eligible for routed-pool demand.
+		if got := bead.Metadata["session_origin"]; got != "ephemeral" {
+			t.Fatalf("session_origin(%q) = %q, want ephemeral", sessionName, got)
+		}
 	}
 }
 
