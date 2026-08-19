@@ -590,6 +590,12 @@ var (
 	supervisorReloadWaitTimeout  = 5 * time.Minute
 )
 
+const supervisorReloadBusyMessage = "gc supervisor reload: reconcile queue is busy; try again shortly"
+
+func supervisorReloadRejectedAsBusy(output string) bool {
+	return strings.Contains(output, supervisorReloadBusyMessage)
+}
+
 // shutdownState tracks the supervisor's shutdown progress so socket
 // handlers can report the final result to --wait clients. done is closed
 // when shutdown has finished (successful or not). err is populated (may
@@ -1062,7 +1068,7 @@ func reloadSupervisorJSON(stdout, stderr io.Writer, jsonOut bool) int {
 		fmt.Fprintln(stdout, "Reconciliation triggered.") //nolint:errcheck
 		return 0
 	case "busy":
-		fmt.Fprintln(stderr, "gc supervisor reload: reconcile queue is busy; try again shortly") //nolint:errcheck
+		fmt.Fprintln(stderr, supervisorReloadBusyMessage) //nolint:errcheck
 		return 1
 	case "timeout":
 		fmt.Fprintln(stderr, "gc supervisor reload: reconcile did not finish before timeout") //nolint:errcheck

@@ -1119,6 +1119,185 @@ func TestUnregisterCityFromSupervisorRestoresRegistrationOnReloadFailure(t *test
 	}
 }
 
+// TestUnregisterCityFromSupervisorBusyReloadDoesNotRestoreRegistration is the
+// #5343 busy-reconcile stop class: gc stop unregisters, supervisor reload
+// replies busy, and restoring the registry would keep the city running.
+func TestUnregisterCityFromSupervisorBusyReloadDoesNotRestoreRegistration(t *testing.T) {
+	gcHome := t.TempDir()
+	t.Setenv("GC_HOME", gcHome)
+
+	cityPath := filepath.Join(t.TempDir(), "bright-lights")
+	if err := os.MkdirAll(cityPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cityPath, "city.toml"), []byte("[workspace]\nname = \"bright-lights\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	reg := supervisor.NewRegistry(supervisor.RegistryPath())
+	if err := reg.Register(cityPath, "bright-lights"); err != nil {
+		t.Fatal(err)
+	}
+
+	runningChecks := 0
+	withSupervisorTestHooks(
+		t,
+		func(_, _ io.Writer) int { return 0 },
+		func(_ io.Writer, stderr io.Writer) int {
+			_, _ = io.WriteString(stderr, supervisorReloadBusyMessage+"\n")
+			return 1
+		},
+		func() int { return 4242 },
+		func(string) (bool, string, bool) {
+			runningChecks++
+			if runningChecks < 3 {
+				return true, "", true
+			}
+			return false, "", true
+		},
+		20*time.Millisecond,
+		time.Millisecond,
+	)
+	waitForSupervisorControllerStopHook = func(string, time.Duration) error { return nil }
+
+	var stdout, stderr bytes.Buffer
+	handled, code := unregisterCityFromSupervisorWithForce(cityPath, &stdout, &stderr, "gc stop", false)
+	if !handled || code != 0 {
+		t.Fatalf("unregisterCityFromSupervisorWithForce = (%t, %d), want (true, 0); stdout=%q stderr=%q", handled, code, stdout.String(), stderr.String())
+	}
+	if strings.Contains(stderr.String(), "restored registration") {
+		t.Fatalf("stderr = %q, busy reload must not restore a live registration", stderr.String())
+	}
+	if strings.Contains(stdout.String(), "Unregistered city") && strings.Contains(stderr.String(), "reconcile failed") {
+		t.Fatalf("confused half-stop: stdout=%q stderr=%q", stdout.String(), stderr.String())
+	}
+
+	entries, err := reg.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("registry still has %v after busy-reload stop; city would keep running", entries)
+	}
+}
+
+func TestUnregisterCityFromSupervisorBusyReloadWaitFailureLeavesUnregistered(t *testing.T) {
+	gcHome := t.TempDir()
+	t.Setenv("GC_HOME", gcHome)
+
+	cityPath := filepath.Join(t.TempDir(), "bright-lights")
+	if err := os.MkdirAll(cityPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cityPath, "city.toml"), []byte("[workspace]\nname = \"bright-lights\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	reg := supervisor.NewRegistry(supervisor.RegistryPath())
+	if err := reg.Register(cityPath, "bright-lights"); err != nil {
+		t.Fatal(err)
+	}
+
+	oldFloor := supervisorCityStopTimeoutFloor
+	supervisorCityStopTimeoutFloor = 20 * time.Millisecond
+	t.Cleanup(func() { supervisorCityStopTimeoutFloor = oldFloor })
+
+	withSupervisorTestHooks(
+		t,
+		func(_, _ io.Writer) int { return 0 },
+		func(_ io.Writer, stderr io.Writer) int {
+			_, _ = io.WriteString(stderr, supervisorReloadBusyMessage+"\n")
+			return 1
+		},
+		func() int { return 4242 },
+		func(string) (bool, string, bool) { return true, "", true },
+		20*time.Millisecond,
+		time.Millisecond,
+	)
+
+	var stdout, stderr bytes.Buffer
+	handled, code := unregisterCityFromSupervisorWithForce(cityPath, &stdout, &stderr, "gc stop", false)
+	if !handled || code != 1 {
+		t.Fatalf("unregisterCityFromSupervisorWithForce = (%t, %d), want (true, 1); stdout=%q stderr=%q", handled, code, stdout.String(), stderr.String())
+	}
+	if strings.Contains(stderr.String(), "restored registration") {
+		t.Fatalf("stderr = %q, busy-reload wait failure must not restore registration", stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "left 'bright-lights' unregistered") {
+		t.Fatalf("stderr = %q, want left-unregistered guidance", stderr.String())
+	}
+	if strings.Contains(stdout.String(), "Unregistered city") {
+		t.Fatalf("stdout = %q, must not claim unregister success while the city stayed up", stdout.String())
+	}
+
+	entries, err := reg.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("registry still has %v after busy-reload wait failure; city would keep running", entries)
+	}
+}
+
+func TestUnregisterCityFromSupervisorBusyReloadWaitsThroughInitStatus(t *testing.T) {
+	gcHome := t.TempDir()
+	t.Setenv("GC_HOME", gcHome)
+
+	cityPath := filepath.Join(t.TempDir(), "bright-lights")
+	if err := os.MkdirAll(cityPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cityPath, "city.toml"), []byte("[workspace]\nname = \"bright-lights\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	reg := supervisor.NewRegistry(supervisor.RegistryPath())
+	if err := reg.Register(cityPath, "bright-lights"); err != nil {
+		t.Fatal(err)
+	}
+
+	runningChecks := 0
+	withSupervisorTestHooks(
+		t,
+		func(_, _ io.Writer) int { return 0 },
+		func(_ io.Writer, stderr io.Writer) int {
+			_, _ = io.WriteString(stderr, supervisorReloadBusyMessage+"\n")
+			return 1
+		},
+		func() int { return 4242 },
+		func(string) (bool, string, bool) {
+			runningChecks++
+			if runningChecks < 3 {
+				return false, "starting_bead_store", true
+			}
+			return false, "", false
+		},
+		20*time.Millisecond,
+		time.Millisecond,
+	)
+	waitForSupervisorControllerStopHook = func(string, time.Duration) error { return nil }
+
+	var stdout, stderr bytes.Buffer
+	handled, code := unregisterCityFromSupervisorWithForce(cityPath, &stdout, &stderr, "gc stop", false)
+	if !handled || code != 0 {
+		t.Fatalf("unregisterCityFromSupervisorWithForce = (%t, %d), want (true, 0); stdout=%q stderr=%q", handled, code, stdout.String(), stderr.String())
+	}
+	if runningChecks < 3 {
+		t.Fatalf("running checks = %d, want wait through init status", runningChecks)
+	}
+	if strings.Contains(stderr.String(), "restored registration") {
+		t.Fatalf("stderr = %q, busy reload must not restore a live registration", stderr.String())
+	}
+
+	entries, err := reg.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("registry still has %v after busy-reload stop during init; city would keep starting", entries)
+	}
+}
+
 func TestUnregisterCityFromSupervisorWaitsForControllerStop(t *testing.T) {
 	gcHome := t.TempDir()
 	t.Setenv("GC_HOME", gcHome)

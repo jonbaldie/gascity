@@ -547,6 +547,67 @@ func TestCmdStopSupervisorManagedInvalidCityTomlWaitsForControllerStop(t *testin
 	}
 }
 
+func TestCmdStopBusyReloadDoesNotRestoreRunningCity(t *testing.T) {
+	resetFlags(t)
+	gcHome := t.TempDir()
+	t.Setenv("GC_HOME", gcHome)
+	t.Setenv("GC_BEADS", "file")
+	t.Setenv("GC_BEADS_SCOPE_ROOT", "")
+
+	cityDir := filepath.Join(t.TempDir(), "busy-reload-city")
+	if err := os.MkdirAll(filepath.Join(cityDir, ".gc"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cityDir, "city.toml"), []byte("[workspace]\nname = \"busy-reload-city\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	reg := registryAt(t, gcHome)
+	if err := reg.Register(cityDir, "busy-reload-city"); err != nil {
+		t.Fatal(err)
+	}
+
+	runningChecks := 0
+	withSupervisorTestHooks(
+		t,
+		func(_, _ io.Writer) int { return 0 },
+		func(_ io.Writer, stderr io.Writer) int {
+			_, _ = io.WriteString(stderr, supervisorReloadBusyMessage+"\n")
+			return 1
+		},
+		func() int { return 4242 },
+		func(string) (bool, string, bool) {
+			runningChecks++
+			if runningChecks < 3 {
+				return true, "", true
+			}
+			return false, "", true
+		},
+		20*time.Millisecond,
+		time.Millisecond,
+	)
+	waitForSupervisorControllerStopHook = func(string, time.Duration) error { return nil }
+
+	var stdout, stderr lockedBuffer
+	code := cmdStop([]string{cityDir}, &stdout, &stderr, time.Second, false)
+	if code != 0 {
+		t.Fatalf("cmdStop() = %d, want 0; stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if strings.Contains(stderr.String(), "restored registration") {
+		t.Fatalf("stderr = %q, busy reload must not restore a live registration", stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "City stopped.") {
+		t.Fatalf("stdout = %q, want City stopped", stdout.String())
+	}
+
+	entries, err := reg.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("registry still has %v after busy-reload gc stop; city would keep running", entries)
+	}
+}
+
 func setupSupervisorManagedInvalidCity(t *testing.T) string {
 	t.Helper()
 	resetFlags(t)
