@@ -2365,7 +2365,9 @@ func TestUnloadSupervisorServiceSkipsDefaultUnitForIsolatedGCHome(t *testing.T) 
 		t.Fatal(err)
 	}
 
-	unloadSupervisorService()
+	if err := unloadSupervisorService(); err != nil {
+		t.Fatal(err)
+	}
 
 	if got := strings.TrimSpace(readCommandLog(t, logFile)); got != "" {
 		t.Fatalf("unloadSupervisorService invoked systemctl for default unit under isolated GC_HOME: %q", got)
@@ -2389,7 +2391,9 @@ func TestUnloadSupervisorServiceUsesIsolatedUnitWhenPresent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	unloadSupervisorService()
+	if err := unloadSupervisorService(); err != nil {
+		t.Fatal(err)
+	}
 
 	got := strings.TrimSpace(readCommandLog(t, logFile))
 	if !strings.Contains(got, "--user stop "+supervisorSystemdServiceName()) {
@@ -2418,7 +2422,9 @@ func TestUnloadSupervisorServiceStopsMatchingLegacyDefaultUnitForIsolatedGCHome(
 		t.Fatal(err)
 	}
 
-	unloadSupervisorService()
+	if err := unloadSupervisorService(); err != nil {
+		t.Fatal(err)
+	}
 
 	got := strings.TrimSpace(readCommandLog(t, logFile))
 	if !strings.Contains(got, "--user stop "+defaultSupervisorSystemdUnit) {
@@ -3230,8 +3236,8 @@ func TestInstallSupervisorLaunchdEnablesAndKickstartsLoadedService(t *testing.T)
 	target := "gui/" + strconv.Itoa(os.Getuid()) + "/" + label
 	wantSequence := []string{
 		"unload " + path,
-		"load " + path,
 		"enable " + target,
+		"load " + path,
 		"kickstart -p " + target,
 	}
 	last := -1
