@@ -134,6 +134,30 @@ extract_quoted_value() {
   printf '%s\n' "${value%%\"*}"
 }
 
+extract_section_quoted_value() {
+  local section="$1"
+  local key="$2"
+  awk -v section="$section" -v key="$key" '
+    {
+      section_line = $0
+      sub(/^[[:space:]]*/, "", section_line)
+      sub(/[[:space:]]*(#.*)?$/, "", section_line)
+    }
+    section_line == "[" section "]" { in_section = 1; next }
+    section_line ~ /^\[/ && in_section { in_section = 0 }
+    in_section {
+      line = $0
+      sub(/^[[:space:]]*/, "", line)
+      if (!found && line ~ ("^" key "[[:space:]]*=")) {
+        sub(/^[^=]*=[[:space:]]*"/, "", line)
+        sub(/".*$/, "", line)
+        print line
+        found = 1
+      }
+    }
+  '
+}
+
 bootstrap_controller_scope() {
   local label="$1"
   local command="$2"
@@ -173,13 +197,13 @@ init_controller_beads() {
   fi
 
   local ws_name
-  ws_name=$(printf '%s\n' "$resolved_config" | sed -n '/^\[workspace\]/,/^\[/{ s/^name *= *"\([^"]*\)".*/\1/p; }' | head -1)
+  ws_name=$(printf '%s\n' "$resolved_config" | extract_section_quoted_value "workspace" "name")
   if [ -z "$ws_name" ]; then
     ws_name=$(basename "$city_path")
   fi
 
   local hq_prefix
-  hq_prefix=$(printf '%s\n' "$resolved_config" | sed -n '/^\[workspace\]/,/^\[/{ s/^prefix *= *"\([^"]*\)".*/\1/p; }' | head -1)
+  hq_prefix=$(printf '%s\n' "$resolved_config" | extract_section_quoted_value "workspace" "prefix")
   if [ -z "$hq_prefix" ]; then
     hq_prefix=$(derive_prefix "$ws_name")
   fi
@@ -273,15 +297,15 @@ case "$op" in
           restartPolicy: "Never",
           securityContext: {
             runAsNonRoot: true,
-            runAsUser: 1000,
-            runAsGroup: 1000,
-            fsGroup: 1000,
+            runAsUser: 1001,
+            runAsGroup: 1001,
+            fsGroup: 1001,
             seccompProfile: {type: "RuntimeDefault"}
           },
           containers: [{
             name: "controller",
             image: $image,
-            imagePullPolicy: "Always",
+            imagePullPolicy: "IfNotPresent",
             workingDir: "/city",
             env: (
               [
@@ -312,7 +336,8 @@ case "$op" in
             },
             volumeMounts: [
               {name: "city", mountPath: "/city"},
-              {name: "tmp", mountPath: "/tmp"}
+              {name: "tmp", mountPath: "/tmp"},
+              {name: "home", mountPath: "/home/gcagent"}
             ]
           }],
           volumes: [
@@ -322,6 +347,10 @@ case "$op" in
             },
             {
               name: "tmp",
+              emptyDir: {}
+            },
+            {
+              name: "home",
               emptyDir: {}
             }
           ]

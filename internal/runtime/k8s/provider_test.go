@@ -13,6 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/gastownhall/gascity/internal/shellquote"
 )
 
 func TestProviderImplementsInterface(_ *testing.T) {
@@ -63,6 +64,124 @@ func TestManagedServiceAliasRejectsPartialCompatOverride(t *testing.T) {
 	}
 	if got := err.Error(); got != "requires both GC_K8S_DOLT_HOST and GC_K8S_DOLT_PORT when either is set" {
 		t.Fatalf("managedServiceAlias() error = %q", got)
+	}
+}
+
+func TestParseSchedulingEnvHappyPath(t *testing.T) {
+	clearSchedulingEnv(t)
+	t.Setenv("GC_K8S_NODE_SELECTOR", `{"workload":"gc-agents"}`)
+	t.Setenv("GC_K8S_TOLERATIONS", `[{"key":"gc-agents","operator":"Exists","effect":"NoSchedule","tolerationSeconds":60}]`)
+	t.Setenv("GC_K8S_AFFINITY", `{"nodeAffinity":{"requiredDuringSchedulingIgnoredDuringExecution":{"nodeSelectorTerms":[{"matchExpressions":[{"key":"node-type","operator":"In","values":["gpu"]}]}]}}}`)
+	t.Setenv("GC_K8S_PRIORITY_CLASS_NAME", "gc-agent-high")
+
+	scheduling, err := parseSchedulingEnv()
+	if err != nil {
+		t.Fatalf("parseSchedulingEnv: %v", err)
+	}
+	if scheduling.nodeSelector["workload"] != "gc-agents" {
+		t.Fatalf("nodeSelector[workload] = %q, want gc-agents", scheduling.nodeSelector["workload"])
+	}
+	if len(scheduling.tolerations) != 1 {
+		t.Fatalf("len(tolerations) = %d, want 1", len(scheduling.tolerations))
+	}
+	if scheduling.tolerations[0].TolerationSeconds == nil || *scheduling.tolerations[0].TolerationSeconds != 60 {
+		t.Fatalf("tolerationSeconds = %v, want 60", scheduling.tolerations[0].TolerationSeconds)
+	}
+	if scheduling.affinity == nil ||
+		scheduling.affinity.NodeAffinity == nil ||
+		scheduling.affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
+		t.Fatalf("affinity did not parse required node affinity: %#v", scheduling.affinity)
+	}
+	if got := scheduling.priorityClassName; got != "gc-agent-high" {
+		t.Fatalf("priorityClassName = %q, want gc-agent-high", got)
+	}
+}
+
+func TestParseSchedulingEnvRejectsMalformedJSON(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		key  string
+	}{
+		{name: "node selector", key: "GC_K8S_NODE_SELECTOR"},
+		{name: "tolerations", key: "GC_K8S_TOLERATIONS"},
+		{name: "affinity", key: "GC_K8S_AFFINITY"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			clearSchedulingEnv(t)
+			t.Setenv(tc.key, "{")
+
+			_, err := parseSchedulingEnv()
+			if err == nil {
+				t.Fatal("expected malformed JSON to fail")
+			}
+			if !strings.Contains(err.Error(), tc.key) {
+				t.Fatalf("error = %q, want to mention %s", err, tc.key)
+			}
+		})
+	}
+}
+
+func TestParseSchedulingEnvEmptyAndNullAffinitySemantics(t *testing.T) {
+	t.Run("empty strings are unset", func(t *testing.T) {
+		clearSchedulingEnv(t)
+
+		scheduling, err := parseSchedulingEnv()
+		if err != nil {
+			t.Fatalf("parseSchedulingEnv: %v", err)
+		}
+		if scheduling.nodeSelector != nil {
+			t.Fatalf("nodeSelector = %#v, want nil", scheduling.nodeSelector)
+		}
+		if len(scheduling.tolerations) != 0 {
+			t.Fatalf("len(tolerations) = %d, want 0", len(scheduling.tolerations))
+		}
+		if scheduling.affinity != nil {
+			t.Fatalf("affinity = %#v, want nil", scheduling.affinity)
+		}
+		if scheduling.priorityClassName != "" {
+			t.Fatalf("priorityClassName = %q, want empty", scheduling.priorityClassName)
+		}
+	})
+
+	t.Run("affinity null is unset", func(t *testing.T) {
+		clearSchedulingEnv(t)
+		t.Setenv("GC_K8S_AFFINITY", "null")
+
+		scheduling, err := parseSchedulingEnv()
+		if err != nil {
+			t.Fatalf("parseSchedulingEnv: %v", err)
+		}
+		if scheduling.affinity != nil {
+			t.Fatalf("affinity = %#v, want nil", scheduling.affinity)
+		}
+	})
+
+	t.Run("affinity empty object is explicit empty", func(t *testing.T) {
+		clearSchedulingEnv(t)
+		t.Setenv("GC_K8S_AFFINITY", "{}")
+
+		scheduling, err := parseSchedulingEnv()
+		if err != nil {
+			t.Fatalf("parseSchedulingEnv: %v", err)
+		}
+		if scheduling.affinity == nil {
+			t.Fatal("affinity = nil, want explicit empty affinity")
+		}
+		if scheduling.affinity.NodeAffinity != nil {
+			t.Fatalf("NodeAffinity = %#v, want nil", scheduling.affinity.NodeAffinity)
+		}
+	})
+}
+
+func clearSchedulingEnv(t *testing.T) {
+	t.Helper()
+	for _, key := range []string{
+		"GC_K8S_NODE_SELECTOR",
+		"GC_K8S_TOLERATIONS",
+		"GC_K8S_AFFINITY",
+		"GC_K8S_PRIORITY_CLASS_NAME",
+	} {
+		t.Setenv(key, "")
 	}
 }
 
@@ -228,6 +347,89 @@ func TestSendKeys(t *testing.T) {
 	}
 	if !found {
 		t.Error("no tmux send-keys call with Down Enter")
+	}
+}
+
+// TestNudgePropagatesTransportError verifies that a transport failure (no
+// running pod for the session) surfaces as a non-nil error instead of being
+// swallowed — Nudge is not best-effort at the delivery layer, callers up
+// through worker.RuntimeHandle.Nudge and `gc session nudge` rely on this
+// error to report failed delivery (#4389). It also verifies the missing-pod
+// case is specifically [runtime.ErrSessionNotFound] — distinct from a live
+// pod's exec-stream failure — so callers like internal/session/chat.go and
+// internal/api/session_resolution.go can no-op on a gone session instead of
+// hard-failing (sjarmak's #4405 review).
+func TestNudgePropagatesTransportError(t *testing.T) {
+	fake := newFakeK8sOps()
+	p := newProviderWithOps(fake)
+
+	// No pod registered for this session name, so findRunningPod fails.
+	err := p.Nudge("gc-missing-agent", runtime.TextContent("hello world"))
+	if err == nil {
+		t.Fatal("Nudge: expected error for missing pod, got nil")
+	}
+	if !errors.Is(err, runtime.ErrSessionNotFound) {
+		t.Errorf("Nudge missing-pod error = %v, want errors.Is(..., runtime.ErrSessionNotFound)", err)
+	}
+}
+
+// TestSendKeysMissingSessionIsNoOp verifies SendKeys honors the documented
+// best-effort contract (runtime.go SendKeys_MissingSession): a missing pod
+// (ErrSessionNotFound at the carrier) is a no-op returning nil, not an error.
+// This is the deliberate asymmetry with Nudge (#4389/#4405): SendKeys is
+// best-effort on a gone session, while a genuine transport failure to a live
+// pod still propagates (see TestSendKeysExecStreamFailureIsNotErrSessionNotFound).
+func TestSendKeysMissingSessionIsNoOp(t *testing.T) {
+	fake := newFakeK8sOps()
+	p := newProviderWithOps(fake)
+
+	err := p.SendKeys("gc-missing-agent", "Down", "Enter")
+	if err != nil {
+		t.Fatalf("SendKeys: expected nil for missing pod (best-effort contract), got %v", err)
+	}
+}
+
+// TestNudgeExecStreamFailureIsNotErrSessionNotFound verifies the other half
+// of sjarmak's #4405 review: a running pod whose exec stream fails (a real
+// transport failure — #4389's actual bug) must NOT be mistaken for a gone
+// session. Only the pod-not-found case is ErrSessionNotFound; this failure
+// mode must propagate as a plain error so callers correctly treat it as a
+// hard failure rather than silently no-opping.
+func TestNudgeExecStreamFailureIsNotErrSessionNotFound(t *testing.T) {
+	fake := newFakeK8sOps()
+	p := newProviderWithOps(fake)
+
+	addRunningPod(fake, "gc-test-agent", "gc-test-agent")
+	fake.setExecResult("gc-test-agent",
+		[]string{"tmux", "send-keys", "-t", "main", "-l", "hello world"},
+		"", errors.New("stream error: broken pipe"))
+
+	err := p.Nudge("gc-test-agent", runtime.TextContent("hello world"))
+	if err == nil {
+		t.Fatal("Nudge: expected error for exec-stream failure, got nil")
+	}
+	if errors.Is(err, runtime.ErrSessionNotFound) {
+		t.Errorf("Nudge exec-stream-failure error = %v, must NOT be ErrSessionNotFound (pod exists, this is a real transport failure)", err)
+	}
+}
+
+// TestSendKeysExecStreamFailureIsNotErrSessionNotFound mirrors
+// TestNudgeExecStreamFailureIsNotErrSessionNotFound for SendKeys.
+func TestSendKeysExecStreamFailureIsNotErrSessionNotFound(t *testing.T) {
+	fake := newFakeK8sOps()
+	p := newProviderWithOps(fake)
+
+	addRunningPod(fake, "gc-test-agent", "gc-test-agent")
+	fake.setExecResult("gc-test-agent",
+		[]string{"tmux", "send-keys", "-t", "main", "Down", "Enter"},
+		"", errors.New("stream error: broken pipe"))
+
+	err := p.SendKeys("gc-test-agent", "Down", "Enter")
+	if err == nil {
+		t.Fatal("SendKeys: expected error for exec-stream failure, got nil")
+	}
+	if errors.Is(err, runtime.ErrSessionNotFound) {
+		t.Errorf("SendKeys exec-stream-failure error = %v, must NOT be ErrSessionNotFound (pod exists, this is a real transport failure)", err)
 	}
 }
 
@@ -431,7 +633,8 @@ func TestStartCreatesPodsAndWaits(t *testing.T) {
 		[]string{"tmux", "has-session", "-t", "main"}, "", nil)
 
 	cfg := runtime.Config{
-		Command: "claude --settings .gc/settings.json",
+		Command:      "claude --settings .gc/settings.json",
+		ProcessNames: []string{"claude"},
 		Env: map[string]string{
 			"GC_AGENT": "mayor",
 			"GC_CITY":  "/workspace",
@@ -479,7 +682,8 @@ func TestStartDetectsStalePod(t *testing.T) {
 		[]string{"tmux", "has-session", "-t", "main"}, "", nil)
 
 	cfg := runtime.Config{
-		Command: "claude",
+		Command:      "claude",
+		ProcessNames: []string{"claude"},
 		Env: map[string]string{
 			"GC_AGENT": "mayor",
 			"GC_CITY":  "/workspace",
@@ -512,8 +716,9 @@ func TestStartRejectsExistingLiveSession(t *testing.T) {
 		[]string{"tmux", "has-session", "-t", "main"}, "", nil)
 
 	cfg := runtime.Config{
-		Command: "claude",
-		Env:     map[string]string{"GC_AGENT": "mayor", "GC_CITY": "/workspace"},
+		Command:      "claude",
+		ProcessNames: []string{"claude"},
+		Env:          map[string]string{"GC_AGENT": "mayor", "GC_CITY": "/workspace"},
 	}
 	err := p.Start(context.Background(), "gc-test-agent", cfg)
 	if err == nil {
@@ -543,8 +748,9 @@ func TestStartTreatsYoungPodWithDeadTmuxAsInitializing(t *testing.T) {
 		fmt.Errorf("no server running on /tmp/tmux-1000/default"))
 
 	cfg := runtime.Config{
-		Command: "claude",
-		Env:     map[string]string{"GC_AGENT": "mayor", "GC_CITY": "/workspace"},
+		Command:      "claude",
+		ProcessNames: []string{"claude"},
+		Env:          map[string]string{"GC_AGENT": "mayor", "GC_CITY": "/workspace"},
 	}
 	err := p.Start(context.Background(), "gc-test-agent", cfg)
 	if err == nil {
@@ -585,7 +791,8 @@ func TestStartDeletesOldPodWithDeadTmux(t *testing.T) {
 	fake.createErr = fmt.Errorf("intentional: verify deletion only")
 
 	cfg := runtime.Config{
-		Command: "claude",
+		Command:      "claude",
+		ProcessNames: []string{"claude"},
 		Env: map[string]string{
 			"GC_AGENT": "mayor",
 			"GC_CITY":  "/workspace",
@@ -651,10 +858,16 @@ func TestPodManifestCompatibility(t *testing.T) {
 		}
 	}
 
-	// Verify working directory is pod-mapped.
-	if pod.Spec.Containers[0].WorkingDir != "/workspace/demo-rig" {
-		t.Errorf("workingDir = %q, want /workspace/demo-rig",
-			pod.Spec.Containers[0].WorkingDir)
+	// The manifest's workingDir is the workspace root, which always exists —
+	// the kubelet chdirs there before the entrypoint runs. The pod-mapped agent
+	// directory is entered by the entrypoint instead. gc-session-k8s builds its
+	// manifest the same way, so the two providers stay interchangeable.
+	if pod.Spec.Containers[0].WorkingDir != podWorkspaceRoot {
+		t.Errorf("workingDir = %q, want %q",
+			pod.Spec.Containers[0].WorkingDir, podWorkspaceRoot)
+	}
+	if args := strings.Join(pod.Spec.Containers[0].Args, " "); !strings.Contains(args, "cd "+shellquote.Quote("/workspace/demo-rig")) {
+		t.Errorf("entrypoint should enter the pod-mapped agent dir; got: %s", args)
 	}
 }
 
@@ -713,33 +926,34 @@ func mustBuildPodEnv(t *testing.T, cfgEnv map[string]string, podWorkDir, managed
 
 func TestBuildPodEnvRemapsVars(t *testing.T) {
 	cfgEnv := map[string]string{
-		"GC_AGENT":               "mayor",
-		"GC_CITY":                "/host/city",
-		"GC_CITY_PATH":           "/host/city",
-		"GC_DIR":                 "/host/city/rig",
-		"GC_RIG_ROOT":            "/host/city/rig",
-		"GC_STORE_ROOT":          "/host/city/rig",
-		"BEADS_DIR":              "/host/city/rig/.beads",
-		"GT_ROOT":                "/host/city",
-		"GC_CITY_RUNTIME_DIR":    "/host/city/.gc/runtime",
-		"GC_PACK_STATE_DIR":      "/host/city/.gc/runtime/packs/rlm",
-		"GC_PACK_DIR":            "/host/city/packs/maintenance",
-		"GC_SESSION":             "exec:gc-session-k8s",
-		"GC_BEADS":               "exec:something",
-		"GC_EVENTS":              "exec:other",
-		"GC_DOLT_HOST":           "",
-		"GC_DOLT_PORT":           "3307",
-		"BEADS_DOLT_SERVER_HOST": "",
-		"BEADS_DOLT_SERVER_PORT": "3307",
-		"GC_K8S_DOLT_HOST":       "legacy-dolt.example.com",
-		"GC_K8S_DOLT_PORT":       "3308",
-		"GC_DOLT_USER":           "admin",
-		"GC_DOLT_PASSWORD":       "secret",
-		"BEADS_DOLT_SERVER_USER": "admin",
-		"BEADS_DOLT_PASSWORD":    "secret",
-		"GC_MAIL":                "exec:mail",
-		"GC_MCP_MAIL_URL":        "http://localhost:8765",
-		"CUSTOM_VAR":             "preserved",
+		"GC_AGENT":                            "mayor",
+		"GC_CITY":                             "/host/city",
+		"GC_CITY_PATH":                        "/host/city",
+		"GC_DIR":                              "/host/city/rig",
+		"GC_RIG_ROOT":                         "/host/city/rig",
+		"GC_STORE_ROOT":                       "/host/city/rig",
+		"BEADS_DIR":                           "/host/city/rig/.beads",
+		"GT_ROOT":                             "/host/city",
+		"GC_CITY_RUNTIME_DIR":                 "/host/city/.gc/runtime",
+		"GC_CONTROL_DISPATCHER_TRACE_DEFAULT": "/host/city/.gc/runtime/control-dispatcher-trace.log",
+		"GC_PACK_STATE_DIR":                   "/host/city/.gc/runtime/packs/rlm",
+		"GC_PACK_DIR":                         "/host/city/packs/maintenance",
+		"GC_SESSION":                          "exec:gc-session-k8s",
+		"GC_BEADS":                            "exec:something",
+		"GC_EVENTS":                           "exec:other",
+		"GC_DOLT_HOST":                        "",
+		"GC_DOLT_PORT":                        "3307",
+		"BEADS_DOLT_SERVER_HOST":              "",
+		"BEADS_DOLT_SERVER_PORT":              "3307",
+		"GC_K8S_DOLT_HOST":                    "legacy-dolt.example.com",
+		"GC_K8S_DOLT_PORT":                    "3308",
+		"GC_DOLT_USER":                        "admin",
+		"GC_DOLT_PASSWORD":                    "secret",
+		"BEADS_DOLT_SERVER_USER":              "admin",
+		"BEADS_DOLT_PASSWORD":                 "secret",
+		"GC_MAIL":                             "exec:mail",
+		"GC_MCP_MAIL_URL":                     "http://localhost:8765",
+		"CUSTOM_VAR":                          "preserved",
 	}
 
 	env := mustBuildPodEnv(t, cfgEnv, "/workspace/rig", podManagedDoltHost, podManagedDoltPort)
@@ -785,6 +999,11 @@ func TestBuildPodEnvRemapsVars(t *testing.T) {
 	// GC_CITY_RUNTIME_DIR should be remapped.
 	if envMap["GC_CITY_RUNTIME_DIR"] != "/workspace/.gc/runtime" {
 		t.Errorf("GC_CITY_RUNTIME_DIR = %q, want /workspace/.gc/runtime", envMap["GC_CITY_RUNTIME_DIR"])
+	}
+
+	// GC_CONTROL_DISPATCHER_TRACE_DEFAULT should be remapped.
+	if envMap["GC_CONTROL_DISPATCHER_TRACE_DEFAULT"] != "/workspace/.gc/runtime/control-dispatcher-trace.log" {
+		t.Errorf("GC_CONTROL_DISPATCHER_TRACE_DEFAULT = %q, want /workspace/.gc/runtime/control-dispatcher-trace.log", envMap["GC_CONTROL_DISPATCHER_TRACE_DEFAULT"])
 	}
 
 	// GC_PACK_STATE_DIR should be remapped.
@@ -840,6 +1059,33 @@ func TestBuildPodEnvRemapsVars(t *testing.T) {
 	// GC_TMUX_SESSION should be added.
 	if envMap["GC_TMUX_SESSION"] != "main" {
 		t.Errorf("GC_TMUX_SESSION = %q, want main", envMap["GC_TMUX_SESSION"])
+	}
+}
+
+func TestBuildPodEnvReprojectsExternalRuntimeRoots(t *testing.T) {
+	cfgEnv := map[string]string{
+		"GC_CITY":                             "/host/city",
+		"GC_CITY_PATH":                        "/host/city",
+		"GC_CITY_RUNTIME_DIR":                 "/var/tmp/gascity-runtime",
+		"GC_CONTROL_DISPATCHER_TRACE_DEFAULT": "/var/tmp/gascity-runtime/control-dispatcher-trace.log",
+		"GC_PACK_STATE_DIR":                   "/var/tmp/gascity-runtime/packs/rlm",
+	}
+
+	env := mustBuildPodEnv(t, cfgEnv, "/workspace", podManagedDoltHost, podManagedDoltPort)
+
+	envMap := map[string]string{}
+	for _, e := range env {
+		envMap[e.Name] = e.Value
+	}
+
+	if envMap["GC_CITY_RUNTIME_DIR"] != "/workspace/.gc/runtime" {
+		t.Fatalf("GC_CITY_RUNTIME_DIR = %q, want /workspace/.gc/runtime", envMap["GC_CITY_RUNTIME_DIR"])
+	}
+	if envMap["GC_CONTROL_DISPATCHER_TRACE_DEFAULT"] != "/workspace/.gc/runtime/control-dispatcher-trace.log" {
+		t.Fatalf("GC_CONTROL_DISPATCHER_TRACE_DEFAULT = %q, want /workspace/.gc/runtime/control-dispatcher-trace.log", envMap["GC_CONTROL_DISPATCHER_TRACE_DEFAULT"])
+	}
+	if envMap["GC_PACK_STATE_DIR"] != "/workspace/.gc/runtime/packs/rlm" {
+		t.Fatalf("GC_PACK_STATE_DIR = %q, want /workspace/.gc/runtime/packs/rlm", envMap["GC_PACK_STATE_DIR"])
 	}
 }
 
@@ -1101,6 +1347,12 @@ func TestNeedsStaging(t *testing.T) {
 			want: true,
 		},
 		{
+			name:     "pack overlay dir",
+			cfg:      runtime.Config{WorkDir: "/city", PackOverlayDirs: []string{"/some/pack"}},
+			ctrlCity: "/city",
+			want:     true,
+		},
+		{
 			name: "copy files",
 			cfg:  runtime.Config{CopyFiles: []runtime.CopyEntry{{Src: "/a"}}},
 			want: true,
@@ -1125,6 +1377,33 @@ func TestNeedsStaging(t *testing.T) {
 				t.Errorf("needsStaging = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestPodManifestAddsInitContainerForPackOverlayCityAgent(t *testing.T) {
+	p := newProviderWithOps(newFakeK8sOps())
+
+	cfg := runtime.Config{
+		Command:         "kiro-cli chat --no-interactive --agent gascity",
+		WorkDir:         "/city",
+		ProviderName:    "kiro",
+		PackOverlayDirs: []string{"/packs/core/overlay"},
+		Env: map[string]string{
+			"GC_AGENT": "mayor",
+			"GC_CITY":  "/city",
+		},
+	}
+
+	pod, err := buildPod("gc-city-mayor", cfg, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(pod.Spec.InitContainers) == 0 {
+		t.Fatal("expected init container for city agent with pack overlay")
+	}
+	if pod.Spec.InitContainers[0].Name != "stage" {
+		t.Errorf("init container name = %q, want %q", pod.Spec.InitContainers[0].Name, "stage")
 	}
 }
 
@@ -1454,6 +1733,12 @@ func TestInitBeadsInPodStripsProjectIDFromMetadata(t *testing.T) {
 	if count < 2 {
 		t.Errorf("expected %q to appear in both python3 patch invocations (>=2 times), got %d\nscript:\n%s", want, count, script)
 	}
+	if strings.Contains(script, "<<<") {
+		t.Errorf("metadata patch script must be POSIX sh compatible; found bash here-string in:\n%s", script)
+	}
+	if !strings.Contains(script, `printf '%s' "$PATCH" | python3 -c`) {
+		t.Errorf("metadata patch fallback should pipe PATCH into python3 stdin for POSIX sh compatibility:\n%s", script)
+	}
 }
 
 func TestStartSkipsStagingWhenPrebaked(t *testing.T) {
@@ -1513,8 +1798,9 @@ func TestStartDetectsImmediateSessionDeath(t *testing.T) {
 	}
 
 	cfg := runtime.Config{
-		Command: "claude --resume stale-key",
-		Env:     map[string]string{"GC_AGENT": "deacon", "GC_CITY": "/workspace"},
+		Command:      "claude --resume stale-key",
+		Env:          map[string]string{"GC_AGENT": "deacon", "GC_CITY": "/workspace"},
+		ProcessNames: []string{"claude"},
 	}
 	err := p.Start(context.Background(), "gc-test-agent", cfg)
 	if err == nil {
@@ -1530,6 +1816,130 @@ func TestStartDetectsImmediateSessionDeath(t *testing.T) {
 	}
 }
 
+func TestStartAllowsOneShotLifecycleCommands(t *testing.T) {
+	tests := []struct {
+		name    string
+		command string
+	}{
+		{
+			name:    "direct agent script",
+			command: "gc agent-script --script /workspace/rig/assets/scripts/hyperscale-worker.yaml",
+		},
+		{
+			name:    "wrapped one shot",
+			command: "env GC_LOG_LEVEL=debug custom-once --work",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fake := newFakeK8sOps()
+			p := newProviderWithOps(fake)
+			p.postStartSettle = 100 * time.Millisecond
+
+			hasSessionCalls := 0
+			fake.execFunc = func(_ string, cmd []string) (string, error) {
+				if len(cmd) >= 3 && cmd[0] == "tmux" && cmd[1] == "has-session" {
+					hasSessionCalls++
+					if hasSessionCalls == 1 {
+						return "", nil
+					}
+					return "", fmt.Errorf("no server running on /tmp/tmux-1000/default")
+				}
+				return "", nil
+			}
+
+			cfg := runtime.Config{
+				Command:   tt.command,
+				Env:       map[string]string{"GC_AGENT": "hyperscale/worker", "GC_CITY": "/workspace"},
+				Lifecycle: runtime.LifecycleOneShot,
+				Nudge:     "Check your hook for work.",
+			}
+
+			started := time.Now()
+			err := p.Start(context.Background(), "gc-test-agent", cfg)
+			if err != nil {
+				t.Fatalf("Start should allow one-shot lifecycle command: %v", err)
+			}
+			if elapsed := time.Since(started); elapsed >= p.postStartSettle {
+				t.Fatalf("Start returned after %v, want before settle duration %v", elapsed, p.postStartSettle)
+			}
+			if hasSessionCalls != 1 {
+				t.Fatalf("tmux has-session calls = %d, want only waitForTmux check", hasSessionCalls)
+			}
+			if _, exists := fake.pods["gc-test-agent"]; !exists {
+				t.Fatal("pod should remain for normal session reconciliation after one-shot command")
+			}
+		})
+	}
+}
+
+func TestStartChecksLivenessForScriptCommandWithoutOneShotLifecycle(t *testing.T) {
+	fake := newFakeK8sOps()
+	p := newProviderWithOps(fake)
+	p.postStartSettle = 0
+
+	hasSessionCalls := 0
+	fake.execFunc = func(_ string, cmd []string) (string, error) {
+		if len(cmd) >= 3 && cmd[0] == "tmux" && cmd[1] == "has-session" {
+			hasSessionCalls++
+			if hasSessionCalls == 1 {
+				return "", nil
+			}
+			return "", fmt.Errorf("no server running on /tmp/tmux-1000/default")
+		}
+		return "", nil
+	}
+
+	cfg := runtime.Config{
+		Command: "gc agent-script --script /workspace/rig/assets/scripts/hyperscale-worker.yaml",
+		Env:     map[string]string{"GC_AGENT": "hyperscale/worker", "GC_CITY": "/workspace"},
+		Nudge:   "Check your hook for work.",
+	}
+	err := p.Start(context.Background(), "gc-test-agent", cfg)
+	if !errors.Is(err, runtime.ErrSessionDiedDuringStartup) {
+		t.Fatalf("Start error = %v, want ErrSessionDiedDuringStartup", err)
+	}
+	if hasSessionCalls != 2 {
+		t.Fatalf("tmux has-session calls = %d, want waitForTmux and post-start liveness checks", hasSessionCalls)
+	}
+}
+
+func TestStartChecksLivenessForCustomCommandWithSetupAndNudgeHints(t *testing.T) {
+	fake := newFakeK8sOps()
+	p := newProviderWithOps(fake)
+	p.postStartSettle = 0
+
+	// tmux has-session succeeds during waitForTmux, then fails on post-start check.
+	hasSessionCalls := 0
+	fake.execFunc = func(_ string, cmd []string) (string, error) {
+		if len(cmd) >= 3 && cmd[0] == "tmux" && cmd[1] == "has-session" {
+			hasSessionCalls++
+			if hasSessionCalls == 1 {
+				return "", nil
+			}
+			return "", fmt.Errorf("no server running on /tmp/tmux-1000/default")
+		}
+		return "", nil
+	}
+
+	cfg := runtime.Config{
+		Command:      "custom-agent --interactive",
+		Env:          map[string]string{"GC_AGENT": "custom/worker", "GC_CITY": "/workspace"},
+		SessionSetup: []string{"printf setup-ready >/tmp/agent-ready"},
+		Nudge:        "Check your hook for work.",
+	}
+	err := p.Start(context.Background(), "gc-test-agent", cfg)
+	if !errors.Is(err, runtime.ErrSessionDiedDuringStartup) {
+		t.Fatalf("Start error = %v, want ErrSessionDiedDuringStartup", err)
+	}
+	if hasSessionCalls != 2 {
+		t.Fatalf("tmux has-session calls = %d, want waitForTmux and post-start liveness checks", hasSessionCalls)
+	}
+	if _, exists := fake.pods["gc-test-agent"]; exists {
+		t.Error("pod should have been deleted after immediate session death")
+	}
+}
+
 func TestStartSucceedsWhenSessionStaysAlive(t *testing.T) {
 	fake := newFakeK8sOps()
 	p := newProviderWithOps(fake)
@@ -1540,8 +1950,9 @@ func TestStartSucceedsWhenSessionStaysAlive(t *testing.T) {
 		[]string{"tmux", "has-session", "-t", "main"}, "", nil)
 
 	cfg := runtime.Config{
-		Command: "claude --session-id fresh-key",
-		Env:     map[string]string{"GC_AGENT": "deacon", "GC_CITY": "/workspace"},
+		Command:      "claude --session-id fresh-key",
+		Env:          map[string]string{"GC_AGENT": "deacon", "GC_CITY": "/workspace"},
+		ProcessNames: []string{"claude"},
 	}
 	err := p.Start(context.Background(), "gc-test-agent", cfg)
 	if err != nil {
@@ -1569,8 +1980,9 @@ func TestStartHonorsCancellationDuringPostStartSettle(t *testing.T) {
 	}()
 
 	cfg := runtime.Config{
-		Command: "claude --session-id fresh-key",
-		Env:     map[string]string{"GC_AGENT": "deacon", "GC_CITY": "/workspace"},
+		Command:      "claude --session-id fresh-key",
+		Env:          map[string]string{"GC_AGENT": "deacon", "GC_CITY": "/workspace"},
+		ProcessNames: []string{"claude"},
 	}
 
 	started := time.Now()
@@ -1663,6 +2075,100 @@ func TestStartSkipsNudgeWhenEmpty(t *testing.T) {
 	}
 }
 
+// --- Relaunch (un-weld B3a) ---
+
+// findExecCmd returns the cmd of the first execInPod call whose joined cmd
+// contains substr (nil if none).
+func findExecCmd(fake *fakeK8sOps, substr string) []string { //nolint:unparam // substr varies in future tests
+	for _, c := range fake.calls {
+		if c.method == "execInPod" && strings.Contains(strings.Join(c.cmd, " "), substr) {
+			return c.cmd
+		}
+	}
+	return nil
+}
+
+func TestProvider_RelaunchRespawnsAgentInWarmPod(t *testing.T) {
+	fake := newFakeK8sOps()
+	p := newProviderWithOps(fake)
+	addRunningPod(fake, "s", "s")
+	hasSessionAlive(fake, "s") // guard + liveness recheck both succeed
+
+	if err := p.Relaunch(context.Background(), "s", runtime.Config{Command: "agent --resume"}); err != nil {
+		t.Fatalf("Relaunch: %v", err)
+	}
+
+	respawn := findExecCmd(fake, "respawn-pane")
+	if respawn == nil {
+		t.Fatal("Relaunch did not issue tmux respawn-pane over execInPod")
+	}
+	body := respawn[len(respawn)-1] // sh -c <body>
+	if !strings.Contains(body, "tmux respawn-pane -k -t main") {
+		t.Errorf("respawn body = %q, want it to respawn the 'main' session in place", body)
+	}
+	// The command is base64-shipped, not inlined verbatim.
+	wantB64 := base64.StdEncoding.EncodeToString([]byte("agent --resume"))
+	if !strings.Contains(body, wantB64) {
+		t.Errorf("respawn body = %q, want base64 %q of the agent command", body, wantB64)
+	}
+	if strings.Contains(body, "agent --resume") {
+		t.Errorf("respawn body = %q leaked the raw command; it must be base64-shipped", body)
+	}
+	// Warm reuse: no pod was created or deleted.
+	for _, c := range fake.calls {
+		if c.method == "createPod" || c.method == "deletePod" {
+			t.Errorf("Relaunch must reuse the warm pod, but called %s", c.method)
+		}
+	}
+}
+
+func TestProvider_RelaunchMissingPodIsErrSessionNotFound(t *testing.T) {
+	fake := newFakeK8sOps() // no pods
+	p := newProviderWithOps(fake)
+	err := p.Relaunch(context.Background(), "s", runtime.Config{Command: "agent"})
+	if !errors.Is(err, runtime.ErrSessionNotFound) {
+		t.Fatalf("Relaunch err = %v, want ErrSessionNotFound", err)
+	}
+	if findExecCmd(fake, "respawn-pane") != nil {
+		t.Error("respawn-pane must not be issued when there is no running pod")
+	}
+}
+
+func TestProvider_RelaunchDeadTmuxIsErrSessionNotFound(t *testing.T) {
+	fake := newFakeK8sOps()
+	p := newProviderWithOps(fake)
+	addRunningPod(fake, "s", "s")
+	// Pod runs but tmux "main" is gone: relaunch must NOT recreate the pod.
+	fake.setExecResult("s", []string{"tmux", "has-session", "-t", tmuxSession}, "", errors.New("no session"))
+	err := p.Relaunch(context.Background(), "s", runtime.Config{Command: "agent"})
+	if !errors.Is(err, runtime.ErrSessionNotFound) {
+		t.Fatalf("Relaunch err = %v, want ErrSessionNotFound", err)
+	}
+	if findExecCmd(fake, "respawn-pane") != nil {
+		t.Error("respawn-pane must not be issued when the tmux session is dead")
+	}
+}
+
+func TestProvider_RelaunchSuWrapsForLinuxUsername(t *testing.T) {
+	fake := newFakeK8sOps()
+	p := newProviderWithOps(fake)
+	addRunningPod(fake, "s", "s")
+	hasSessionAlive(fake, "s")
+
+	cfg := runtime.Config{Command: "agent", Env: map[string]string{"LINUX_USERNAME": "dev"}}
+	if err := p.Relaunch(context.Background(), "s", cfg); err != nil {
+		t.Fatalf("Relaunch: %v", err)
+	}
+	body := findExecCmd(fake, "respawn-pane")
+	if body == nil {
+		t.Fatal("no respawn-pane call")
+	}
+	last := body[len(body)-1]
+	if !strings.Contains(last, `su - dev -c`) {
+		t.Errorf("respawn body = %q, want it su-wrapped for the LINUX_USERNAME tmux socket", last)
+	}
+}
+
 // --- Test helpers ---
 
 func addRunningPod(fake *fakeK8sOps, name, sessionLabel string) { //nolint:unparam // name varies in future tests
@@ -1672,6 +2178,18 @@ func addRunningPod(fake *fakeK8sOps, name, sessionLabel string) { //nolint:unpar
 			Labels: map[string]string{"app": "gc-agent", "gc-session": sessionLabel},
 		},
 		Status: corev1.PodStatus{Phase: corev1.PodRunning},
+	}
+}
+
+// addFailedPod adds a pod that exists by session label but is NOT Running, so
+// IsRunning(name) is false while Stop (list-by-label, any phase) still finds it.
+func addFailedPod(fake *fakeK8sOps, name, sessionLabel string) { //nolint:unparam // name varies in future tests
+	fake.pods[name] = &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   name,
+			Labels: map[string]string{"app": "gc-agent", "gc-session": sessionLabel},
+		},
+		Status: corev1.PodStatus{Phase: corev1.PodFailed},
 	}
 }
 
@@ -1769,5 +2287,22 @@ func TestInitCityInPodSkipsDolt(t *testing.T) {
 	}
 	if !hasSkip {
 		t.Errorf("gc init should run with GC_DOLT=skip; got cmd=%v", gcInitCmd)
+	}
+
+	// Pod-local init only scaffolds a session filesystem; it must not register
+	// or start a city, and must not run provider login/readiness probes (a
+	// gateway-backed provider cannot satisfy a first-party-login probe, and the
+	// controller owns readiness). Assert both flags are present.
+	for _, flag := range []string{"--no-start", "--skip-provider-readiness"} {
+		found := false
+		for _, arg := range gcInitCmd {
+			if arg == flag {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("gc init should run with %s; got cmd=%v", flag, gcInitCmd)
+		}
 	}
 }

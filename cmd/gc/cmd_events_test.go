@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -18,14 +20,14 @@ import (
 )
 
 func TestDoEventsCityDefaultUsesJSONLItems(t *testing.T) {
-	items := []genclient.WireEvent{
-		{Actor: "human", Seq: 1, Subject: stringPtr("gc-1"), Ts: time.Unix(1700000000, 0).UTC(), Type: "bead.created"},
-		{Actor: "gc", Seq: 2, Subject: stringPtr("mayor"), Ts: time.Unix(1700000010, 0).UTC(), Type: "session.woke"},
+	items := []cliWireEvent{
+		{Actor: "human", Seq: 1, Subject: "gc-1", Ts: time.Unix(1700000000, 0).UTC(), Type: "bead.created"},
+		{Actor: "gc", Seq: 2, Subject: "mayor", Ts: time.Unix(1700000010, 0).UTC(), Type: "session.woke"},
 	}
 	server := newEventsTestServer(t, testEventRoutes{
 		cityEvents: func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("X-GC-Index", "2")
-			writeJSONResponse(t, w, genclient.ListBodyWireEvent{Items: &items, Total: int64(len(items))})
+			writeJSONResponse(t, w, cityEventsListResponse(t, items))
 		},
 	})
 	defer server.Close()
@@ -40,9 +42,9 @@ func TestDoEventsCityDefaultUsesJSONLItems(t *testing.T) {
 	if len(lines) != 2 {
 		t.Fatalf("got %d JSONL lines, want 2; output=%q", len(lines), stdout.String())
 	}
-	var got []genclient.WireEvent
+	var got []cliWireEvent
 	for _, line := range lines {
-		var item genclient.WireEvent
+		var item cliWireEvent
 		if err := json.Unmarshal([]byte(line), &item); err != nil {
 			t.Fatalf("unmarshal line: %v; line=%q", err, line)
 		}
@@ -54,12 +56,12 @@ func TestDoEventsCityDefaultUsesJSONLItems(t *testing.T) {
 }
 
 func TestDoEventsSupervisorDefaultUsesTaggedJSONLItems(t *testing.T) {
-	items := []genclient.WireTaggedEvent{
-		{Actor: "human", City: "alpha", Seq: 3, Subject: stringPtr("gc-1"), Ts: time.Unix(1700000000, 0).UTC(), Type: "bead.created"},
+	items := []cliWireTaggedEvent{
+		{Actor: "human", City: "alpha", Seq: 3, Subject: "gc-1", Ts: time.Unix(1700000000, 0).UTC(), Type: "bead.created"},
 	}
 	server := newEventsTestServer(t, testEventRoutes{
 		supervisorEvents: func(w http.ResponseWriter, _ *http.Request) {
-			writeJSONResponse(t, w, genclient.SupervisorEventListOutputBody{Items: &items, Total: int64(len(items))})
+			writeJSONResponse(t, w, supervisorEventsListResponse(t, items))
 		},
 	})
 	defer server.Close()
@@ -70,7 +72,7 @@ func TestDoEventsSupervisorDefaultUsesTaggedJSONLItems(t *testing.T) {
 		t.Fatalf("doEvents = %d, want 0; stderr=%s", code, stderr.String())
 	}
 
-	var got genclient.WireTaggedEvent
+	var got cliWireTaggedEvent
 	if err := json.Unmarshal(bytes.TrimSpace(stdout.Bytes()), &got); err != nil {
 		t.Fatalf("unmarshal stdout: %v; output=%s", err, stdout.String())
 	}
@@ -79,12 +81,67 @@ func TestDoEventsSupervisorDefaultUsesTaggedJSONLItems(t *testing.T) {
 	}
 }
 
+func TestEventsJSONFlagIsSilentNoOp(t *testing.T) {
+	clearGCEnv(t)
+	t.Chdir(t.TempDir())
+
+	items := []cliWireTaggedEvent{
+		{Actor: "human", City: "alpha", Seq: 3, Subject: "gc-1", Ts: time.Unix(1700000000, 0).UTC(), Type: "bead.created"},
+	}
+	server := newEventsTestServer(t, testEventRoutes{
+		supervisorEvents: func(w http.ResponseWriter, _ *http.Request) {
+			writeJSONResponse(t, w, supervisorEventsListResponse(t, items))
+		},
+	})
+	defer server.Close()
+
+	var stdout, stderr bytes.Buffer
+	cmd := newEventsCmd(&stdout, &stderr)
+	cmd.SetArgs([]string{"--api", server.URL, "--json"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("gc events --json execute: %v; stderr=%s", err, stderr.String())
+	}
+	if stderr.Len() > 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	var got cliWireTaggedEvent
+	if err := json.Unmarshal(bytes.TrimSpace(stdout.Bytes()), &got); err != nil {
+		t.Fatalf("unmarshal stdout: %v; output=%s", err, stdout.String())
+	}
+	if got.City != "alpha" || got.Type != "bead.created" || got.Seq != 3 {
+		t.Fatalf("unexpected tagged event: %+v", got)
+	}
+}
+
+// TestEventsAfterRequiresFollowOrWatch pins workspace-jbhq: --after /
+// --after-cursor resume a stream, so the plain list and --seq paths (which do
+// not consume them) must reject rather than silently ignore them — a dropped
+// --after otherwise returns the newest tail, masquerading as events-after-N.
+func TestEventsAfterRequiresFollowOrWatch(t *testing.T) {
+	cases := [][]string{
+		{"--after", "100"},
+		{"--after-cursor", "city-a:5"},
+		{"--after", "100", "--seq"},
+	}
+	for _, args := range cases {
+		var stdout, stderr bytes.Buffer
+		cmd := newEventsCmd(&stdout, &stderr)
+		cmd.SetArgs(args)
+		if err := cmd.Execute(); err == nil {
+			t.Fatalf("args %v: expected error, got nil (stdout=%q)", args, stdout.String())
+		}
+		if !strings.Contains(stderr.String(), "require --follow or --watch") {
+			t.Fatalf("args %v: stderr = %q, want --follow/--watch guidance", args, stderr.String())
+		}
+	}
+}
+
 func TestDoEventsSeqCityUsesIndexHeader(t *testing.T) {
 	server := newEventsTestServer(t, testEventRoutes{
 		cityEvents: func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("X-GC-Index", "7")
-			items := []genclient.WireEvent{}
-			writeJSONResponse(t, w, genclient.ListBodyWireEvent{Items: &items, Total: 0})
+			items := []cliWireEvent{}
+			writeJSONResponse(t, w, cityEventsListResponse(t, items))
 		},
 	})
 	defer server.Close()
@@ -100,13 +157,13 @@ func TestDoEventsSeqCityUsesIndexHeader(t *testing.T) {
 }
 
 func TestDoEventsSeqSupervisorPrintsCompositeCursor(t *testing.T) {
-	items := []genclient.WireTaggedEvent{
+	items := []cliWireTaggedEvent{
 		{Actor: "human", City: "beta", Seq: 9, Ts: time.Unix(1700000001, 0).UTC(), Type: "mail.sent"},
 		{Actor: "human", City: "alpha", Seq: 4, Ts: time.Unix(1700000000, 0).UTC(), Type: "bead.created"},
 	}
 	server := newEventsTestServer(t, testEventRoutes{
 		supervisorEvents: func(w http.ResponseWriter, _ *http.Request) {
-			writeJSONResponse(t, w, genclient.SupervisorEventListOutputBody{Items: &items, Total: int64(len(items))})
+			writeJSONResponse(t, w, supervisorEventsListResponse(t, items))
 		},
 	})
 	defer server.Close()
@@ -152,7 +209,7 @@ func TestDoEventsFallsBackToLocalCityEventsWhenCityStopped(t *testing.T) {
 		t.Fatalf("doEvents = %d, want 0; stderr=%s", code, stderr.String())
 	}
 
-	var got genclient.WireEvent
+	var got cliWireEvent
 	if err := json.Unmarshal(bytes.TrimSpace(stdout.Bytes()), &got); err != nil {
 		t.Fatalf("unmarshal stdout: %v; output=%s", err, stdout.String())
 	}
@@ -192,7 +249,7 @@ func TestDoEventsFallsBackToLocalCityEventsOnTypedStoppedCityNotFound(t *testing
 		t.Fatalf("doEvents = %d, want 0; stderr=%s", code, stderr.String())
 	}
 
-	var got genclient.WireEvent
+	var got cliWireEvent
 	if err := json.Unmarshal(bytes.TrimSpace(stdout.Bytes()), &got); err != nil {
 		t.Fatalf("unmarshal stdout: %v; output=%s", err, stdout.String())
 	}
@@ -311,7 +368,7 @@ func TestDoEventsFallsBackToLocalCityEventsForExplicitLocalSupervisorAPI(t *test
 		t.Fatalf("doEvents = %d, want 0; stderr=%s", code, stderr.String())
 	}
 
-	var got genclient.WireEvent
+	var got cliWireEvent
 	if err := json.Unmarshal(bytes.TrimSpace(stdout.Bytes()), &got); err != nil {
 		t.Fatalf("unmarshal stdout: %v; output=%s", err, stdout.String())
 	}
@@ -346,12 +403,85 @@ func TestDoEventsFallsBackToLocalCityEventsForExplicitLocalSupervisorAPITranspor
 		t.Fatalf("doEvents = %d, want 0; stderr=%s", code, stderr.String())
 	}
 
-	var got genclient.WireEvent
+	var got cliWireEvent
 	if err := json.Unmarshal(bytes.TrimSpace(stdout.Bytes()), &got); err != nil {
 		t.Fatalf("unmarshal stdout: %v; output=%s", err, stdout.String())
 	}
 	if got.Type != events.SessionStopped || got.Seq != 1 {
 		t.Fatalf("fallback event = %+v, want session.stopped seq=1", got)
+	}
+}
+
+func TestDoEventsReadsCustomCityEventTypesThroughAPI(t *testing.T) {
+	cityDir := t.TempDir()
+	items := []cliWireEvent{{
+		Actor:   "human",
+		Seq:     1,
+		Subject: "fixture",
+		Ts:      time.Unix(1700000000, 0).UTC(),
+		Type:    "app.custom",
+		Message: "custom event",
+		Payload: json.RawMessage(`{"source":"test"}`),
+	}}
+
+	server := newEventsTestServer(t, testEventRoutes{
+		cityEvents: func(w http.ResponseWriter, r *http.Request) {
+			if got := r.URL.Query().Get("type"); got != "app.custom" {
+				t.Fatalf("type query = %q, want app.custom", got)
+			}
+			w.Header().Set("X-GC-Index", "1")
+			writeJSONResponse(t, w, cityEventsListResponse(t, items))
+		},
+	})
+	defer server.Close()
+
+	var stdout, stderr bytes.Buffer
+	code := doEvents(eventsAPIScope{
+		apiURL:   server.URL,
+		cityName: "mc-city",
+		cityPath: cityDir,
+	}, "app.custom", "", nil, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("doEvents = %d, want 0; stderr=%s", code, stderr.String())
+	}
+
+	var got cliWireEvent
+	if err := json.Unmarshal(bytes.TrimSpace(stdout.Bytes()), &got); err != nil {
+		t.Fatalf("unmarshal stdout: %v; output=%s", err, stdout.String())
+	}
+	if got.Type != "app.custom" || got.Subject != "fixture" || got.Message != "custom event" {
+		t.Fatalf("custom event = %+v", got)
+	}
+	if string(got.Payload) != `{"source":"test"}` {
+		t.Fatalf("custom event payload = %s", got.Payload)
+	}
+}
+
+func TestDoEventsDoesNotReadLocalUntypedCityEventsForExplicitRemoteAPI(t *testing.T) {
+	cityDir := t.TempDir()
+	rec := newTestProvider(t, filepath.Join(cityDir, ".gc"))
+	rec.Record(events.Event{Type: "app.custom", Actor: "human"})
+
+	server := newEventsTestServer(t, testEventRoutes{
+		cityEvents: func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("X-GC-Index", "0")
+			writeJSONResponse(t, w, cityEventsListResponse(t, []cliWireEvent{}))
+		},
+	})
+	defer server.Close()
+
+	var stdout, stderr bytes.Buffer
+	code := doEvents(eventsAPIScope{
+		apiURL:      server.URL,
+		cityName:    "mc-city",
+		cityPath:    cityDir,
+		explicitAPI: true,
+	}, "app.custom", "", nil, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("doEvents = %d, want 0; stderr=%s", code, stderr.String())
+	}
+	if strings.TrimSpace(stdout.String()) != "" {
+		t.Fatalf("stdout = %q, want explicit remote API result", stdout.String())
 	}
 }
 
@@ -554,14 +684,14 @@ func TestDoEventsWatchStoppedCityAfterSeqRequiresRunningAPI(t *testing.T) {
 }
 
 func TestDoEventsWatchCityBufferedReplayUsesEnvelopeSchema(t *testing.T) {
-	items := []genclient.WireEvent{
-		{Actor: "human", Seq: 1, Subject: stringPtr("gc-1"), Ts: time.Unix(1700000000, 0).UTC(), Type: "bead.created"},
-		{Actor: "human", Message: stringPtr("hello"), Seq: 2, Subject: stringPtr("gc-2"), Ts: time.Unix(1700000010, 0).UTC(), Type: "mail.sent"},
+	items := []cliWireEvent{
+		{Actor: "human", Seq: 1, Subject: "gc-1", Ts: time.Unix(1700000000, 0).UTC(), Type: "bead.created"},
+		{Actor: "human", Message: "hello", Seq: 2, Subject: "gc-2", Ts: time.Unix(1700000010, 0).UTC(), Type: "mail.sent"},
 	}
 	server := newEventsTestServer(t, testEventRoutes{
 		cityEvents: func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("X-GC-Index", "2")
-			writeJSONResponse(t, w, genclient.ListBodyWireEvent{Items: &items, Total: int64(len(items))})
+			writeJSONResponse(t, w, cityEventsListResponse(t, items))
 		},
 	})
 	defer server.Close()
@@ -586,15 +716,15 @@ func TestDoEventsWatchCityBufferedReplayUsesEnvelopeSchema(t *testing.T) {
 }
 
 func TestDoEventsWatchCityBufferedReplayAfterSeqSkipsHeadProbe(t *testing.T) {
-	items := []genclient.WireEvent{
-		{Actor: "human", Seq: 1, Subject: stringPtr("gc-1"), Ts: time.Unix(1700000000, 0).UTC(), Type: "bead.created"},
-		{Actor: "human", Message: stringPtr("hello"), Seq: 2, Subject: stringPtr("gc-2"), Ts: time.Unix(1700000010, 0).UTC(), Type: "mail.sent"},
+	items := []cliWireEvent{
+		{Actor: "human", Seq: 1, Subject: "gc-1", Ts: time.Unix(1700000000, 0).UTC(), Type: "bead.created"},
+		{Actor: "human", Message: "hello", Seq: 2, Subject: "gc-2", Ts: time.Unix(1700000010, 0).UTC(), Type: "mail.sent"},
 	}
 	server := newEventsTestServer(t, testEventRoutes{
 		cityEvents: func(w http.ResponseWriter, _ *http.Request) {
 			// Buffered replay for --after only needs the JSON body; a missing
 			// X-GC-Index header should not block replay.
-			writeJSONResponse(t, w, genclient.ListBodyWireEvent{Items: &items, Total: int64(len(items))})
+			writeJSONResponse(t, w, cityEventsListResponse(t, items))
 		},
 	})
 	defer server.Close()
@@ -619,13 +749,13 @@ func TestDoEventsWatchCityBufferedReplayAfterSeqSkipsHeadProbe(t *testing.T) {
 }
 
 func TestDoEventsWatchSupervisorBufferedReplayUsesTaggedEnvelopeSchema(t *testing.T) {
-	items := []genclient.WireTaggedEvent{
+	items := []cliWireTaggedEvent{
 		{Actor: "human", City: "alpha", Seq: 2, Ts: time.Unix(1700000000, 0).UTC(), Type: "bead.created"},
 		{Actor: "gc", City: "beta", Seq: 5, Ts: time.Unix(1700000010, 0).UTC(), Type: "session.woke"},
 	}
 	server := newEventsTestServer(t, testEventRoutes{
 		supervisorEvents: func(w http.ResponseWriter, _ *http.Request) {
-			writeJSONResponse(t, w, genclient.SupervisorEventListOutputBody{Items: &items, Total: int64(len(items))})
+			writeJSONResponse(t, w, supervisorEventsListResponse(t, items))
 		},
 	})
 	defer server.Close()
@@ -649,12 +779,196 @@ func TestDoEventsWatchSupervisorBufferedReplayUsesTaggedEnvelopeSchema(t *testin
 	}
 }
 
+// assertCorrelationIDsInJSON decodes a single line of `gc events` stdout JSON
+// through an independent struct (not the CLI wire structs under test) and
+// asserts the run_id/session_id/step_id keys survived to the wire. Decoding
+// into a fresh struct proves the keys are present in the emitted JSON rather
+// than merely re-reading the producer's own struct.
+func assertCorrelationIDsInJSON(t *testing.T, line, wantRun, wantSession, wantStep string) {
+	t.Helper()
+	var got struct {
+		RunID     string `json:"run_id"`
+		SessionID string `json:"session_id"`
+		StepID    string `json:"step_id"`
+	}
+	if err := json.Unmarshal([]byte(line), &got); err != nil {
+		t.Fatalf("unmarshal correlation ids: %v; line=%q", err, line)
+	}
+	if got.RunID != wantRun || got.SessionID != wantSession || got.StepID != wantStep {
+		t.Fatalf("correlation ids = run_id=%q session_id=%q step_id=%q, want %q/%q/%q; line=%q",
+			got.RunID, got.SessionID, got.StepID, wantRun, wantSession, wantStep, line)
+	}
+}
+
+func assertTopologyInJSON(t *testing.T, line string, want *[]string) {
+	t.Helper()
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(line), &fields); err != nil {
+		t.Fatalf("unmarshal event: %v; line=%q", err, line)
+	}
+	raw, present := fields["depends_on_step_ids"]
+	if want == nil {
+		if present {
+			t.Fatalf("UNKNOWN topology unexpectedly present; line=%q", line)
+		}
+		return
+	}
+	if !present {
+		t.Fatalf("authoritative topology missing; line=%q", line)
+	}
+	var got []string
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatalf("unmarshal topology: %v; line=%q", err, line)
+	}
+	if !slices.Equal(got, *want) {
+		t.Fatalf("topology = %v, want %v; line=%q", got, *want, line)
+	}
+}
+
+func TestDoEventsCityListForwardsCorrelationFields(t *testing.T) {
+	deps := []string{"step-1"}
+	items := []cliWireEvent{
+		{Actor: "gc", Seq: 1, Subject: "gcg-1", Ts: time.Unix(1700000000, 0).UTC(), Type: "bead.created", RunID: "run-abc", SessionID: "sess-1", StepID: "step-7", DependsOnStepIDs: &deps},
+	}
+	server := newEventsTestServer(t, testEventRoutes{
+		cityEvents: func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("X-GC-Index", "1")
+			writeJSONResponse(t, w, cityEventsListResponse(t, items))
+		},
+	})
+	defer server.Close()
+
+	var stdout, stderr bytes.Buffer
+	code := doEvents(eventsAPIScope{apiURL: server.URL, cityName: "mc-city"}, "", "", nil, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("doEvents = %d, want 0; stderr=%s", code, stderr.String())
+	}
+	assertCorrelationIDsInJSON(t, strings.TrimSpace(stdout.String()), "run-abc", "sess-1", "step-7")
+	assertTopologyInJSON(t, strings.TrimSpace(stdout.String()), &deps)
+}
+
+func TestDoEventsSupervisorListForwardsCorrelationFields(t *testing.T) {
+	root := []string{}
+	items := []cliWireTaggedEvent{
+		{Actor: "gc", City: "alpha", Seq: 3, Subject: "gcg-2", Ts: time.Unix(1700000000, 0).UTC(), Type: "bead.created", RunID: "run-xyz", SessionID: "sess-2", StepID: "step-9", DependsOnStepIDs: &root},
+	}
+	server := newEventsTestServer(t, testEventRoutes{
+		supervisorEvents: func(w http.ResponseWriter, _ *http.Request) {
+			writeJSONResponse(t, w, supervisorEventsListResponse(t, items))
+		},
+	})
+	defer server.Close()
+
+	var stdout, stderr bytes.Buffer
+	code := doEvents(eventsAPIScope{apiURL: server.URL}, "", "", nil, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("doEvents = %d, want 0; stderr=%s", code, stderr.String())
+	}
+	assertCorrelationIDsInJSON(t, strings.TrimSpace(stdout.String()), "run-xyz", "sess-2", "step-9")
+	assertTopologyInJSON(t, strings.TrimSpace(stdout.String()), &root)
+}
+
+func TestDoEventsWatchCityBufferedReplayForwardsCorrelationFields(t *testing.T) {
+	items := []cliWireEvent{
+		{Actor: "human", Seq: 1, Subject: "gc-1", Ts: time.Unix(1700000000, 0).UTC(), Type: "bead.created"},
+		{Actor: "gc", Seq: 2, Subject: "gc-2", Ts: time.Unix(1700000010, 0).UTC(), Type: "mail.sent", RunID: "run-abc", SessionID: "sess-1", StepID: "step-7"},
+	}
+	server := newEventsTestServer(t, testEventRoutes{
+		cityEvents: func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("X-GC-Index", "2")
+			writeJSONResponse(t, w, cityEventsListResponse(t, items))
+		},
+	})
+	defer server.Close()
+
+	var stdout, stderr bytes.Buffer
+	code := doEventsWatch(eventsAPIScope{apiURL: server.URL, cityName: "mc-city"}, "", nil, 1, "", 50*time.Millisecond, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("doEventsWatch = %d, want 0; stderr=%s", code, stderr.String())
+	}
+	assertCorrelationIDsInJSON(t, strings.TrimSpace(stdout.String()), "run-abc", "sess-1", "step-7")
+}
+
+func TestDoEventsWatchSupervisorBufferedReplayForwardsCorrelationFields(t *testing.T) {
+	items := []cliWireTaggedEvent{
+		{Actor: "human", City: "alpha", Seq: 2, Ts: time.Unix(1700000000, 0).UTC(), Type: "bead.created"},
+		{Actor: "gc", City: "beta", Seq: 5, Ts: time.Unix(1700000010, 0).UTC(), Type: "session.woke", RunID: "run-xyz", SessionID: "sess-2", StepID: "step-9"},
+	}
+	server := newEventsTestServer(t, testEventRoutes{
+		supervisorEvents: func(w http.ResponseWriter, _ *http.Request) {
+			writeJSONResponse(t, w, supervisorEventsListResponse(t, items))
+		},
+	})
+	defer server.Close()
+
+	var stdout, stderr bytes.Buffer
+	code := doEventsWatch(eventsAPIScope{apiURL: server.URL}, "", nil, 0, "alpha:2", 50*time.Millisecond, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("doEventsWatch = %d, want 0; stderr=%s", code, stderr.String())
+	}
+	assertCorrelationIDsInJSON(t, strings.TrimSpace(stdout.String()), "run-xyz", "sess-2", "step-9")
+}
+
+func TestDoEventsLocalCityFallbackForwardsCorrelationFields(t *testing.T) {
+	cityDir := t.TempDir()
+	rec := newTestProvider(t, filepath.Join(cityDir, ".gc"))
+	deps := []string{"step-parent"}
+	rec.Record(events.Event{
+		Type:             events.SessionStopped,
+		Actor:            "gc",
+		Subject:          "worker",
+		Message:          "stopped",
+		RunID:            "run-local",
+		SessionID:        "sess-local",
+		StepID:           "step-local",
+		DependsOnStepIDs: &deps,
+	})
+
+	server := newEventsTestServer(t, testEventRoutes{
+		cityEvents: func(w http.ResponseWriter, _ *http.Request) {
+			writeProblemResponse(t, w, genclient.ErrorModel{
+				Status: notFoundStatusPtr(),
+				Title:  stringPtr("Not Found"),
+				Detail: stringPtr(gcapi.CityNotFoundOrNotRunningDetail("mc-city")),
+			})
+		},
+	})
+	defer server.Close()
+
+	var stdout, stderr bytes.Buffer
+	code := doEvents(eventsAPIScope{
+		apiURL:   server.URL,
+		cityName: "mc-city",
+		cityPath: cityDir,
+	}, events.SessionStopped, "", nil, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("doEvents = %d, want 0; stderr=%s", code, stderr.String())
+	}
+	assertCorrelationIDsInJSON(t, strings.TrimSpace(stdout.String()), "run-local", "sess-local", "step-local")
+	assertTopologyInJSON(t, strings.TrimSpace(stdout.String()), &deps)
+}
+
+func TestLocalWireEventClonesTopology(t *testing.T) {
+	root := []string{}
+	rootEvent := localWireEvent(events.Event{DependsOnStepIDs: &root}, io.Discard)
+	if rootEvent.DependsOnStepIDs == nil || *rootEvent.DependsOnStepIDs == nil || len(*rootEvent.DependsOnStepIDs) != 0 {
+		t.Fatalf("root topology = %#v, want present empty slice", rootEvent.DependsOnStepIDs)
+	}
+
+	deps := []string{"step-parent"}
+	item := localWireEvent(events.Event{DependsOnStepIDs: &deps}, io.Discard)
+	deps[0] = "mutated"
+	if item.DependsOnStepIDs == &deps || item.DependsOnStepIDs == nil || (*item.DependsOnStepIDs)[0] != "step-parent" {
+		t.Fatalf("local topology retained mutable source: %#v", item.DependsOnStepIDs)
+	}
+}
+
 func TestDoEventsWatchTimesOutWithoutMatch(t *testing.T) {
 	server := newEventsTestServer(t, testEventRoutes{
 		cityEvents: func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("X-GC-Index", "3")
-			items := []genclient.WireEvent{}
-			writeJSONResponse(t, w, genclient.ListBodyWireEvent{Items: &items, Total: 0})
+			items := []cliWireEvent{}
+			writeJSONResponse(t, w, cityEventsListResponse(t, items))
 		},
 		cityStream: func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "text/event-stream")
@@ -710,6 +1024,127 @@ func TestMatchPayload(t *testing.T) {
 			t.Fatal("expected OR payload match to succeed")
 		}
 	})
+
+	t.Run("matches nested payload via dotted path", func(t *testing.T) {
+		// bead.closed events have shape {"payload":{"bead":{"issue_type":"...",...}}}
+		// where the filterable fields live nested under "bead". A dotted-key
+		// filter must walk into the nested map.
+		payload := map[string]any{
+			"bead": map[string]any{
+				"id":         "pc-wisp-foo",
+				"issue_type": "molecule",
+				"status":     "closed",
+			},
+		}
+		if !matchPayload(payload, map[string][]string{"bead.issue_type": {"molecule"}}) {
+			t.Fatal("expected nested key bead.issue_type to match molecule")
+		}
+		if !matchPayload(payload, map[string][]string{"bead.status": {"closed"}}) {
+			t.Fatal("expected nested key bead.status to match closed")
+		}
+	})
+
+	t.Run("nested key value mismatch returns false", func(t *testing.T) {
+		payload := map[string]any{
+			"bead": map[string]any{"issue_type": "molecule"},
+		}
+		if matchPayload(payload, map[string][]string{"bead.issue_type": {"task"}}) {
+			t.Fatal("expected nested value mismatch to fail")
+		}
+	})
+
+	t.Run("missing intermediate path returns false", func(t *testing.T) {
+		payload := map[string]any{"foo": "bar"}
+		if matchPayload(payload, map[string][]string{"bead.issue_type": {"molecule"}}) {
+			t.Fatal("expected missing intermediate map to fail closed")
+		}
+	})
+
+	t.Run("intermediate non-object returns false", func(t *testing.T) {
+		// "bead" is a string here, not a map — walking should fail without panic.
+		payload := map[string]any{"bead": "not-an-object"}
+		if matchPayload(payload, map[string][]string{"bead.issue_type": {"molecule"}}) {
+			t.Fatal("expected non-object intermediate to fail closed")
+		}
+	})
+
+	t.Run("flat key still matches at top level (backward-compat)", func(t *testing.T) {
+		payload := map[string]any{"type": "merge-request"}
+		if !matchPayload(payload, map[string][]string{"type": {"merge-request"}}) {
+			t.Fatal("flat top-level key must still match")
+		}
+	})
+
+	t.Run("flat key with no dot does not silently traverse", func(t *testing.T) {
+		// Guard against future refactors where lookupPayloadKey accidentally
+		// walks even when there's no dot. A flat key "type" must not match
+		// a nested {"bead":{"type":"..."}} value.
+		payload := map[string]any{
+			"bead": map[string]any{"type": "merge-request"},
+		}
+		if matchPayload(payload, map[string][]string{"type": {"merge-request"}}) {
+			t.Fatal("flat key must not match nested value at the same name")
+		}
+	})
+
+	t.Run("nested OR works across siblings", func(t *testing.T) {
+		payload := map[string]any{
+			"bead": map[string]any{"issue_type": "task"},
+		}
+		filter := map[string][]string{"bead.issue_type": {"bug", "task", "molecule"}}
+		if !matchPayload(payload, filter) {
+			t.Fatal("expected nested key OR-list to match task")
+		}
+	})
+
+	t.Run("matches literal dotted key below nested map", func(t *testing.T) {
+		payload := map[string]any{
+			"bead": map[string]any{
+				"metadata": map[string]any{
+					"gc.root_bead_id": "ga-root",
+				},
+			},
+		}
+		if !matchPayload(payload, map[string][]string{"bead.metadata.gc.root_bead_id": {"ga-root"}}) {
+			t.Fatal("expected dotted path to match literal metadata key gc.root_bead_id")
+		}
+	})
+
+	t.Run("matches deeper nested payload via dotted path", func(t *testing.T) {
+		payload := map[string]any{
+			"request": map[string]any{
+				"result": map[string]any{
+					"status": "ok",
+				},
+			},
+		}
+		if !matchPayload(payload, map[string][]string{"request.result.status": {"ok"}}) {
+			t.Fatal("expected 3-segment nested key to match")
+		}
+	})
+
+	t.Run("matches flat and nested filters together", func(t *testing.T) {
+		payload := map[string]any{
+			"type": "bead.closed",
+			"bead": map[string]any{"issue_type": "task"},
+		}
+		filter := map[string][]string{
+			"type":            {"bead.closed"},
+			"bead.issue_type": {"task"},
+		}
+		if !matchPayload(payload, filter) {
+			t.Fatal("expected combined flat and nested filters to match")
+		}
+	})
+
+	t.Run("matches nested numeric payload value", func(t *testing.T) {
+		payload := map[string]any{
+			"bead": map[string]any{"priority": 2.0},
+		}
+		if !matchPayload(payload, map[string][]string{"bead.priority": {"2"}}) {
+			t.Fatal("expected nested numeric value to match string form")
+		}
+	})
 }
 
 func TestParsePayloadMatch(t *testing.T) {
@@ -747,8 +1182,184 @@ func TestCmdEventsValidatesLocalFlagsBeforeAPIDiscovery(t *testing.T) {
 	}
 }
 
+func TestDoEventsRotateGoldenPathPrintsJSONL(t *testing.T) {
+	server := newEventsTestServer(t, testEventRoutes{
+		cityRotate: func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodPost {
+				t.Fatalf("method = %s, want POST", r.Method)
+			}
+			if got := r.Header.Get("X-GC-Request"); got == "" {
+				t.Fatal("missing X-GC-Request header")
+			}
+			if got := r.URL.Query().Get("wait"); got != "" {
+				t.Fatalf("wait query = %q, want absent", got)
+			}
+			writeJSONResponse(t, w, eventRotateTestResponse("pending"))
+		},
+	})
+	defer server.Close()
+
+	var stdout, stderr bytes.Buffer
+	code := doEventsRotate(eventsAPIScope{apiURL: server.URL, cityName: "mc-city"}, false, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("doEventsRotate = %d, want 0; stderr=%s", code, stderr.String())
+	}
+	want := `{"rotated":true,"archive":{"path":"/tmp/events.jsonl.archive-20260505T035000Z-seq-1234-5678.gz","first_seq":1234,"last_seq":5678,"compression_status":"pending"},"anchor_event":{"seq":5679,"type":"events.rotated","ts":"2026-05-05T03:50:00.123456Z"},"ok":true}` + "\n"
+	if stdout.String() != want {
+		t.Fatalf("stdout = %q, want %q", stdout.String(), want)
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+}
+
+func TestDoEventsRotateEmptyActiveLogNoOp(t *testing.T) {
+	server := newEventsTestServer(t, testEventRoutes{
+		cityRotate: func(w http.ResponseWriter, _ *http.Request) {
+			writeJSONResponse(t, w, eventRotateNoopTestResponse())
+		},
+	})
+	defer server.Close()
+
+	var stdout, stderr bytes.Buffer
+	code := doEventsRotate(eventsAPIScope{apiURL: server.URL, cityName: "mc-city"}, false, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("doEventsRotate = %d, want 0; stderr=%s", code, stderr.String())
+	}
+	want := `{"rotated":false,"reason":"active log is empty","ok":true}` + "\n"
+	if stdout.String() != want {
+		t.Fatalf("stdout = %q, want %q", stdout.String(), want)
+	}
+}
+
+func TestDoEventsRotateWaitRequestsServerSideWait(t *testing.T) {
+	server := newEventsTestServer(t, testEventRoutes{
+		cityRotate: func(w http.ResponseWriter, r *http.Request) {
+			if got := r.URL.Query().Get("wait"); got != "true" {
+				t.Fatalf("wait query = %q, want true", got)
+			}
+			writeJSONResponse(t, w, eventRotateTestResponse("complete"))
+		},
+	})
+	defer server.Close()
+
+	var stdout, stderr bytes.Buffer
+	code := doEventsRotate(eventsAPIScope{apiURL: server.URL, cityName: "mc-city"}, true, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("doEventsRotate --wait = %d, want 0; stderr=%s", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), `"compression_status":"complete"`) {
+		t.Fatalf("stdout = %q, want complete compression status", stdout.String())
+	}
+}
+
+func TestDoEventsRotateUnsupportedProviderErrorIsPinned(t *testing.T) {
+	server := newEventsTestServer(t, testEventRoutes{
+		cityRotate: func(w http.ResponseWriter, _ *http.Request) {
+			writeProblemResponseStatus(t, w, http.StatusMethodNotAllowed, map[string]any{
+				"title":  "Method Not Allowed",
+				"status": http.StatusMethodNotAllowed,
+				"detail": "rotation is only supported for the file-backed events provider; current provider is 'exec:my-script'",
+			})
+		},
+	})
+	defer server.Close()
+
+	var stdout, stderr bytes.Buffer
+	code := doEventsRotate(eventsAPIScope{apiURL: server.URL, cityName: "mc-city"}, false, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("doEventsRotate = %d, want 1", code)
+	}
+	want := "gc events: rotate is only supported for the file-backed events provider; current provider is 'exec:my-script'\n"
+	if stderr.String() != want {
+		t.Fatalf("stderr = %q, want %q", stderr.String(), want)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+}
+
+func TestDoEventsRotateRequiresRunningSupervisor(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := doEventsRotate(eventsAPIScope{localOnly: true, cityName: "mc-city"}, false, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("doEventsRotate localOnly = %d, want 1", code)
+	}
+	want := "gc events: rotate requires a running supervisor; start it with 'gc supervisor start'\n"
+	if stderr.String() != want {
+		t.Fatalf("stderr = %q, want %q", stderr.String(), want)
+	}
+}
+
+func TestDoEventsRotateCityNotFoundErrorIsPinned(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v0/city/missing-city/events/rotate" {
+			t.Fatalf("path = %s, want missing-city rotate path", r.URL.Path)
+		}
+		writeProblemResponseStatus(t, w, http.StatusNotFound, map[string]any{
+			"title":  "Not Found",
+			"status": http.StatusNotFound,
+			"detail": gcapi.CityNotFoundOrNotRunningDetail("missing-city"),
+		})
+	}))
+	defer server.Close()
+
+	var stdout, stderr bytes.Buffer
+	code := doEventsRotate(eventsAPIScope{apiURL: server.URL, cityName: "missing-city"}, false, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("doEventsRotate missing city = %d, want 1", code)
+	}
+	want := "gc events: city 'missing-city' not found; run 'gc supervisor cities' to list registered cities\n"
+	if stderr.String() != want {
+		t.Fatalf("stderr = %q, want %q", stderr.String(), want)
+	}
+}
+
+func TestDoEventsRotateWaitTimeoutIsPinned(t *testing.T) {
+	server := newEventsTestServer(t, testEventRoutes{
+		cityRotate: func(w http.ResponseWriter, _ *http.Request) {
+			writeJSONResponse(t, w, eventRotateTestResponse("pending"))
+		},
+	})
+	defer server.Close()
+
+	var stdout, stderr bytes.Buffer
+	code := doEventsRotate(eventsAPIScope{apiURL: server.URL, cityName: "mc-city"}, true, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("doEventsRotate wait pending = %d, want 1", code)
+	}
+	want := "gc events: rotation succeeded but compression did not complete within 30s; archive_path=/tmp/events.jsonl.archive-20260505T035000Z-seq-1234-5678.gz; check disk space and retry\n"
+	if stderr.String() != want {
+		t.Fatalf("stderr = %q, want %q", stderr.String(), want)
+	}
+}
+
+func TestEventsRotateHelpIncludesFlagsAndExample(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	cmd := newRootCmd(&stdout, &stderr)
+	cmd.SetArgs([]string{"events", "rotate", "--help"})
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("events rotate --help: %v; stderr=%s", err, stderr.String())
+	}
+	help := stdout.String()
+	for _, want := range []string{
+		"gc events rotate",
+		"--api",
+		"--city",
+		"--wait",
+		"gc events rotate --wait",
+	} {
+		if !strings.Contains(help, want) {
+			t.Fatalf("help missing %q:\n%s", want, help)
+		}
+	}
+}
+
 type testEventRoutes struct {
 	cityEvents       func(http.ResponseWriter, *http.Request)
+	cityRotate       func(http.ResponseWriter, *http.Request)
 	cityStream       func(http.ResponseWriter, *http.Request)
 	supervisorEvents func(http.ResponseWriter, *http.Request)
 	supervisorStream func(http.ResponseWriter, *http.Request)
@@ -763,6 +1374,11 @@ func newEventsTestServer(t *testing.T, routes testEventRoutes) *httptest.Server 
 				t.Fatalf("unexpected city events request: %s", r.URL.String())
 			}
 			routes.cityEvents(w, r)
+		case "/v0/city/mc-city/events/rotate":
+			if routes.cityRotate == nil {
+				t.Fatalf("unexpected city rotate request: %s", r.URL.String())
+			}
+			routes.cityRotate(w, r)
 		case "/v0/city/mc-city/events/stream":
 			if routes.cityStream == nil {
 				t.Fatalf("unexpected city stream request: %s", r.URL.String())
@@ -784,6 +1400,30 @@ func newEventsTestServer(t *testing.T, routes testEventRoutes) *httptest.Server 
 	}))
 }
 
+func eventRotateTestResponse(status string) cliEventsRotateResponse {
+	return cliEventsRotateResponse{
+		Rotated: true,
+		Archive: &cliEventsRotateArchive{
+			Path:              "/tmp/events.jsonl.archive-20260505T035000Z-seq-1234-5678.gz",
+			FirstSeq:          1234,
+			LastSeq:           5678,
+			CompressionStatus: status,
+		},
+		AnchorEvent: &cliEventsRotateAnchor{
+			Seq:  5679,
+			Type: events.EventsRotated,
+			Ts:   time.Date(2026, 5, 5, 3, 50, 0, 123456000, time.UTC),
+		},
+	}
+}
+
+func eventRotateNoopTestResponse() cliEventsRotateResponse {
+	return cliEventsRotateResponse{
+		Rotated: false,
+		Reason:  "active log is empty",
+	}
+}
+
 func writeJSONResponse(t *testing.T, w http.ResponseWriter, body any) {
 	t.Helper()
 	w.Header().Set("Content-Type", "application/json")
@@ -792,10 +1432,49 @@ func writeJSONResponse(t *testing.T, w http.ResponseWriter, body any) {
 	}
 }
 
+func cityEventsListResponse(t *testing.T, items []cliWireEvent) genclient.ListBodyWireEvent {
+	t.Helper()
+	typed := make([]genclient.TypedEventStreamEnvelope, 0, len(items))
+	for _, item := range items {
+		data, err := json.Marshal(item)
+		if err != nil {
+			t.Fatalf("marshal city event item: %v", err)
+		}
+		var envelope genclient.TypedEventStreamEnvelope
+		if err := envelope.UnmarshalJSON(data); err != nil {
+			t.Fatalf("unmarshal typed city event item: %v; item=%s", err, data)
+		}
+		typed = append(typed, envelope)
+	}
+	return genclient.ListBodyWireEvent{Items: &typed, Total: int64(len(typed))}
+}
+
+func supervisorEventsListResponse(t *testing.T, items []cliWireTaggedEvent) genclient.SupervisorEventListOutputBody {
+	t.Helper()
+	typed := make([]genclient.TypedTaggedEventStreamEnvelope, 0, len(items))
+	for _, item := range items {
+		data, err := json.Marshal(item)
+		if err != nil {
+			t.Fatalf("marshal supervisor event item: %v", err)
+		}
+		var envelope genclient.TypedTaggedEventStreamEnvelope
+		if err := envelope.UnmarshalJSON(data); err != nil {
+			t.Fatalf("unmarshal typed supervisor event item: %v; item=%s", err, data)
+		}
+		typed = append(typed, envelope)
+	}
+	return genclient.SupervisorEventListOutputBody{Items: &typed, Total: int64(len(typed))}
+}
+
 func writeProblemResponse(t *testing.T, w http.ResponseWriter, body any) {
 	t.Helper()
+	writeProblemResponseStatus(t, w, http.StatusNotFound, body)
+}
+
+func writeProblemResponseStatus(t *testing.T, w http.ResponseWriter, status int, body any) {
+	t.Helper()
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(http.StatusNotFound)
+	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(body); err != nil {
 		t.Fatalf("encode problem response: %v", err)
 	}
@@ -818,4 +1497,184 @@ func newTestProvider(t *testing.T, dir string) *events.FileRecorder {
 	}
 	t.Cleanup(func() { _ = rec.Close() })
 	return rec
+}
+
+// TestFetchCityEventsSinglePageChronological pins the S3 keyset contract on
+// the CLI: the server serves seq-DESC pages (newest first) with v1 sq
+// cursors; gc events fetches ONE page (recent activity, pre-S3 parity — a
+// full drain of a 100MB+ event history would blow the command timeout) and
+// prints it chronologically (ascending seq), never following next_cursor.
+func TestFetchCityEventsSinglePageChronological(t *testing.T) {
+	page1 := []cliWireEvent{
+		{Actor: "gc", Seq: 6, Type: "e.t", Ts: time.Unix(1700000060, 0).UTC()},
+		{Actor: "gc", Seq: 5, Type: "e.t", Ts: time.Unix(1700000050, 0).UTC()},
+		{Actor: "gc", Seq: 4, Type: "e.t", Ts: time.Unix(1700000040, 0).UTC()},
+	}
+	server := newEventsTestServer(t, testEventRoutes{
+		cityEvents: func(w http.ResponseWriter, r *http.Request) {
+			if c := r.URL.Query().Get("cursor"); c != "" {
+				t.Errorf("gc events must not follow cursors, requested cursor %q", c)
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			w.Header().Set("X-GC-Index", "6")
+			body := cityEventsListResponse(t, page1)
+			next := "v1:eyJrIjoic3EiLCJzIjo0fQ"
+			body.NextCursor = &next
+			writeJSONResponse(t, w, body)
+		},
+	})
+	defer server.Close()
+
+	client, err := genclient.NewClientWithResponses(server.URL)
+	if err != nil {
+		t.Fatalf("client: %v", err)
+	}
+	var warn bytes.Buffer
+	got, err := fetchCityEvents(context.Background(), client, "mc-city", "", "", &warn)
+	if err != nil {
+		t.Fatalf("fetchCityEvents: %v", err)
+	}
+	if len(got) != 3 {
+		t.Fatalf("got %d events, want 3 (one page, cursor not followed)", len(got))
+	}
+	for i, item := range got {
+		if item.Seq != int64(i+4) {
+			t.Fatalf("event[%d].Seq = %d, want %d (chronological ascending)", i, item.Seq, i+4)
+		}
+	}
+	// The unbounded (no --since) fetch stays single-page, but a present
+	// next_cursor must surface an explicit truncation notice, never a silent drop.
+	if !strings.Contains(warn.String(), "omitted") {
+		t.Fatalf("expected truncation notice on stderr, got %q", warn.String())
+	}
+}
+
+// pagedCityEventsHandler serves allDesc (events in seq-DESC order) as keyset
+// pages of at most pageSize, honoring the opaque `cursor` query param the same
+// way the #4194 server does: the cursor is the seq boundary and each page
+// returns events strictly below it, minting next_cursor (the page's oldest seq
+// as a decimal string) whenever more matching rows remain below the page.
+func pagedCityEventsHandler(t *testing.T, allDesc []cliWireEvent, pageSize int) func(http.ResponseWriter, *http.Request) {
+	t.Helper()
+	return func(w http.ResponseWriter, r *http.Request) {
+		boundary := int64(-1) // -1 = no boundary (first page)
+		if c := r.URL.Query().Get("cursor"); c != "" {
+			v, err := strconv.ParseInt(c, 10, 64)
+			if err != nil {
+				t.Errorf("bad cursor %q: %v", c, err)
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			boundary = v
+		}
+		page := make([]cliWireEvent, 0, pageSize)
+		for _, e := range allDesc {
+			if boundary >= 0 && e.Seq >= boundary {
+				continue
+			}
+			if len(page) == pageSize {
+				break
+			}
+			page = append(page, e)
+		}
+		body := cityEventsListResponse(t, page)
+		body.Total = int64(len(allDesc))
+		if len(page) > 0 {
+			oldest := page[len(page)-1].Seq
+			// More below this page?
+			for _, e := range allDesc {
+				if e.Seq < oldest {
+					next := strconv.FormatInt(oldest, 10)
+					body.NextCursor = &next
+					break
+				}
+			}
+		}
+		w.Header().Set("X-GC-Index", strconv.FormatInt(allDesc[0].Seq, 10))
+		writeJSONResponse(t, w, body)
+	}
+}
+
+// TestFetchCityEventsPaginatesSinceWindow pins the bug fix (workspace-l9a2): a
+// bounded --since request drains every page of the requested window, not just
+// the newest 500. Regression guard for `gc events --since <window>` silently
+// hard-capping at one page.
+func TestFetchCityEventsPaginatesSinceWindow(t *testing.T) {
+	const total = 1200 // 3 keyset pages of 500/500/200
+	allDesc := make([]cliWireEvent, 0, total)
+	for seq := total; seq >= 1; seq-- {
+		allDesc = append(allDesc, cliWireEvent{
+			Actor: "gc", Seq: int64(seq), Type: "e.t",
+			Ts: time.Unix(1700000000+int64(seq), 0).UTC(),
+		})
+	}
+	server := newEventsTestServer(t, testEventRoutes{
+		cityEvents: pagedCityEventsHandler(t, allDesc, 500),
+	})
+	defer server.Close()
+
+	client, err := genclient.NewClientWithResponses(server.URL)
+	if err != nil {
+		t.Fatalf("client: %v", err)
+	}
+	var warn bytes.Buffer
+	got, err := fetchCityEvents(context.Background(), client, "mc-city", "", "24h", &warn)
+	if err != nil {
+		t.Fatalf("fetchCityEvents: %v", err)
+	}
+	if len(got) != total {
+		t.Fatalf("got %d events, want %d (full window drained across pages)", len(got), total)
+	}
+	// Chronological ascending, contiguous, no gaps/dups across page seams.
+	for i, item := range got {
+		if item.Seq != int64(i+1) {
+			t.Fatalf("event[%d].Seq = %d, want %d (ascending, contiguous)", i, item.Seq, i+1)
+		}
+	}
+	// A drained window is complete, so no truncation notice.
+	if warn.Len() != 0 {
+		t.Fatalf("unexpected truncation notice for a fully drained window: %q", warn.String())
+	}
+}
+
+// TestDoEventsWatchReplayDrainsAfterSeq pins workspace-d5rx: the --watch --after
+// buffered replay must return EVERY event after the resume seq, not just the
+// newest page. Regression guard for the single-page fetch that dropped events
+// when more than one page arrived since the resume seq.
+func TestDoEventsWatchReplayDrainsAfterSeq(t *testing.T) {
+	const total = 1200 // > 2 pages of 500
+	allDesc := make([]cliWireEvent, 0, total)
+	for seq := total; seq >= 1; seq-- {
+		allDesc = append(allDesc, cliWireEvent{
+			Actor: "gc", Seq: int64(seq), Type: "e.t",
+			Ts: time.Unix(1700000000+int64(seq), 0).UTC(),
+		})
+	}
+	server := newEventsTestServer(t, testEventRoutes{
+		cityEvents: pagedCityEventsHandler(t, allDesc, 500),
+	})
+	defer server.Close()
+
+	var stdout, stderr bytes.Buffer
+	// Resume from seq 100 → expect the 1100 events 101..1200, replayed in full.
+	code := doEventsWatch(eventsAPIScope{apiURL: server.URL, cityName: "mc-city"},
+		"", nil, 100, "", 30*time.Second, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("doEventsWatch = %d, want 0; stderr=%s", code, stderr.String())
+	}
+	lines := strings.Split(strings.TrimSpace(stdout.String()), "\n")
+	if len(lines) != total-100 {
+		t.Fatalf("replayed %d events, want %d (full gap after resume seq 100)", len(lines), total-100)
+	}
+	// Chronological ascending, contiguous from seq 101, no gaps across page seams.
+	for i, line := range lines {
+		var e cliWireEvent
+		if err := json.Unmarshal([]byte(line), &e); err != nil {
+			t.Fatalf("unmarshal line %d: %v; line=%q", i, err, line)
+		}
+		if e.Seq != int64(i+101) {
+			t.Fatalf("event[%d].Seq = %d, want %d (ascending, contiguous from 101)", i, e.Seq, i+101)
+		}
+	}
 }

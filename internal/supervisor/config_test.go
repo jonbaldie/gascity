@@ -3,6 +3,7 @@ package supervisor
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -58,6 +59,8 @@ func TestLoadConfigSeedsIsolatedGCHomeConfig(t *testing.T) {
 }
 
 func TestShouldSeedIsolatedSupervisorConfigFalseForCanonicalDefaultUnderSymlinkedHome(t *testing.T) {
+	setProgramName(t, "gc")
+
 	root := t.TempDir()
 	realHome := filepath.Join(root, "real-home")
 	if err := os.MkdirAll(realHome, 0o755); err != nil {
@@ -70,9 +73,41 @@ func TestShouldSeedIsolatedSupervisorConfigFalseForCanonicalDefaultUnderSymlinke
 
 	t.Setenv("HOME", linkHome)
 	t.Setenv("GC_HOME", filepath.Join(realHome, ".gc"))
+	t.Setenv("GC_ISOLATED", "")
 	if shouldSeedIsolatedSupervisorConfig(ConfigPath()) {
 		t.Fatal("shouldSeedIsolatedSupervisorConfig() = true, want false for canonical default GC_HOME under symlinked HOME")
 	}
+}
+
+func TestShouldSeedIsolatedSupervisorConfigFalseForNonTestBinaryWithoutGCIsolated(t *testing.T) {
+	setProgramName(t, "gc")
+
+	t.Setenv("GC_ISOLATED", "")
+	t.Setenv("GC_HOME", filepath.Join(t.TempDir(), ".gc"))
+
+	if shouldSeedIsolatedSupervisorConfig(ConfigPath()) {
+		t.Fatal("shouldSeedIsolatedSupervisorConfig() = true, want false for non-test binary without GC_ISOLATED=1")
+	}
+}
+
+func TestShouldSeedIsolatedSupervisorConfigTrueForNonTestBinaryWithGCIsolated(t *testing.T) {
+	setProgramName(t, "gc")
+
+	t.Setenv("GC_ISOLATED", "1")
+	t.Setenv("GC_HOME", filepath.Join(t.TempDir(), ".gc"))
+
+	if !shouldSeedIsolatedSupervisorConfig(ConfigPath()) {
+		t.Fatal("shouldSeedIsolatedSupervisorConfig() = false, want true for non-test binary with GC_ISOLATED=1")
+	}
+}
+
+func setProgramName(t *testing.T, name string) {
+	t.Helper()
+	oldArgs := os.Args
+	os.Args = append([]string{name}, oldArgs[1:]...)
+	t.Cleanup(func() {
+		os.Args = oldArgs
+	})
 }
 
 func TestLoadConfigExplicit(t *testing.T) {
@@ -83,6 +118,7 @@ func TestLoadConfigExplicit(t *testing.T) {
 port = 9090
 bind = "0.0.0.0"
 patrol_interval = "5s"
+allowed_hosts = ["city-admin.local", "192.168.1.58"]
 
 [publication]
 provider = "hosted"
@@ -108,6 +144,9 @@ policy_ref = "platform-sso"
 	if cfg.Supervisor.PatrolIntervalDuration() != 5*time.Second {
 		t.Errorf("expected patrol 5s, got %v", cfg.Supervisor.PatrolIntervalDuration())
 	}
+	if got := cfg.Supervisor.AllowedHosts; len(got) != 2 || got[0] != "city-admin.local" || got[1] != "192.168.1.58" {
+		t.Errorf("Supervisor.AllowedHosts = %#v, want city-admin.local and 192.168.1.58", got)
+	}
 	if cfg.Publication.ProviderOrDefault() != "hosted" {
 		t.Errorf("Publication.ProviderOrDefault() = %q, want hosted", cfg.Publication.ProviderOrDefault())
 	}
@@ -119,6 +158,62 @@ policy_ref = "platform-sso"
 	}
 	if cfg.Publication.TenantAuth.PolicyRef != "platform-sso" {
 		t.Errorf("Publication.TenantAuth.PolicyRef = %q, want platform-sso", cfg.Publication.TenantAuth.PolicyRef)
+	}
+}
+
+func TestLoadConfigEventExportCities(t *testing.T) {
+	tests := []struct {
+		name     string
+		contents string
+		wantNil  bool
+		want     []string
+	}{
+		{
+			name: "omitted preserves all-city default",
+			contents: `
+[events.export]
+endpoint = "https://example.invalid/ingest"
+`,
+			wantNil: true,
+		},
+		{
+			name: "explicit empty is retained",
+			contents: `
+[events.export]
+endpoint = "https://example.invalid/ingest"
+cities = []
+`,
+			want: []string{},
+		},
+		{
+			name: "configured names retain exact spelling and order",
+			contents: `
+[events.export]
+endpoint = "https://example.invalid/ingest"
+cities = ["north", " south "]
+`,
+			want: []string{"north", " south "},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "supervisor.toml")
+			if err := os.WriteFile(path, []byte(tt.contents), 0o644); err != nil {
+				t.Fatal(err)
+			}
+
+			cfg, err := LoadConfig(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if (cfg.Events.Export.Cities == nil) != tt.wantNil {
+				t.Fatalf("Cities nil = %t, want %t", cfg.Events.Export.Cities == nil, tt.wantNil)
+			}
+			if got := cfg.Events.Export.Cities; !slices.Equal(got, tt.want) {
+				t.Fatalf("Cities = %#v, want %#v", got, tt.want)
+			}
+		})
 	}
 }
 

@@ -6,37 +6,41 @@ package api
 // These types drive the OpenAPI spec for all /v0/session* endpoints.
 
 import (
-	"github.com/danielgtaylor/huma/v2"
 	"github.com/gastownhall/gascity/internal/session"
 )
 
 // SessionListInput is the Huma input for GET /v0/city/{cityName}/sessions.
+// Keyset cursors made the old "cursor present but empty" distinction moot: an
+// empty cursor is first-page paging, anything else must be a valid v1 token.
 type SessionListInput struct {
 	CityScope
 	PaginationParam
 	State    string `query:"state" required:"false" doc:"Filter by session state (e.g. active, closed)."`
 	Template string `query:"template" required:"false" doc:"Filter by session template (agent qualified name)."`
 	Peek     bool   `query:"peek" required:"false" doc:"Include last output preview."`
-
-	// cursorPresent is set by Resolve to distinguish "cursor absent" from
-	// "cursor present but empty" in the query string. Huma gives "" for both.
-	cursorPresent bool
 }
 
-// Resolve implements huma.Resolver to detect whether the cursor query
-// parameter was explicitly provided (even as an empty string).
-func (s *SessionListInput) Resolve(ctx huma.Context) []error {
-	// huma.Context.URL() returns the parsed URL; check raw query for cursor key.
-	u := ctx.URL()
-	s.cursorPresent = u.Query().Has("cursor")
-	return nil
+// CityPendingInput is the Huma input for GET /v0/city/{cityName}/pending.
+type CityPendingInput struct {
+	CityScope
+}
+
+// cityPendingEntry is one active session awaiting a human decision in the
+// city-wide pending aggregate. It carries ids only; consumers fetch the full
+// interaction via the per-session GET /v0/city/{cityName}/session/{id}/pending
+// endpoint, keeping this snapshot minimal.
+type cityPendingEntry struct {
+	SessionID string `json:"session_id" doc:"Session ID awaiting a human decision."`
+	RequestID string `json:"request_id" doc:"Pending interaction request ID."`
+	Kind      string `json:"kind" doc:"Pending interaction kind (e.g. tool-approval, prompt-for-input)."`
 }
 
 // SessionGetInput is the Huma input for GET /v0/city/{cityName}/session/{id}.
 type SessionGetInput struct {
 	CityScope
-	ID   string `path:"id" doc:"Session ID, alias, or runtime session_name."`
-	Peek bool   `query:"peek" required:"false" doc:"Include last output preview."`
+	ID        string `path:"id" doc:"Session ID, alias, or runtime session_name."`
+	Peek      bool   `query:"peek" required:"false" doc:"Include last output preview."`
+	PeekLines int    `query:"peek_lines" required:"false" minimum:"0" maximum:"10000" doc:"Number of lines to include in the last output preview when peek=true. Defaults to 5."`
 }
 
 // sessionCreateBody is the request body for POST /v0/sessions.
@@ -58,12 +62,17 @@ type SessionCreateInput struct {
 	Body sessionCreateBody
 }
 
+// asyncAcceptedBody is the response body for all async session 202 responses.
+type asyncAcceptedBody struct {
+	Status      string `json:"status" doc:"Async request status." example:"accepted"`
+	RequestID   string `json:"request_id" doc:"Correlation ID. Watch the city event stream for request.result.session.create, request.result.session.message, request.result.session.submit, or request.failed with this request_id."`
+	EventCursor string `json:"event_cursor" doc:"City event-stream sequence captured before the async request was accepted. Pass this value as after_seq to /v0/city/{cityName}/events/stream to receive the request result without replaying unrelated historical backlog. A value of 0 can also mean no event provider is configured or the event log is empty."`
+}
+
 // SessionCreateOutput is the Huma output for POST /v0/sessions.
-// Status allows the handler to return different HTTP status codes:
-// 201 Created for provider sessions, 202 Accepted for agent sessions.
 type SessionCreateOutput struct {
 	Status int `json:"-"`
-	Body   sessionResponse
+	Body   asyncAcceptedBody
 }
 
 // SessionIDInput is a generic Huma input for session endpoints that only need {cityName}+{id}.
@@ -76,16 +85,21 @@ type SessionIDInput struct {
 type SessionTranscriptInput struct {
 	CityScope
 	TailParam
-	ID     string `path:"id" doc:"Session ID, alias, or runtime session_name."`
-	Format string `query:"format" required:"false" doc:"Transcript format: conversation (default) or raw."`
-	Before string `query:"before" required:"false" doc:"Pagination cursor: return entries before this UUID."`
+	ID              string `path:"id" doc:"Session ID, alias, or runtime session_name."`
+	Format          string `query:"format" required:"false" enum:"conversation,raw,structured" doc:"Transcript format: conversation (default), raw, or structured."`
+	IncludeThinking bool   `query:"include_thinking" required:"false" doc:"Include thinking block text and signature in structured responses. Defaults to false; both are redacted otherwise."`
+	Before          string `query:"before" required:"false" doc:"Pagination cursor: return entries before this stable transcript entry ID."`
+	After           string `query:"after" required:"false" doc:"Pagination cursor: return entries after this stable transcript entry ID."`
 }
 
 // SessionStreamInput is the Huma input for GET /v0/city/{cityName}/session/{id}/stream.
 type SessionStreamInput struct {
 	CityScope
-	ID     string `path:"id" doc:"Session ID, alias, or runtime session_name."`
-	Format string `query:"format" required:"false" doc:"Transcript format: conversation (default) or raw."`
+	ID              string `path:"id" doc:"Session ID, alias, or runtime session_name."`
+	Format          string `query:"format" required:"false" enum:"conversation,raw,structured" doc:"Transcript format: conversation (default), raw, or structured."`
+	IncludeThinking bool   `query:"include_thinking" required:"false" doc:"Include thinking block text and signature in structured stream frames. Defaults to false; both are redacted otherwise."`
+	AfterCursor     string `query:"after_cursor" required:"false" maxLength:"2048" doc:"Opaque structured transcript resume cursor from the REST snapshot. Last-Event-ID takes precedence on automatic SSE reconnect."`
+	LastEventID     string `header:"Last-Event-ID" required:"false" maxLength:"2048" doc:"Opaque structured transcript resume cursor from the last received SSE frame. Takes precedence over after_cursor."`
 
 	resolved *sessionStreamState
 }
@@ -114,6 +128,20 @@ type SessionPatchInput struct {
 	Body SessionPatchBody
 }
 
+// SessionPermissionModeBody is the request body for updating the
+// schema-backed permission_mode option on a session.
+type SessionPermissionModeBody struct {
+	_              struct{} `json:"-" additionalProperties:"false"`
+	PermissionMode string   `json:"permission_mode" minLength:"1" pattern:"\\S" doc:"Provider schema value for the permission_mode option."`
+}
+
+// SessionPermissionModeInput is the Huma input for POST /v0/city/{cityName}/session/{id}/permission-mode.
+type SessionPermissionModeInput struct {
+	CityScope
+	ID   string `path:"id" doc:"Session ID, alias, or runtime session_name."`
+	Body SessionPermissionModeBody
+}
+
 // SessionCloseInput is the Huma input for POST /v0/city/{cityName}/session/{id}/close.
 type SessionCloseInput struct {
 	CityScope
@@ -133,12 +161,7 @@ type SessionSubmitInput struct {
 
 // SessionSubmitOutput is the Huma output for POST /v0/session/{id}/submit.
 type SessionSubmitOutput struct {
-	Body struct {
-		Status string `json:"status" doc:"Operation result." example:"accepted"`
-		ID     string `json:"id" doc:"Session ID."`
-		Queued bool   `json:"queued" doc:"Whether the message was queued."`
-		Intent string `json:"intent" doc:"Resolved submit intent."`
-	}
+	Body asyncAcceptedBody
 }
 
 // SessionMessageInput is the Huma input for POST /v0/city/{cityName}/session/{id}/messages.
@@ -154,10 +177,7 @@ type SessionMessageInput struct {
 
 // SessionMessageOutput is the Huma output for POST /v0/session/{id}/messages.
 type SessionMessageOutput struct {
-	Body struct {
-		Status string `json:"status" doc:"Operation result." example:"accepted"`
-		ID     string `json:"id" doc:"Session ID."`
-	}
+	Body asyncAcceptedBody
 }
 
 // SessionRespondInput is the Huma input for POST /v0/city/{cityName}/session/{id}/respond.

@@ -12,13 +12,13 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/gastownhall/gascity/internal/beads/contract"
 	"github.com/gastownhall/gascity/internal/config"
 	"github.com/gastownhall/gascity/internal/doltauth"
 	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/gastownhall/gascity/internal/rig"
 	"github.com/go-sql-driver/mysql"
 	"github.com/spf13/cobra"
 )
@@ -26,6 +26,8 @@ import (
 type rigEndpointOptions struct {
 	Inherit         bool
 	External        bool
+	Self            bool
+	Force           bool
 	Host            string
 	Port            string
 	User            string
@@ -37,6 +39,7 @@ var verifyRigExternalEndpoint = verifyExternalDoltEndpoint
 
 func newRigSetEndpointCmd(stdout, stderr io.Writer) *cobra.Command {
 	var opts rigEndpointOptions
+	var jsonOutput bool
 	cmd := &cobra.Command{
 		Use:   "set-endpoint <rig>",
 		Short: "Set the canonical endpoint ownership for a rig",
@@ -44,27 +47,49 @@ func newRigSetEndpointCmd(stdout, stderr io.Writer) *cobra.Command {
 
 Use --inherit to make a rig derive its endpoint from the current city
 topology. Use --external to pin the rig to its own external Dolt endpoint.
+Use --self to mark the rig as running its own local Dolt server on
+127.0.0.1 at the given --port; while the city is in managed_city mode the
+command requires --force because the rig's .beads/dolt-server.port mirror
+will no longer track the managed city Dolt.
 
 This command owns the rig's canonical .beads/config.yaml topology state.`,
 		Example: `  gc rig set-endpoint frontend --inherit
   gc rig set-endpoint frontend --external --host db.example.com --port 3307
   gc rig set-endpoint frontend --external --host db.example.com --port 3307 --user agent --adopt-unverified
+  gc rig set-endpoint frontend --self --port 28232 --force
   gc rig set-endpoint frontend --inherit --dry-run`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
+			if jsonOutput {
+				if cmdRigSetEndpoint(args[0], opts, io.Discard, stderr) != 0 {
+					return errExit
+				}
+				return writeManagementActionJSON(stdout, managementActionResult{
+					Command:  commandName("rig", "set-endpoint"),
+					Action:   "set-endpoint",
+					Name:     args[0],
+					Rig:      args[0],
+					DryRun:   managementBoolPtr(opts.DryRun),
+					Endpoint: rigEndpointJSONFromOptions(opts),
+				})
+			}
 			if cmdRigSetEndpoint(args[0], opts, stdout, stderr) != 0 {
 				return errExit
 			}
 			return nil
 		},
+		ValidArgsFunction: completeRigNames,
 	}
 	cmd.Flags().BoolVar(&opts.Inherit, "inherit", false, "inherit the city endpoint")
 	cmd.Flags().BoolVar(&opts.External, "external", false, "set an explicit external endpoint for the rig")
+	cmd.Flags().BoolVar(&opts.Self, "self", false, "mark the rig as running its own local Dolt on 127.0.0.1")
+	cmd.Flags().BoolVar(&opts.Force, "force", false, "acknowledge conflicting managed-city state when using --self")
 	cmd.Flags().StringVar(&opts.Host, "host", "", "external Dolt host")
-	cmd.Flags().StringVar(&opts.Port, "port", "", "external Dolt port")
+	cmd.Flags().StringVar(&opts.Port, "port", "", "external Dolt port (required with --external or --self)")
 	cmd.Flags().StringVar(&opts.User, "user", "", "external Dolt user")
 	cmd.Flags().BoolVar(&opts.AdoptUnverified, "adopt-unverified", false, "record the endpoint without live validation")
 	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", false, "show the canonical changes without writing files")
+	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output in JSONL format")
 	return cmd
 }
 
@@ -126,6 +151,11 @@ func doRigSetEndpoint(fs fsys.FS, cityPath, rigName string, opts rigEndpointOpti
 
 	targetState := requestedRigEndpointState(rig, currentState, cityState, opts)
 
+	if opts.Self && cityState.EndpointOrigin == contract.EndpointOriginManagedCity && !opts.Force {
+		fmt.Fprintf(stderr, "gc rig set-endpoint: --self conflicts with managed_city: the rig's .beads/dolt-server.port mirror will stop tracking the managed city Dolt and any rig-local Dolt must be started and managed independently of `gc start`. Re-run with --force to acknowledge.\n") //nolint:errcheck // best-effort stderr
+		return 1
+	}
+
 	if opts.DryRun {
 		printRigEndpointDryRun(stdout, rig, currentState, targetState)
 		return 0
@@ -138,13 +168,17 @@ func doRigSetEndpoint(fs fsys.FS, cityPath, rigName string, opts rigEndpointOpti
 		}
 	}
 
-	if opts.External && !opts.AdoptUnverified {
+	if (opts.External || opts.Self) && !opts.AdoptUnverified {
 		if err := verifyRigExternalEndpoint(targetState, rig.Path, rig.Path); err != nil {
-			fmt.Fprintf(stderr, "gc rig set-endpoint: validate external endpoint: %v\n", err)                                      //nolint:errcheck // best-effort stderr
+			fmt.Fprintf(stderr, "gc rig set-endpoint: validate endpoint: %v\n", err)                                               //nolint:errcheck // best-effort stderr
 			fmt.Fprintf(stderr, "gc rig set-endpoint: rerun with --adopt-unverified to record this endpoint without validation\n") //nolint:errcheck // best-effort stderr
 			return 1
 		}
 		targetState.EndpointStatus = contract.EndpointStatusVerified
+	}
+
+	if opts.Self && cityState.EndpointOrigin == contract.EndpointOriginManagedCity {
+		fmt.Fprintf(stderr, "gc rig set-endpoint: WARN: rig %q now runs its own Dolt on 127.0.0.1:%s, independent of the city's managed Dolt; `gc start` will not supervise it.\n", rig.Name, targetState.DoltPort) //nolint:errcheck // best-effort stderr
 	}
 
 	snapshots, err := snapshotRigEndpointFiles(fs, cityPath, rig.Path)
@@ -174,8 +208,21 @@ func doRigSetEndpoint(fs fsys.FS, cityPath, rigName string, opts rigEndpointOpti
 }
 
 func validateRigEndpointOptions(opts rigEndpointOptions) error {
-	if opts.Inherit == opts.External {
-		return fmt.Errorf("choose exactly one of --inherit or --external")
+	modes := 0
+	if opts.Inherit {
+		modes++
+	}
+	if opts.External {
+		modes++
+	}
+	if opts.Self {
+		modes++
+	}
+	if modes != 1 {
+		return fmt.Errorf("choose exactly one of --inherit, --external, or --self")
+	}
+	if opts.Force && !opts.Self {
+		return fmt.Errorf("--force is only valid with --self")
 	}
 	if opts.Inherit {
 		if strings.TrimSpace(opts.Host) != "" || strings.TrimSpace(opts.Port) != "" || strings.TrimSpace(opts.User) != "" {
@@ -183,6 +230,24 @@ func validateRigEndpointOptions(opts rigEndpointOptions) error {
 		}
 		if opts.AdoptUnverified {
 			return fmt.Errorf("--adopt-unverified is only valid with --external")
+		}
+		return nil
+	}
+
+	if opts.Self {
+		if strings.TrimSpace(opts.Host) != "" {
+			return fmt.Errorf("--self always uses 127.0.0.1; do not pass --host")
+		}
+		if strings.TrimSpace(opts.User) != "" {
+			return fmt.Errorf("--self does not accept --user")
+		}
+		port := strings.TrimSpace(opts.Port)
+		if port == "" {
+			return fmt.Errorf("--self requires --port")
+		}
+		value, err := strconv.Atoi(port)
+		if err != nil || value <= 0 {
+			return fmt.Errorf("invalid --port %q", port)
 		}
 		return nil
 	}
@@ -235,6 +300,21 @@ func requestedRigEndpointState(rig config.Rig, currentState, cityState contract.
 		return inheritedRigDoltConfigState(rig.Path, rig.EffectivePrefix(), cityState)
 	}
 
+	if opts.Self {
+		state := contract.ConfigState{
+			IssuePrefix:    rig.EffectivePrefix(),
+			EndpointOrigin: contract.EndpointOriginExplicit,
+			EndpointStatus: contract.EndpointStatusVerified,
+			DoltHost:       "127.0.0.1",
+			DoltPort:       strings.TrimSpace(opts.Port),
+			DoltMode:       "server",
+		}
+		if opts.AdoptUnverified {
+			state.EndpointStatus = contract.EndpointStatusUnverified
+		}
+		return state
+	}
+
 	user := strings.TrimSpace(opts.User)
 	if user == "" && currentState.EndpointOrigin == contract.EndpointOriginExplicit {
 		user = strings.TrimSpace(currentState.DoltUser)
@@ -247,6 +327,7 @@ func requestedRigEndpointState(rig config.Rig, currentState, cityState contract.
 		DoltHost:       strings.TrimSpace(opts.Host),
 		DoltPort:       strings.TrimSpace(opts.Port),
 		DoltUser:       user,
+		DoltMode:       "server",
 	}
 	if opts.AdoptUnverified {
 		state.EndpointStatus = contract.EndpointStatusUnverified
@@ -281,6 +362,14 @@ func requireCanonicalScopeMetadata(fs fsys.FS, scopeRoot string) error {
 	return nil
 }
 
+// ensureCanonicalScopeMetadataIfPresent canonicalizes an existing scope's
+// metadata to server mode, for the endpoint commands (`gc rig set-endpoint`,
+// `gc beads city use-managed`/`use-external`).
+//
+// It announces the mode change for the same reason ensureCanonicalScopeMetadata
+// does: this is the identical rewrite through a different door, and a warning
+// that depends on which command performed the flip is a warning an operator
+// cannot rely on.
 func ensureCanonicalScopeMetadataIfPresent(fs fsys.FS, scopeRoot string) error {
 	path := filepath.Join(scopeRoot, ".beads", "metadata.json")
 	doltDatabase, err := func() (string, error) {
@@ -296,6 +385,7 @@ func ensureCanonicalScopeMetadataIfPresent(fs fsys.FS, scopeRoot string) error {
 	if err != nil {
 		return err
 	}
+	announceStorageModeChange(fs, path, "server", doltDatabase)
 	_, err = contract.EnsureCanonicalMetadata(fs, path, contract.MetadataState{
 		Database:     "dolt",
 		Backend:      "dolt",
@@ -317,6 +407,15 @@ func syncRigManagedPortArtifact(cityPath, rigPath string, cityState, rigState co
 }
 
 func readManagedRuntimePublishedPort(cityPath string) (string, error) {
+	if cityUsesBdStoreContract(cityPath) {
+		owned, err := managedDoltLifecycleOwned(cityPath)
+		if err != nil {
+			return "", fmt.Errorf("determine managed dolt ownership for published port: %w", err)
+		}
+		if !owned {
+			return "", fmt.Errorf("managed dolt lifecycle is not owned by this city")
+		}
+	}
 	data, err := os.ReadFile(managedDoltStatePath(cityPath))
 	if err != nil {
 		return "", err
@@ -325,10 +424,15 @@ func readManagedRuntimePublishedPort(cityPath string) (string, error) {
 	if err := json.Unmarshal(data, &state); err != nil {
 		return "", err
 	}
-	if !state.Running || state.Port == 0 {
+	if !state.Running || state.Port <= 0 {
 		return "", fmt.Errorf("dolt runtime state unavailable")
 	}
-	if state.PID > 0 && !pidAlive(state.PID) {
+	if state.PID > 0 || strings.TrimSpace(state.DataDir) != "" {
+		if !validDoltRuntimeState(state, cityPath) {
+			return "", fmt.Errorf("dolt runtime state unavailable")
+		}
+	}
+	if state.PID < 0 {
 		return "", fmt.Errorf("dolt runtime state unavailable")
 	}
 	return strconv.Itoa(state.Port), nil
@@ -345,14 +449,46 @@ func writeDoltPortFileStrict(fs fsys.FS, dir, port string) error {
 	if err := ensureBeadsDir(fs, filepath.Dir(portFile)); err != nil {
 		return err
 	}
-	return fsys.WriteFileAtomic(fs, portFile, []byte(strings.TrimSpace(port)+"\n"), 0o644)
+	writePath, err := resolveDoltPortFileWritePath(fs, portFile)
+	if err != nil {
+		return err
+	}
+	if err := ensureBeadsDir(fs, filepath.Dir(writePath)); err != nil {
+		return err
+	}
+	return fsys.WriteFileAtomic(fs, writePath, []byte(strings.TrimSpace(port)+"\n"), 0o644)
+}
+
+func resolveDoltPortFileWritePath(fs fsys.FS, portFile string) (string, error) {
+	writePath, err := fsys.ResolveSymlinks(fs, portFile)
+	if err != nil {
+		return "", fmt.Errorf("resolving managed dolt port file %q for rewrite: %w", portFile, err)
+	}
+	return writePath, nil
 }
 
 func removeDoltPortFileStrict(dir string) error {
 	if strings.TrimSpace(dir) == "" {
 		return nil
 	}
-	if err := os.Remove(filepath.Join(dir, ".beads", "dolt-server.port")); err != nil && !os.IsNotExist(err) {
+	return removeResolvedDoltPortFile(fsys.OSFS{}, dir)
+}
+
+// removeResolvedDoltPortFile clears the managed dolt port mirror under dir,
+// resolving an operator symlink to its target first so the link entry is
+// preserved and only the resolved target is removed. This mirrors the
+// symlink-preserving write path (resolveDoltPortFileWritePath); removing the
+// unresolved link instead would delete the operator's symlink and make the
+// next port publication recreate a regular file at the link path (the
+// ga-lurp5d clobber class). Missing files, including dangling links, are not
+// an error.
+func removeResolvedDoltPortFile(fs fsys.FS, dir string) error {
+	portFile := filepath.Join(dir, ".beads", "dolt-server.port")
+	target, err := fsys.ResolveSymlinks(fs, portFile)
+	if err != nil {
+		return fmt.Errorf("resolving managed dolt port file %q for cleanup: %w", portFile, err)
+	}
+	if err := fs.Remove(target); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 	return nil
@@ -487,11 +623,9 @@ func verifyExternalDoltEndpoint(state contract.ConfigState, databaseScopeRoot, a
 	}
 
 	var issuesTable string
-	if err := db.QueryRowContext(ctx, "SHOW TABLES LIKE 'issues'").Scan(&issuesTable); err != nil {
-		if err == sql.ErrNoRows {
-			return fmt.Errorf("beads store not usable on external endpoint: database %q is missing the issues table", strings.TrimSpace(database))
-		}
-		return fmt.Errorf("beads store not usable on external endpoint: %w", err)
+	issuesScanErr := db.QueryRowContext(ctx, "SHOW TABLES LIKE 'issues'").Scan(&issuesTable)
+	if err := validateExternalDoltIssuesTableScan(database, issuesScanErr); err != nil {
+		return err
 	}
 
 	databaseProjectID, ok, err := readDatabaseProjectID(ctx, db)
@@ -499,46 +633,51 @@ func verifyExternalDoltEndpoint(state contract.ConfigState, databaseScopeRoot, a
 		return fmt.Errorf("beads store not usable on external endpoint: %w", err)
 	}
 	if localProjectID == "" {
-		return fmt.Errorf("external endpoint identity unverifiable: local metadata.json is missing project_id; rerun with --adopt-unverified or repair the canonical metadata first")
+		return fmt.Errorf("external endpoint identity unverifiable: neither %s nor .beads/metadata.json carry a project_id; rerun with --adopt-unverified or seed the canonical identity first", projectIdentityDisplayPath)
 	}
 	if !ok {
 		return fmt.Errorf("external endpoint identity unverifiable: database %q is missing metadata _project_id; rerun with --adopt-unverified", strings.TrimSpace(database))
 	}
 	if localProjectID != databaseProjectID {
-		return fmt.Errorf("PROJECT IDENTITY MISMATCH — refusing to connect: local metadata.json project_id %q does not match database _project_id %q", localProjectID, databaseProjectID)
+		return fmt.Errorf(
+			"PROJECT IDENTITY MISMATCH — refusing to connect:\n"+
+				"  canonical local project_id    = %q   (from "+projectIdentityDisplayPath+" or metadata.json)\n"+
+				"  database metadata._project_id  = %q\n"+
+				"\n"+
+				"Inspect both values and resolve manually before reconnecting.",
+			localProjectID, databaseProjectID,
+		)
 	}
 	return nil
 }
 
+func validateExternalDoltIssuesTableScan(database string, scanErr error) error {
+	if scanErr == nil {
+		return nil
+	}
+	if scanErr == sql.ErrNoRows { //nolint:errorlint // Preserve the pre-extraction exact-sentinel contract.
+		return fmt.Errorf("beads store not usable on external endpoint: database %q is missing the issues table", strings.TrimSpace(database))
+	}
+	return fmt.Errorf("beads store not usable on external endpoint: %w", scanErr)
+}
+
 func readCanonicalProjectID(metadataPath string) (string, error) {
-	data, err := os.ReadFile(metadataPath)
+	scopeRoot, err := scopeRootFromMetadataPath(metadataPath)
 	if err != nil {
 		return "", err
 	}
-	var meta map[string]any
-	if err := json.Unmarshal(data, &meta); err != nil {
-		return "", nil
-	}
-	raw, ok := meta["project_id"]
-	if !ok || raw == nil {
-		return "", nil
-	}
-	switch value := raw.(type) {
-	case string:
-		return strings.TrimSpace(value), nil
-	default:
-		projectID := strings.TrimSpace(fmt.Sprint(value))
-		if projectID == "" || projectID == "<nil>" || strings.EqualFold(projectID, "null") {
-			return "", nil
-		}
+	if projectID, ok, err := contract.ReadProjectIdentity(fsys.OSFS{}, scopeRoot); err != nil {
+		return "", err
+	} else if ok {
 		return projectID, nil
 	}
+	return readManagedMetadataProjectID(metadataPath)
 }
 
 func readDatabaseProjectID(ctx context.Context, db *sql.DB) (string, bool, error) {
 	var projectID string
 	if err := db.QueryRowContext(ctx, "SELECT value FROM metadata WHERE `key` = '_project_id'").Scan(&projectID); err != nil {
-		if err == sql.ErrNoRows {
+		if err == sql.ErrNoRows || isMissingDoltMetadataTableError(err) {
 			return "", false, nil
 		}
 		return "", false, fmt.Errorf("read database _project_id: %w", err)
@@ -550,11 +689,20 @@ func readDatabaseProjectID(ctx context.Context, db *sql.DB) (string, bool, error
 	return projectID, true, nil
 }
 
-type fileSnapshot struct {
-	path   string
-	data   []byte
-	exists bool
+func isMissingDoltMetadataTableError(err error) bool {
+	var mysqlErr *mysql.MySQLError
+	if errors.As(err, &mysqlErr) && mysqlErr.Number == 1146 {
+		return true
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "table not found: metadata") ||
+		strings.Contains(msg, "table 'metadata' doesn't exist") ||
+		strings.Contains(msg, "no such table: metadata")
 }
+
+// fileSnapshot aliases rig.FileSnapshot so cmd/gc's existing rollback call sites
+// keep compiling while the primitives live in internal/rig (C2.1 extraction).
+type fileSnapshot = rig.FileSnapshot
 
 func snapshotRigCanonicalFiles(fs fsys.FS, scopeRoot string) ([]fileSnapshot, error) {
 	paths := []string{
@@ -563,7 +711,7 @@ func snapshotRigCanonicalFiles(fs fsys.FS, scopeRoot string) ([]fileSnapshot, er
 	}
 	snapshots := make([]fileSnapshot, 0, len(paths))
 	for _, path := range paths {
-		snap, err := snapshotOptionalFile(fs, path)
+		snap, err := snapshotResolvedFile(fs, path)
 		if err != nil {
 			return nil, err
 		}
@@ -577,23 +725,40 @@ func syncRigEndpointCompatConfig(fs fsys.FS, cityPath string, cfg *config.City, 
 		if !strings.EqualFold(cfg.Rigs[i].Name, rigName) {
 			continue
 		}
-		cfg.Rigs[i].DoltHost = strings.TrimSpace(state.DoltHost)
-		cfg.Rigs[i].DoltPort = strings.TrimSpace(state.DoltPort)
+		// An inherited rig must not carry the deprecated per-rig
+		// dolt_host/dolt_port in city.toml. A stamped target makes the beads
+		// reconciler treat the rig as an explicit override and churn its
+		// .beads/config.yaml back to `explicit` (dropping the inherited
+		// dolt.user) on every city start, and drifts into a hard error if the
+		// city endpoint later changes (validateCanonicalCompatDoltDrift). Clear
+		// it so the rig truly inherits — matching the managed-city path.
+		// Explicit and self targets keep their host/port.
+		if state.EndpointOrigin == contract.EndpointOriginInheritedCity {
+			cfg.Rigs[i].DoltHost = ""
+			cfg.Rigs[i].DoltPort = ""
+		} else {
+			cfg.Rigs[i].DoltHost = strings.TrimSpace(state.DoltHost)
+			cfg.Rigs[i].DoltPort = strings.TrimSpace(state.DoltPort)
+		}
 		return writeCityConfigForEditFS(fs, filepath.Join(cityPath, "city.toml"), cfg)
 	}
 	return fmt.Errorf("rig %q not found in city config", rigName)
 }
 
 func snapshotRigEndpointFiles(fs fsys.FS, cityPath, scopeRoot string) ([]fileSnapshot, error) {
+	cityToml, err := snapshotResolvedFile(fs, filepath.Join(cityPath, "city.toml"))
+	if err != nil {
+		return nil, err
+	}
 	paths := []string{
-		filepath.Join(cityPath, "city.toml"),
 		config.SiteBindingPath(cityPath),
 		filepath.Join(scopeRoot, ".beads", "metadata.json"),
 		filepath.Join(scopeRoot, ".beads", "config.yaml"),
 	}
-	snapshots := make([]fileSnapshot, 0, len(paths))
+	snapshots := make([]fileSnapshot, 0, len(paths)+1)
+	snapshots = append(snapshots, cityToml)
 	for _, path := range paths {
-		snap, err := snapshotOptionalFile(fs, path)
+		snap, err := snapshotResolvedFile(fs, path)
 		if err != nil {
 			return nil, err
 		}
@@ -602,16 +767,24 @@ func snapshotRigEndpointFiles(fs fsys.FS, cityPath, scopeRoot string) ([]fileSna
 	return snapshots, nil
 }
 
-func snapshotOptionalFile(fs fsys.FS, path string) (fileSnapshot, error) {
-	data, err := fs.ReadFile(path)
-	if err != nil {
-		if os.IsNotExist(err) || errors.Is(err, syscall.ENOTDIR) {
-			return fileSnapshot{path: path}, nil
-		}
-		return fileSnapshot{}, err
-	}
-	cp := append([]byte(nil), data...)
-	return fileSnapshot{path: path, data: cp, exists: true}, nil
+// snapshotResolvedFile delegates to internal/rig, which owns the rollback
+// primitives (C2.1). The symlink-resolution rationale lives on
+// rig.SnapshotResolvedFile.
+func snapshotResolvedFile(fs fsys.FS, path string) (fileSnapshot, error) {
+	return rig.SnapshotResolvedFile(fs, path)
+}
+
+// cityTomlRollbackPath returns the symlink-resolved city.toml path that a
+// rollback snapshot must read and later restore. Resolving first means an
+// atomic restore rewrites the real target file and leaves a live city.toml
+// symlink intact, instead of replacing the link with a regular file (the
+// failure ResolveCityRewritePath/ResolveCityAppendPath exist to prevent). When
+// city.toml is a plain file (or not yet created), resolution is a no-op and the
+// path is unchanged. The controller config-mutation snapshot
+// (captureConfigMutationSnapshot) routes through this so it stays symlink-aware,
+// matching the CLI rollback snapshots that resolve via snapshotResolvedFile.
+func cityTomlRollbackPath(fs fsys.FS, cityPath string) (string, error) {
+	return fsys.ResolveSymlinks(fs, filepath.Join(cityPath, "city.toml"))
 }
 
 func writeRigEndpointRollbackError(fs fsys.FS, stderr io.Writer, snapshots []fileSnapshot, action string, cause error) {
@@ -623,24 +796,5 @@ func writeRigEndpointRollbackError(fs fsys.FS, stderr io.Writer, snapshots []fil
 }
 
 func restoreSnapshots(fs fsys.FS, snapshots []fileSnapshot) error {
-	var failures []string
-	for _, snap := range snapshots {
-		if err := restoreSnapshot(fs, snap); err != nil {
-			failures = append(failures, fmt.Sprintf("%s: %v", snap.path, err))
-		}
-	}
-	if len(failures) == 0 {
-		return nil
-	}
-	return fmt.Errorf("%s", strings.Join(failures, "; "))
-}
-
-func restoreSnapshot(fs fsys.FS, snap fileSnapshot) error {
-	if !snap.exists {
-		if err := fs.Remove(snap.path); err != nil && !os.IsNotExist(err) {
-			return err
-		}
-		return nil
-	}
-	return fsys.WriteFileAtomic(fs, snap.path, snap.data, 0o644)
+	return rig.RestoreSnapshots(fs, snapshots)
 }

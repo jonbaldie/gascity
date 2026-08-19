@@ -4,15 +4,20 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gastownhall/gascity/internal/beads"
 	"github.com/gastownhall/gascity/internal/config"
+	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/gastownhall/gascity/internal/importsvc"
 	"github.com/gastownhall/gascity/internal/session"
 )
 
@@ -22,6 +27,7 @@ type prefixedAliasStore struct {
 	getCalls      int
 	updateCalls   int
 	closeCalls    int
+	reopenCalls   int
 	childrenCalls int
 }
 
@@ -140,6 +146,11 @@ func (s *prefixedAliasStore) Close(id string) error {
 	return s.base.Close(s.aliasToBase(id))
 }
 
+func (s *prefixedAliasStore) Reopen(id string) error {
+	s.reopenCalls++
+	return s.base.Reopen(s.aliasToBase(id))
+}
+
 func (s *prefixedAliasStore) CloseAll(ids []string, metadata map[string]string) (int, error) {
 	mapped := make([]string, 0, len(ids))
 	for _, id := range ids {
@@ -188,8 +199,8 @@ func (s *prefixedAliasStore) List(query beads.ListQuery) ([]beads.Bead, error) {
 	return out, nil
 }
 
-func (s *prefixedAliasStore) Ready() ([]beads.Bead, error) {
-	items, err := s.base.Ready()
+func (s *prefixedAliasStore) Ready(query ...beads.ReadyQuery) ([]beads.Bead, error) {
+	items, err := s.base.Ready(query...)
 	if err != nil {
 		return nil, err
 	}
@@ -243,6 +254,23 @@ func (s *prefixedAliasStore) SetMetadata(id, key, value string) error {
 
 func (s *prefixedAliasStore) SetMetadataBatch(id string, kvs map[string]string) error {
 	return s.base.SetMetadataBatch(s.aliasToBase(id), kvs)
+}
+
+func (s *prefixedAliasStore) SetLocalString(id, key, value string) error {
+	return s.base.SetLocalString(s.aliasToBase(id), key, value)
+}
+
+func (s *prefixedAliasStore) GetLocalString(id, key string) (string, error) {
+	return s.base.GetLocalString(s.aliasToBase(id), key)
+}
+
+func (s *prefixedAliasStore) Tx(commitMsg string, fn func(beads.Tx) error) error {
+	if fn == nil {
+		return s.base.Tx(commitMsg, nil)
+	}
+	return s.base.Tx(commitMsg, func(beads.Tx) error {
+		return fn(s)
+	})
 }
 
 func (s *prefixedAliasStore) Ping() error {
@@ -318,6 +346,135 @@ func configureBeadRouteState(t *testing.T) (*fakeState, *prefixedAliasStore, *pr
 	return state, alphaStore, betaStore
 }
 
+func TestBeadPrefixAllowsAlphanumericPrefixes(t *testing.T) {
+	if got := beadPrefix("mcdi3bsyeryols-yyn"); got != "mcdi3bsyeryols" {
+		t.Fatalf("beadPrefix() = %q, want alphanumeric prefix", got)
+	}
+}
+
+// TestResolveStoreByPrefixKeepsRigRouteResolution pins the non-class routing
+// behavior: a self-route ("ga" -> ".") resolves to the rig that owns the routes
+// file, and a cross-rig route ("gb" -> "../beta") resolves to the rig it points
+// at. Both must stay exactly as they are.
+func TestResolveStoreByPrefixKeepsRigRouteResolution(t *testing.T) {
+	state, alphaStore, betaStore := configureBeadRouteState(t)
+	s := New(state)
+
+	if got := s.resolveStoreByPrefix("ga"); got != beads.Store(alphaStore) {
+		t.Errorf("resolveStoreByPrefix(ga) = %p, want alpha store %p", got, alphaStore)
+	}
+	if got := s.resolveStoreByPrefix("gb"); got != beads.Store(betaStore) {
+		t.Errorf("resolveStoreByPrefix(gb) = %p, want beta store %p", got, betaStore)
+	}
+}
+
+// TestResolveStoreByPrefixDoesNotCaptureForeignRoute pins that a rig route
+// resolving to a path which is NOT a registered rig no longer answers with that
+// rig's store. The route says the prefix lives elsewhere, so resolution falls
+// through to the by-id candidate scan — which still contains every store, so the
+// bead stays reachable instead of being pinned to the wrong one.
+func TestResolveStoreByPrefixDoesNotCaptureForeignRoute(t *testing.T) {
+	state, alphaStore, betaStore := configureBeadRouteState(t)
+	cityStore := beads.NewMemStore()
+	state.cityBeadStore = cityStore
+	alphaPath := filepath.Join(state.cityPath, "rigs", "alpha")
+	routes := `{"prefix":"ga","path":"."}` + "\n" +
+		`{"prefix":"gb","path":"../beta"}` + "\n" +
+		`{"prefix":"gz","path":"../../elsewhere"}`
+	if err := os.WriteFile(filepath.Join(alphaPath, ".beads", "routes.jsonl"), []byte(routes), 0o644); err != nil {
+		t.Fatalf("WriteFile(routes.jsonl): %v", err)
+	}
+	s := New(state)
+
+	if got := s.resolveStoreByPrefix("gz"); got != nil {
+		t.Fatalf("resolveStoreByPrefix(gz) = %p, want nil (route resolves outside every rig); alpha is %p", got, alphaStore)
+	}
+	got := s.beadStoresForID("gz-1")
+	want := []beads.Store{cityStore, alphaStore, betaStore}
+	if len(got) != len(want) {
+		t.Fatalf("beadStoresForID(gz-1) = %v (len %d), want the full candidate scan %v", got, len(got), want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("beadStoresForID(gz-1)[%d] = %p, want %p", i, got[i], want[i])
+		}
+	}
+}
+
+func TestBeadCloseVerifiesStoreContainsBeadBeforeClosing(t *testing.T) {
+	rigStore := beads.NewMemStore()
+	created, err := rigStore.Create(beads.Bead{Title: "close me"})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	status := "in_progress"
+	if err := rigStore.Update(created.ID, beads.UpdateOpts{Status: &status}); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	misrouted := &closeSucceedsWithoutBeadStore{Store: beads.NewMemStore()}
+	state := newFakeState(t)
+	state.cityBeadStore = misrouted
+	state.stores = map[string]beads.Store{"myrig": rigStore}
+
+	s := New(state)
+	if _, err := s.humaHandleBeadClose(context.Background(), &BeadCloseInput{ID: created.ID}); err != nil {
+		t.Fatalf("humaHandleBeadClose: %v", err)
+	}
+
+	if misrouted.closeCalls != 0 {
+		t.Fatalf("misrouted close calls = %d, want 0", misrouted.closeCalls)
+	}
+	got, err := rigStore.Get(created.ID)
+	if err != nil {
+		t.Fatalf("rig Get: %v", err)
+	}
+	if got.Status != "closed" {
+		t.Fatalf("rig status = %q, want closed", got.Status)
+	}
+}
+
+func TestBeadStoresForIDUsesConfiguredRigPrefixBeforeFallback(t *testing.T) {
+	state := newFakeState(t)
+	cityStore := beads.NewMemStore()
+	rigStore := beads.NewMemStore()
+	state.cityBeadStore = cityStore
+	state.stores = map[string]beads.Store{"myrig": rigStore}
+	state.cfg.Workspace.Prefix = "ct"
+	state.cfg.Rigs = []config.Rig{{Name: "myrig", Path: filepath.Join(state.cityPath, "rigs", "myrig"), Prefix: "rw"}}
+
+	s := New(state)
+	stores := s.beadStoresForID("rw-1")
+	if len(stores) != 1 || stores[0] != rigStore {
+		t.Fatalf("beadStoresForID(rw-1) = %#v, want only configured rig store", stores)
+	}
+}
+
+func TestBeadStoresForIDUsesConfiguredHyphenatedRigPrefix(t *testing.T) {
+	state := newFakeState(t)
+	cityStore := beads.NewMemStore()
+	rigStore := beads.NewMemStore()
+	state.cityBeadStore = cityStore
+	state.stores = map[string]beads.Store{"myrig": rigStore}
+	state.cfg.Workspace.Prefix = "mlcm"
+	state.cfg.Rigs = []config.Rig{{Name: "myrig", Path: filepath.Join(state.cityPath, "rigs", "myrig"), Prefix: "mc-mogbzvrs"}}
+
+	s := New(state)
+	stores := s.beadStoresForID("mc-mogbzvrs-hiv.1")
+	if len(stores) != 1 || stores[0] != rigStore {
+		t.Fatalf("beadStoresForID(hyphenated prefix) = %#v, want only configured rig store", stores)
+	}
+}
+
+type closeSucceedsWithoutBeadStore struct {
+	beads.Store
+	closeCalls int
+}
+
+func (s *closeSucceedsWithoutBeadStore) Close(string) error {
+	s.closeCalls++
+	return nil
+}
+
 func TestBeadCRUD(t *testing.T) {
 	state := newFakeState(t)
 	h := newTestCityHandler(t, state)
@@ -376,6 +533,155 @@ func TestBeadCRUD(t *testing.T) {
 	}
 }
 
+type laggyParentProjectionStore struct {
+	beads.Store
+	pendingChildren map[string]string
+	waitCalls       int
+}
+
+func newLaggyParentProjectionStore() *laggyParentProjectionStore {
+	return &laggyParentProjectionStore{
+		Store:           beads.NewMemStore(),
+		pendingChildren: make(map[string]string),
+	}
+}
+
+func (s *laggyParentProjectionStore) Update(id string, opts beads.UpdateOpts) error {
+	parentChanged := false
+	newParentID := ""
+	if opts.ParentID != nil {
+		current, err := s.Get(id)
+		if err != nil {
+			return err
+		}
+		parentChanged = current.ParentID != *opts.ParentID
+		newParentID = *opts.ParentID
+	}
+	if err := s.Store.Update(id, opts); err != nil {
+		return err
+	}
+	if parentChanged && newParentID != "" {
+		s.pendingChildren[id] = newParentID
+	}
+	return nil
+}
+
+func (s *laggyParentProjectionStore) List(query beads.ListQuery) ([]beads.Bead, error) {
+	items, err := s.Store.List(query)
+	if err != nil {
+		return nil, err
+	}
+	if query.ParentID == "" || len(s.pendingChildren) == 0 {
+		return items, nil
+	}
+	filtered := make([]beads.Bead, 0, len(items))
+	for _, item := range items {
+		if s.pendingChildren[item.ID] == query.ParentID {
+			continue
+		}
+		filtered = append(filtered, item)
+	}
+	return filtered, nil
+}
+
+func (s *laggyParentProjectionStore) WaitForParentProjection(_ context.Context, id string, _, _ string) error {
+	s.waitCalls++
+	delete(s.pendingChildren, id)
+	return nil
+}
+
+type projectionConflictStore struct {
+	beads.Store
+	waitCalls int
+}
+
+func (s *projectionConflictStore) WaitForParentProjection(_ context.Context, _, _, _ string) error {
+	s.waitCalls++
+	return beads.ErrParentProjectionSuperseded
+}
+
+// TestBeadListBoundedReadIsStableOrderedPrefixAcrossRigs pins the #3208
+// contract: a limit-bounded GET /beads returns a deterministic prefix of one
+// global (created_at DESC, id DESC) total order across rig stores — not a
+// per-rig concatenation — and a truncated response carries next_cursor so
+// the remainder is fetchable.
+func TestBeadListBoundedReadIsStableOrderedPrefixAcrossRigs(t *testing.T) {
+	state := newFakeState(t)
+	base := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+	mk := func(id string, minutes int) beads.Bead {
+		return beads.Bead{
+			ID:        id,
+			Title:     id,
+			Status:    "open",
+			Type:      "task",
+			CreatedAt: base.Add(time.Duration(minutes) * time.Minute),
+		}
+	}
+	// Creation times interleave across the two rigs so per-rig concatenation
+	// and the global total order disagree.
+	state.stores["arig"] = beads.NewMemStoreFrom(0, []beads.Bead{
+		mk("aa-1", 1), mk("aa-3", 3), mk("aa-5", 5),
+	}, nil)
+	state.stores["zrig"] = beads.NewMemStoreFrom(0, []beads.Bead{
+		mk("zz-2", 2), mk("zz-4", 4), mk("zz-6", 6),
+	}, nil)
+	h := newTestCityHandler(t, state)
+
+	type listResp struct {
+		Items      []beads.Bead `json:"items"`
+		Total      int          `json:"total"`
+		NextCursor string       `json:"next_cursor"`
+	}
+	get := func(url string) listResp {
+		t.Helper()
+		req := httptest.NewRequest("GET", cityURL(state, url), nil)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("GET %s = %d, want 200: %s", url, rec.Code, rec.Body.String())
+		}
+		var resp listResp
+		if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+			t.Fatalf("decode %s: %v", url, err)
+		}
+		return resp
+	}
+	ids := func(items []beads.Bead) []string {
+		out := make([]string, 0, len(items))
+		for _, b := range items {
+			out = append(out, b.ID)
+		}
+		return out
+	}
+
+	first := get("/beads?limit=4")
+	wantFirst := []string{"zz-6", "aa-5", "zz-4", "aa-3"}
+	if got := ids(first.Items); !slices.Equal(got, wantFirst) {
+		t.Fatalf("bounded page ids = %v, want global order %v", got, wantFirst)
+	}
+	if first.Total != 6 {
+		t.Fatalf("total = %d, want 6", first.Total)
+	}
+	if first.NextCursor == "" {
+		t.Fatalf("truncated bounded read returned no next_cursor; remainder is unfetchable")
+	}
+
+	// The same bounded read must return the same page — the #3208 symptom
+	// was per-call-different subsets.
+	if again := get("/beads?limit=4"); !slices.Equal(ids(again.Items), wantFirst) {
+		t.Fatalf("repeat bounded page ids = %v, want %v (non-deterministic page)", ids(again.Items), wantFirst)
+	}
+
+	rest := get("/beads?limit=4&cursor=" + first.NextCursor)
+	wantRest := []string{"zz-2", "aa-1"}
+	if got := ids(rest.Items); !slices.Equal(got, wantRest) {
+		t.Fatalf("continuation ids = %v, want %v", got, wantRest)
+	}
+	if rest.NextCursor != "" {
+		t.Fatalf("final page next_cursor = %q, want empty", rest.NextCursor)
+	}
+}
+
 func TestBeadListFiltering(t *testing.T) {
 	state := newFakeState(t)
 	store := state.stores["myrig"]
@@ -412,6 +718,10 @@ func TestBeadListFiltering(t *testing.T) {
 func TestBeadListCrossRig(t *testing.T) {
 	state := newFakeState(t)
 	store2 := beads.NewMemStore()
+	// Two rigs mint under different prefixes (config.Rig.EffectivePrefix); two
+	// MemStores left on the default prefix would both mint "gc-1", i.e. one bead
+	// co-resident in two legs rather than two beads.
+	store2.IDPrefix = "r2"
 	state.stores["rig2"] = store2
 
 	state.stores["myrig"].Create(beads.Bead{Title: "Bead from rig1"}) //nolint:errcheck
@@ -476,6 +786,66 @@ func TestBeadGetUsesRoutePrefixStore(t *testing.T) {
 	}
 }
 
+func TestBeadGetIncludesUpdatedAtWhenPopulated(t *testing.T) {
+	createdAt := time.Date(2026, 5, 27, 12, 0, 0, 0, time.UTC)
+	updatedAt := createdAt.Add(5 * time.Minute)
+	state := newFakeState(t)
+	state.stores["myrig"] = beads.NewMemStoreFrom(0, []beads.Bead{{
+		ID:        "gc-updated",
+		Title:     "Updated bead",
+		Status:    "open",
+		Type:      "task",
+		CreatedAt: createdAt,
+		UpdatedAt: updatedAt,
+	}}, nil)
+	h := newTestCityHandler(t, state)
+
+	req := httptest.NewRequest("GET", cityURL(state, "/bead/gc-updated"), nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body: %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+
+	var got map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
+		t.Fatalf("Decode(): %v", err)
+	}
+	if got["updated_at"] != updatedAt.Format(time.RFC3339Nano) {
+		t.Fatalf("updated_at = %v, want %q", got["updated_at"], updatedAt.Format(time.RFC3339Nano))
+	}
+}
+
+func TestBeadGetOmitsUpdatedAtWhenZero(t *testing.T) {
+	createdAt := time.Date(2026, 5, 27, 12, 0, 0, 0, time.UTC)
+	state := newFakeState(t)
+	state.stores["myrig"] = beads.NewMemStoreFrom(0, []beads.Bead{{
+		ID:        "gc-legacy",
+		Title:     "Legacy bead",
+		Status:    "open",
+		Type:      "task",
+		CreatedAt: createdAt,
+	}}, nil)
+	h := newTestCityHandler(t, state)
+
+	req := httptest.NewRequest("GET", cityURL(state, "/bead/gc-legacy"), nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body: %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+
+	var got map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
+		t.Fatalf("Decode(): %v", err)
+	}
+	if updatedAt, ok := got["updated_at"]; ok {
+		t.Fatalf("updated_at = %v, want omitted", updatedAt)
+	}
+}
+
 func TestBeadReady(t *testing.T) {
 	state := newFakeState(t)
 	store := state.stores["myrig"]
@@ -495,6 +865,77 @@ func TestBeadReady(t *testing.T) {
 	json.NewDecoder(rec.Body).Decode(&resp) //nolint:errcheck
 	if resp.Total != 1 {
 		t.Errorf("ready: Total = %d, want 1", resp.Total)
+	}
+}
+
+// TestBeadReadyFederatesCityStore asserts that city-scope ready work surfaces
+// through GET /beads/ready. The pre-fix handler queried only the per-rig
+// BeadStores() and dropped beads that live in the city store.
+func TestBeadReadyFederatesCityStore(t *testing.T) {
+	state := newFakeState(t)
+	state.cityBeadStore = beads.NewMemStore()
+	cityBead, err := state.cityBeadStore.Create(beads.Bead{Title: "city-scope ready"})
+	if err != nil {
+		t.Fatalf("Create(cityBead): %v", err)
+	}
+	h := newTestCityHandler(t, state)
+
+	req := httptest.NewRequest("GET", cityURL(state, "/beads/ready"), nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	var resp struct {
+		Items []beads.Bead `json:"items"`
+		Total int          `json:"total"`
+	}
+	json.NewDecoder(rec.Body).Decode(&resp) //nolint:errcheck
+	found := false
+	for _, b := range resp.Items {
+		if b.ID == cityBead.ID {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("ready Items = %+v, want city bead %s", resp.Items, cityBead.ID)
+	}
+}
+
+// TestBeadReadyDedupesCityAliasedStore mirrors the production wiring where
+// BeadStores() also returns the city store keyed by CityName(). The handler
+// must surface a city-scope ready bead exactly once and must not record a
+// duplicate partial error for the doubly-federated city store.
+func TestBeadReadyDedupesCityAliasedStore(t *testing.T) {
+	state := newFakeState(t)
+	store := beads.NewMemStore()
+	state.cityBeadStore = store
+	state.stores[state.cityName] = store
+	cityBead, err := store.Create(beads.Bead{Title: "city-scope ready"})
+	if err != nil {
+		t.Fatalf("Create(cityBead): %v", err)
+	}
+	h := newTestCityHandler(t, state)
+
+	req := httptest.NewRequest("GET", cityURL(state, "/beads/ready"), nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	var resp struct {
+		Items         []beads.Bead `json:"items"`
+		Total         int          `json:"total"`
+		PartialErrors []string     `json:"partial_errors"`
+	}
+	json.NewDecoder(rec.Body).Decode(&resp) //nolint:errcheck
+	count := 0
+	for _, b := range resp.Items {
+		if b.ID == cityBead.ID {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Fatalf("city bead %s appeared %d times in Items %+v, want exactly 1", cityBead.ID, count, resp.Items)
+	}
+	if len(resp.PartialErrors) != 0 {
+		t.Fatalf("PartialErrors = %v, want empty", resp.PartialErrors)
 	}
 }
 
@@ -604,6 +1045,27 @@ func TestBeadUpdate(t *testing.T) {
 	}
 }
 
+func TestBeadUpdateStatusAndMetadata(t *testing.T) {
+	state := newFakeState(t)
+	store := state.stores["myrig"]
+	b, _ := store.Create(beads.Bead{Title: "Test"})
+	h := newTestCityHandler(t, state)
+
+	body := `{"status":"in_progress","metadata":{"verified":"true"}}`
+	req := newPostRequest(cityURL(state, "/bead/")+b.ID+"/update", bytes.NewBufferString(body))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("update status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	got, _ := store.Get(b.ID)
+	if got.Status != "in_progress" || got.Metadata["verified"] != "true" {
+		t.Fatalf("bead = %+v, want in_progress plus metadata", got)
+	}
+}
+
 func TestBeadCreatePersistsMetadataAndParent(t *testing.T) {
 	state := newFakeState(t)
 	store := state.stores["myrig"]
@@ -619,8 +1081,8 @@ func TestBeadCreatePersistsMetadataAndParent(t *testing.T) {
 		"type":"feature",
 		"parent":"` + parent.ID + `",
 		"metadata":{
-			"mc.contract.role":"child",
-			"mc.contract.run_id":"run-1"
+			"real_world_app.contract.role":"child",
+			"real_world_app.contract.run_id":"run-1"
 		}
 	}`
 	req := newPostRequest(cityURL(state, "/beads"), bytes.NewBufferString(body))
@@ -638,8 +1100,8 @@ func TestBeadCreatePersistsMetadataAndParent(t *testing.T) {
 	if created.ParentID != parent.ID {
 		t.Fatalf("response parent = %q, want %q", created.ParentID, parent.ID)
 	}
-	if created.Metadata["mc.contract.run_id"] != "run-1" {
-		t.Fatalf("response metadata = %#v, want mc.contract.run_id=run-1", created.Metadata)
+	if created.Metadata["real_world_app.contract.run_id"] != "run-1" {
+		t.Fatalf("response metadata = %#v, want real_world_app.contract.run_id=run-1", created.Metadata)
 	}
 
 	got, err := store.Get(created.ID)
@@ -649,8 +1111,45 @@ func TestBeadCreatePersistsMetadataAndParent(t *testing.T) {
 	if got.ParentID != parent.ID {
 		t.Fatalf("stored parent = %q, want %q", got.ParentID, parent.ID)
 	}
-	if got.Metadata["mc.contract.role"] != "child" || got.Metadata["mc.contract.run_id"] != "run-1" {
-		t.Fatalf("stored metadata = %#v, want MC metadata", got.Metadata)
+	if got.Metadata["real_world_app.contract.role"] != "child" || got.Metadata["real_world_app.contract.run_id"] != "run-1" {
+		t.Fatalf("stored metadata = %#v, want real-world app metadata", got.Metadata)
+	}
+}
+
+func TestBeadCreatePersistsDeferUntil(t *testing.T) {
+	state := newFakeState(t)
+	store := state.stores["myrig"]
+	h := newTestCityHandler(t, state)
+
+	deferUntil := time.Date(2026, 6, 1, 12, 30, 0, 0, time.UTC)
+	body := `{
+		"rig":"myrig",
+		"title":"Deferred task",
+		"type":"task",
+		"defer_until":"` + deferUntil.Format(time.RFC3339) + `"
+	}`
+	req := newPostRequest(cityURL(state, "/beads"), bytes.NewBufferString(body))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create status = %d, want %d, body: %s", rec.Code, http.StatusCreated, rec.Body.String())
+	}
+
+	var created beads.Bead
+	if err := json.NewDecoder(rec.Body).Decode(&created); err != nil {
+		t.Fatalf("decode created bead: %v", err)
+	}
+	if created.DeferUntil == nil || !created.DeferUntil.Equal(deferUntil) {
+		t.Fatalf("response defer_until = %v, want %s", created.DeferUntil, deferUntil.Format(time.RFC3339))
+	}
+
+	got, err := store.Get(created.ID)
+	if err != nil {
+		t.Fatalf("Get(created): %v", err)
+	}
+	if got.DeferUntil == nil || !got.DeferUntil.Equal(deferUntil) {
+		t.Fatalf("stored defer_until = %v, want %s", got.DeferUntil, deferUntil.Format(time.RFC3339))
 	}
 }
 
@@ -670,7 +1169,7 @@ func TestBeadCreateResponseUsesAuthoritativeStoredBead(t *testing.T) {
 		"type":"feature",
 		"parent":"` + parent.ID + `",
 		"labels":["urgent"],
-		"metadata":{"mc.contract.run_id":"run-1"}
+		"metadata":{"real_world_app.contract.run_id":"run-1"}
 	}`
 	req := newPostRequest(cityURL(state, "/beads"), bytes.NewBufferString(body))
 	rec := httptest.NewRecorder()
@@ -690,8 +1189,8 @@ func TestBeadCreateResponseUsesAuthoritativeStoredBead(t *testing.T) {
 	if len(created.Labels) != 1 || created.Labels[0] != "urgent" {
 		t.Fatalf("response labels = %#v, want [urgent]", created.Labels)
 	}
-	if created.Metadata["mc.contract.run_id"] != "run-1" {
-		t.Fatalf("response metadata = %#v, want mc.contract.run_id=run-1", created.Metadata)
+	if created.Metadata["real_world_app.contract.run_id"] != "run-1" {
+		t.Fatalf("response metadata = %#v, want real_world_app.contract.run_id=run-1", created.Metadata)
 	}
 }
 
@@ -789,6 +1288,290 @@ func TestBeadUpdateSetsAndClearsParent(t *testing.T) {
 	}
 	if got.ParentID != "" {
 		t.Fatalf("parent after clear = %q, want empty", got.ParentID)
+	}
+}
+
+func TestBeadUpdateWaitsForParentProjectionBeforeReturning(t *testing.T) {
+	state := newFakeState(t)
+	store := newLaggyParentProjectionStore()
+	state.stores["myrig"] = store
+	parent, err := store.Create(beads.Bead{Title: "Parent"})
+	if err != nil {
+		t.Fatalf("Create(parent): %v", err)
+	}
+	child, err := store.Create(beads.Bead{Title: "Child"})
+	if err != nil {
+		t.Fatalf("Create(child): %v", err)
+	}
+	h := newTestCityHandler(t, state)
+
+	req := newPostRequest(cityURL(state, "/bead/")+child.ID+"/update", bytes.NewBufferString(`{"parent":"`+parent.ID+`"}`))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("update status = %d, want %d, body: %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	if store.waitCalls != 1 {
+		t.Fatalf("waitCalls = %d, want 1", store.waitCalls)
+	}
+
+	req = httptest.NewRequest("GET", cityURL(state, "/bead/")+parent.ID+"/deps", nil)
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("deps status = %d, want %d, body: %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+
+	var resp struct {
+		Children []beads.Bead `json:"children"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("Decode(): %v", err)
+	}
+	if len(resp.Children) != 1 || resp.Children[0].ID != child.ID {
+		t.Fatalf("children = %#v, want [%s]", resp.Children, child.ID)
+	}
+}
+
+func TestBeadUpdateWaitsForParentProjectionThroughCachingStore(t *testing.T) {
+	state := newFakeState(t)
+	backing := newLaggyParentProjectionStore()
+	state.stores["myrig"] = beads.NewCachingStoreForTest(backing, nil)
+	parent, err := state.stores["myrig"].Create(beads.Bead{Title: "Parent"})
+	if err != nil {
+		t.Fatalf("Create(parent): %v", err)
+	}
+	child, err := state.stores["myrig"].Create(beads.Bead{Title: "Child"})
+	if err != nil {
+		t.Fatalf("Create(child): %v", err)
+	}
+	h := newTestCityHandler(t, state)
+
+	req := newPostRequest(cityURL(state, "/bead/")+child.ID+"/update", bytes.NewBufferString(`{"parent":"`+parent.ID+`"}`))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("update status = %d, want %d, body: %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	if backing.waitCalls != 1 {
+		t.Fatalf("waitCalls = %d, want 1", backing.waitCalls)
+	}
+
+	req = httptest.NewRequest("GET", cityURL(state, "/bead/")+parent.ID+"/deps", nil)
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("deps status = %d, want %d, body: %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+
+	var resp struct {
+		Children []beads.Bead `json:"children"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("Decode(): %v", err)
+	}
+	if len(resp.Children) != 1 || resp.Children[0].ID != child.ID {
+		t.Fatalf("children = %#v, want [%s]", resp.Children, child.ID)
+	}
+}
+
+func TestBeadUpdateSkipsParentProjectionWaitForClosedBead(t *testing.T) {
+	state := newFakeState(t)
+	store := newLaggyParentProjectionStore()
+	state.stores["myrig"] = store
+	parent, err := store.Create(beads.Bead{Title: "Parent"})
+	if err != nil {
+		t.Fatalf("Create(parent): %v", err)
+	}
+	child, err := store.Create(beads.Bead{Title: "Child"})
+	if err != nil {
+		t.Fatalf("Create(child): %v", err)
+	}
+	h := newTestCityHandler(t, state)
+
+	req := newPostRequest(cityURL(state, "/bead/")+child.ID+"/update", bytes.NewBufferString(`{"parent":"`+parent.ID+`","status":"closed"}`))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("update status = %d, want %d, body: %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	if store.waitCalls != 0 {
+		t.Fatalf("waitCalls = %d, want 0", store.waitCalls)
+	}
+}
+
+func TestBeadUpdateReturnsConflictWhenParentProjectionIsSuperseded(t *testing.T) {
+	state := newFakeState(t)
+	store := &projectionConflictStore{Store: beads.NewMemStore()}
+	state.stores["myrig"] = store
+	parent, err := store.Create(beads.Bead{Title: "Parent"})
+	if err != nil {
+		t.Fatalf("Create(parent): %v", err)
+	}
+	child, err := store.Create(beads.Bead{Title: "Child"})
+	if err != nil {
+		t.Fatalf("Create(child): %v", err)
+	}
+	h := newTestCityHandler(t, state)
+
+	req := newPostRequest(cityURL(state, "/bead/")+child.ID+"/update", bytes.NewBufferString(`{"parent":"`+parent.ID+`"}`))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want %d, body: %s", rec.Code, http.StatusConflict, rec.Body.String())
+	}
+	if store.waitCalls != 1 {
+		t.Fatalf("waitCalls = %d, want 1", store.waitCalls)
+	}
+}
+
+func TestBeadParentRestoreGraphAndFilteredListWithRig(t *testing.T) {
+	state := newFakeState(t)
+	backing := beads.NewMemStore()
+	cache := beads.NewCachingStoreForTest(backing, nil)
+	if err := cache.Prime(context.Background()); err != nil {
+		t.Fatalf("Prime: %v", err)
+	}
+	state.stores["alpha"] = cache
+	state.cfg.Rigs = append(state.cfg.Rigs, config.Rig{Name: "alpha", Path: "/tmp/alpha"})
+	h := newTestCityHandler(t, state)
+
+	createBead := func(body string) beads.Bead {
+		t.Helper()
+		req := newPostRequest(cityURL(state, "/beads"), bytes.NewBufferString(body))
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("create status = %d, want %d; body: %s", rec.Code, http.StatusCreated, rec.Body.String())
+		}
+		var created beads.Bead
+		if err := json.NewDecoder(rec.Body).Decode(&created); err != nil {
+			t.Fatalf("decode created bead: %v", err)
+		}
+		return created
+	}
+	postOK := func(path, body string) {
+		t.Helper()
+		req := newPostRequest(cityURL(state, path), bytes.NewBufferString(body))
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("POST %s status = %d, want %d; body: %s", path, rec.Code, http.StatusOK, rec.Body.String())
+		}
+	}
+	containsID := func(items []beads.Bead, id string) bool {
+		for _, item := range items {
+			if item.ID == id {
+				return true
+			}
+		}
+		return false
+	}
+
+	root := createBead(`{
+		"rig":"alpha",
+		"title":"MC live contract root",
+		"type":"feature",
+		"priority":2,
+		"labels":["mc-live-contract","root"],
+		"metadata":{"mc.contract.run_id":"run-1"}
+	}`)
+	postOK("/bead/"+root.ID+"/update", `{"status":"in_progress","metadata":{"mc.contract.updated":"true"}}`)
+	postOK("/bead/"+root.ID+"/close", ``)
+	postOK("/bead/"+root.ID+"/reopen", ``)
+
+	child := createBead(`{
+		"rig":"alpha",
+		"title":"MC live contract child",
+		"type":"task",
+		"priority":1,
+		"parent":"` + root.ID + `",
+		"labels":["mc-live-contract","child","needs-update"],
+		"metadata":{"mc.contract.run_id":"run-1"}
+	}`)
+	sibling := createBead(`{
+		"rig":"alpha",
+		"title":"MC live contract sibling",
+		"type":"bug",
+		"priority":3,
+		"parent":"` + root.ID + `",
+		"labels":["mc-live-contract","sibling"],
+		"metadata":{"mc.contract.run_id":"run-1"}
+	}`)
+
+	postOK("/bead/"+child.ID+"/update", `{
+		"parent":"",
+		"status":"in_progress",
+		"labels":["verified"],
+		"remove_labels":["needs-update"],
+		"metadata":{"mc.contract.updated":"true"},
+		"type":"bug",
+		"priority":4
+	}`)
+	postOK("/bead/"+child.ID+"/update", `{
+		"parent":"`+root.ID+`",
+		"metadata":{"mc.contract.parent_restored":"true"}
+	}`)
+
+	getBead := httptest.NewRecorder()
+	h.ServeHTTP(getBead, httptest.NewRequest("GET", cityURL(state, "/bead/")+child.ID, nil))
+	if getBead.Code != http.StatusOK {
+		t.Fatalf("get child status = %d, want %d; body: %s", getBead.Code, http.StatusOK, getBead.Body.String())
+	}
+	var restored beads.Bead
+	if err := json.NewDecoder(getBead.Body).Decode(&restored); err != nil {
+		t.Fatalf("decode restored child: %v", err)
+	}
+	if restored.ParentID != root.ID {
+		t.Fatalf("restored child parent = %q, want %q", restored.ParentID, root.ID)
+	}
+
+	depsRec := httptest.NewRecorder()
+	h.ServeHTTP(depsRec, httptest.NewRequest("GET", cityURL(state, "/bead/")+root.ID+"/deps", nil))
+	if depsRec.Code != http.StatusOK {
+		t.Fatalf("deps status = %d, want %d; body: %s", depsRec.Code, http.StatusOK, depsRec.Body.String())
+	}
+	var deps BeadDepsResponse
+	if err := json.NewDecoder(depsRec.Body).Decode(&deps); err != nil {
+		t.Fatalf("decode deps: %v", err)
+	}
+	if !containsID(deps.Children, child.ID) {
+		t.Fatalf("deps children = %#v, want child %s", deps.Children, child.ID)
+	}
+
+	graphRec := httptest.NewRecorder()
+	h.ServeHTTP(graphRec, httptest.NewRequest("GET", cityURL(state, "/beads/graph/")+root.ID, nil))
+	if graphRec.Code != http.StatusOK {
+		t.Fatalf("graph status = %d, want %d; body: %s", graphRec.Code, http.StatusOK, graphRec.Body.String())
+	}
+	var graph BeadGraphResponse
+	if err := json.NewDecoder(graphRec.Body).Decode(&graph); err != nil {
+		t.Fatalf("decode graph: %v", err)
+	}
+	if !containsID(graph.Beads, child.ID) || !containsID(graph.Beads, sibling.ID) {
+		t.Fatalf("graph beads = %#v, want child %s and sibling %s", graph.Beads, child.ID, sibling.ID)
+	}
+
+	listRec := httptest.NewRecorder()
+	h.ServeHTTP(listRec, httptest.NewRequest("GET", cityURL(state, "/beads?label=mc-live-contract&limit=50&rig=alpha"), nil))
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("list status = %d, want %d; body: %s", listRec.Code, http.StatusOK, listRec.Body.String())
+	}
+	var list struct {
+		Items []beads.Bead `json:"items"`
+		Total int          `json:"total"`
+	}
+	if err := json.NewDecoder(listRec.Body).Decode(&list); err != nil {
+		t.Fatalf("decode list: %v", err)
+	}
+	if list.Total < 3 || !containsID(list.Items, root.ID) || !containsID(list.Items, sibling.ID) {
+		t.Fatalf("filtered beads = %+v, want root %s and sibling %s", list, root.ID, sibling.ID)
 	}
 }
 
@@ -942,7 +1725,8 @@ func TestBeadUpdateNullPriorityRejected(t *testing.T) {
 
 func TestBeadReopen(t *testing.T) {
 	state := newFakeState(t)
-	store := state.stores["myrig"]
+	store := newPrefixedAliasStore("myrig-")
+	state.stores["myrig"] = store
 	b, _ := store.Create(beads.Bead{Title: "Closed task"})
 	store.Close(b.ID) //nolint:errcheck
 	h := newTestCityHandler(t, state)
@@ -960,6 +1744,12 @@ func TestBeadReopen(t *testing.T) {
 	got, _ := store.Get(b.ID)
 	if got.Status != "open" {
 		t.Errorf("Status = %q, want %q", got.Status, "open")
+	}
+	if store.reopenCalls != 1 {
+		t.Fatalf("reopen calls = %d, want 1", store.reopenCalls)
+	}
+	if store.updateCalls != 0 {
+		t.Fatalf("update calls = %d, want 0; reopen must not use generic update", store.updateCalls)
 	}
 }
 
@@ -1017,8 +1807,8 @@ func TestPhase2BeadAssignNormalizesCurrentSessionAlias(t *testing.T) {
 		t.Fatalf("assign alias status = %d, want %d; body: %s", rec.Code, http.StatusOK, rec.Body.String())
 	}
 	got, _ := store.Get(work.ID)
-	if got.Assignee != sessionBead.ID {
-		t.Fatalf("assignee = %q, want alias normalized to session bead ID %q", got.Assignee, sessionBead.ID)
+	if got.Assignee != sessionBead.Metadata["alias"] {
+		t.Fatalf("assignee = %q, want canonical alias %q", got.Assignee, sessionBead.Metadata["alias"])
 	}
 
 	listReq := httptest.NewRequest("GET", cityURL(state, "/beads?assignee=worker"), nil)
@@ -1038,16 +1828,28 @@ func TestPhase2BeadAssignNormalizesCurrentSessionAlias(t *testing.T) {
 	}
 }
 
-func TestPhase2BeadListAssigneeAliasKeepsCrossRigDuplicateIDs(t *testing.T) {
+// TestPhase2BeadListAssigneeAliasServesEveryRigsBeads pins that resolving an
+// assignee alias into several identity terms does not cost a rig its rows: every
+// bead assigned to the session, in every rig, is in the response exactly once.
+//
+// The rigs mint under different prefixes because that is the only shape a
+// running city can have — config.ValidateRigs rejects a colliding rig prefix on
+// every start, reload and config-edit path, so two rigs cannot mint the same id.
+// (Its ancestor left both MemStores on the default prefix, which made "two beads"
+// and "one bead resident in two legs" the same fixture; the fan-out reads bead
+// ids as identity, the way GET /v0/beads/ready and every by-id endpoint do.)
+func TestPhase2BeadListAssigneeAliasServesEveryRigsBeads(t *testing.T) {
 	state := newFakeState(t)
 	state.cityBeadStore = beads.NewMemStore()
-	state.stores["otherrig"] = beads.NewMemStore()
-	state.cfg.Rigs = append(state.cfg.Rigs, config.Rig{Name: "otherrig", Path: "/tmp/otherrig"})
+	otherStore := beads.NewMemStore()
+	otherStore.IDPrefix = "or"
+	state.stores["otherrig"] = otherStore
+	state.cfg.Rigs = append(state.cfg.Rigs, config.Rig{Name: "otherrig", Path: "/tmp/otherrig", Prefix: "or"})
 	sessionBead := createPhase2APISessionBead(t, state.cityBeadStore)
 	workA, _ := state.stores["myrig"].Create(beads.Bead{Title: "Task A", Assignee: sessionBead.ID})
-	workB, _ := state.stores["otherrig"].Create(beads.Bead{Title: "Task B", Assignee: sessionBead.ID})
-	if workA.ID != workB.ID {
-		t.Fatalf("test setup expected duplicate local IDs, got %q and %q", workA.ID, workB.ID)
+	workB, _ := otherStore.Create(beads.Bead{Title: "Task B", Assignee: sessionBead.ID})
+	if workA.ID == workB.ID {
+		t.Fatalf("test setup expected distinct per-rig IDs, got %q twice", workA.ID)
 	}
 	srv := New(state)
 	h := newTestCityHandlerWith(t, state, srv)
@@ -1069,6 +1871,56 @@ func TestPhase2BeadListAssigneeAliasKeepsCrossRigDuplicateIDs(t *testing.T) {
 	if listed.Total != 2 || len(listed.Items) != 2 {
 		t.Fatalf("list by alias total/items = %d/%d, want 2/2: %#v", listed.Total, len(listed.Items), listed.Items)
 	}
+	for _, want := range []string{workA.ID, workB.ID} {
+		found := false
+		for _, b := range listed.Items {
+			if b.ID == want {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("alias fan-out dropped %q: %#v", want, listed.Items)
+		}
+	}
+}
+
+// TestBeadListAssigneeTermsIncludesAllSessionIdentityForms pins the term SET
+// beadListAssigneeTerms enumerates for a resolved session: the input term, the
+// bead ID, session_name, alias, configured named identity, and every prior
+// alias. Order is not part of the contract (huma_handlers_beads re-sorts
+// globally when len(terms)>1); the set must stay stable across the codec swap
+// onto session.AssigneeIdentities.
+func TestBeadListAssigneeTermsIncludesAllSessionIdentityForms(t *testing.T) {
+	state := newFakeState(t)
+	state.cityBeadStore = beads.NewMemStore()
+	sessionBead, err := state.cityBeadStore.Create(beads.Bead{
+		Title:  "Worker session",
+		Type:   session.BeadType,
+		Labels: []string{session.LabelSession},
+		Metadata: map[string]string{
+			"session_name":              "test-city--worker",
+			"alias":                     "worker",
+			"configured_named_identity": "reviewer",
+			"alias_history":             "nux,rictus",
+			"template":                  "myrig/worker",
+			"state":                     "active",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Create(session): %v", err)
+	}
+	srv := New(state)
+
+	terms := srv.beadListAssigneeTerms(context.Background(), "worker")
+	got := make(map[string]bool, len(terms))
+	for _, term := range terms {
+		got[term] = true
+	}
+	for _, want := range []string{"worker", sessionBead.ID, "test-city--worker", "reviewer", "nux", "rictus"} {
+		if !got[want] {
+			t.Errorf("beadListAssigneeTerms(worker) missing %q; got %v", want, terms)
+		}
+	}
 }
 
 func TestPhase2BeadAssignNormalizesCurrentSessionName(t *testing.T) {
@@ -1089,8 +1941,8 @@ func TestPhase2BeadAssignNormalizesCurrentSessionName(t *testing.T) {
 		t.Fatalf("assign session_name status = %d, want %d; body: %s", rec.Code, http.StatusOK, rec.Body.String())
 	}
 	got, _ := store.Get(work.ID)
-	if got.Assignee != sessionBead.ID {
-		t.Fatalf("assignee = %q, want session_name normalized to session bead ID %q", got.Assignee, sessionBead.ID)
+	if got.Assignee != sessionBead.Metadata["alias"] {
+		t.Fatalf("assignee = %q, want session_name normalized to canonical alias %q", got.Assignee, sessionBead.Metadata["alias"])
 	}
 }
 
@@ -1111,12 +1963,16 @@ func TestPhase2BeadAssignMaterializesExactConfiguredNamedIdentity(t *testing.T) 
 		t.Fatalf("assign configured named identity status = %d, want %d; body: %s", rec.Code, http.StatusOK, rec.Body.String())
 	}
 	got, _ := store.Get(work.ID)
-	if got.Assignee == "" || got.Assignee == "myrig/worker" {
-		t.Fatalf("assignee = %q, want materialized concrete session bead ID", got.Assignee)
+	if got.Assignee == "" {
+		t.Fatalf("assignee = %q, want materialized session identity", got.Assignee)
 	}
-	gotSession, err := state.cityBeadStore.Get(got.Assignee)
+	sessionID, err := session.ResolveSessionID(state.cityBeadStore, got.Assignee)
 	if err != nil {
-		t.Fatalf("Get(materialized session %q): %v", got.Assignee, err)
+		t.Fatalf("ResolveSessionID(materialized assignee %q): %v", got.Assignee, err)
+	}
+	gotSession, err := state.cityBeadStore.Get(sessionID)
+	if err != nil {
+		t.Fatalf("Get(materialized session %q): %v", sessionID, err)
 	}
 	if gotSession.Metadata[apiNamedSessionMetadataKey] != "true" {
 		t.Fatalf("configured_named_session = %q, want true", gotSession.Metadata[apiNamedSessionMetadataKey])
@@ -1220,8 +2076,8 @@ func TestPhase2BeadAssignAcceptsRepairableSessionBeadID(t *testing.T) {
 		t.Fatalf("assign repairable session status = %d, want %d; body: %s", rec.Code, http.StatusOK, rec.Body.String())
 	}
 	got, _ := store.Get(work.ID)
-	if got.Assignee != sessionBead.ID {
-		t.Fatalf("assignee = %q, want repairable session bead ID %q", got.Assignee, sessionBead.ID)
+	if got.Assignee != sessionBead.Metadata["alias"] {
+		t.Fatalf("assignee = %q, want repairable session alias %q", got.Assignee, sessionBead.Metadata["alias"])
 	}
 	gotSession, _ := state.cityBeadStore.Get(sessionBead.ID)
 	if gotSession.Type != session.BeadType {
@@ -1247,8 +2103,8 @@ func TestPhase2BeadUpdateNormalizesRawAssigneeAlias(t *testing.T) {
 		t.Fatalf("update alias status = %d, want %d; body: %s", rec.Code, http.StatusOK, rec.Body.String())
 	}
 	got, _ := store.Get(work.ID)
-	if got.Assignee != sessionBead.ID {
-		t.Fatalf("assignee = %q, want alias normalized to session bead ID %q", got.Assignee, sessionBead.ID)
+	if got.Assignee != sessionBead.Metadata["alias"] {
+		t.Fatalf("assignee = %q, want canonical alias %q", got.Assignee, sessionBead.Metadata["alias"])
 	}
 }
 
@@ -1273,8 +2129,39 @@ func TestPhase2BeadCreateNormalizesRawAssigneeAlias(t *testing.T) {
 	if len(items) != 1 {
 		t.Fatalf("created %d beads, want 1", len(items))
 	}
-	if items[0].Assignee != sessionBead.ID {
-		t.Fatalf("created assignee = %q, want alias normalized to session bead ID %q", items[0].Assignee, sessionBead.ID)
+	if items[0].Assignee != sessionBead.Metadata["alias"] {
+		t.Fatalf("created assignee = %q, want canonical alias %q", items[0].Assignee, sessionBead.Metadata["alias"])
+	}
+}
+
+func TestPhase2BeadAssignFallsBackToBeadIDWhenSessionHasNoName(t *testing.T) {
+	state := newFakeState(t)
+	state.cityBeadStore = beads.NewMemStore()
+	store := state.stores["myrig"]
+	_, _ = store.Create(beads.Bead{Title: "ID offset"})
+	work, _ := store.Create(beads.Bead{Title: "Task"})
+	// A repairable/crash-migrated session bead can carry no session_name, alias,
+	// or configured_named_identity; the normalized assignee must fall back to the
+	// bead ID so the assignment is never silently cleared.
+	sessionBead, _ := state.cityBeadStore.Create(beads.Bead{
+		Title:    "Nameless session",
+		Type:     session.BeadType,
+		Labels:   []string{session.LabelSession},
+		Metadata: map[string]string{"state": "active"},
+	})
+	srv := New(state)
+	h := newTestCityHandlerWith(t, state, srv)
+
+	req := newPostRequest(cityURL(state, "/bead/"+work.ID+"/assign"), bytes.NewBufferString(`{"assignee":"`+sessionBead.ID+`"}`))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("assign nameless session status = %d, want %d; body: %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	got, _ := store.Get(work.ID)
+	if got.Assignee != sessionBead.ID {
+		t.Fatalf("assignee = %q, want bead-ID fallback %q", got.Assignee, sessionBead.ID)
 	}
 }
 
@@ -1391,15 +2278,20 @@ func TestBeadUpdateParentOpenAPISchemaAllowsNull(t *testing.T) {
 	}
 }
 
+// GET /packs lists the import-binding namespace (the same scope add/remove
+// operate on), via the packListImports seam, so the list shape matches the
+// forge-web {name, source, version} contract.
 func TestPackList(t *testing.T) {
-	state := newFakeState(t)
-	state.cfg.Packs = map[string]config.PackSource{
-		"gastown": {
-			Source: "https://github.com/example/gastown-pack",
-			Ref:    "v1.0.0",
-			Path:   "packs/gastown",
-		},
+	orig := packListImports
+	packListImports = func(_ fsys.FS, _ string) (map[string]config.Import, error) {
+		return map[string]config.Import{
+			"gastown": {Source: "https://github.com/example/gastown-pack", Version: "^1.0.0"},
+			"local":   {Source: "../packs/local"},
+		}, nil
 	}
+	defer func() { packListImports = orig }()
+
+	state := newFakeState(t)
 	h := newTestCityHandler(t, state)
 
 	req := httptest.NewRequest("GET", cityURL(state, "/packs"), nil)
@@ -1414,18 +2306,31 @@ func TestPackList(t *testing.T) {
 		Packs []packResponse `json:"packs"`
 	}
 	json.NewDecoder(rec.Body).Decode(&resp) //nolint:errcheck
-	if len(resp.Packs) != 1 {
-		t.Fatalf("packs count = %d, want 1", len(resp.Packs))
+	if len(resp.Packs) != 2 {
+		t.Fatalf("packs count = %d, want 2: %#v", len(resp.Packs), resp.Packs)
 	}
+	// Bindings are returned sorted by name.
 	if resp.Packs[0].Name != "gastown" {
-		t.Errorf("Name = %q, want %q", resp.Packs[0].Name, "gastown")
+		t.Errorf("Packs[0].Name = %q, want gastown", resp.Packs[0].Name)
 	}
 	if resp.Packs[0].Source != "https://github.com/example/gastown-pack" {
-		t.Errorf("Source = %q", resp.Packs[0].Source)
+		t.Errorf("Packs[0].Source = %q", resp.Packs[0].Source)
+	}
+	if resp.Packs[0].Version != "^1.0.0" {
+		t.Errorf("Packs[0].Version = %q, want ^1.0.0", resp.Packs[0].Version)
+	}
+	if resp.Packs[1].Name != "local" || resp.Packs[1].Version != "" {
+		t.Errorf("Packs[1] = %#v, want local with empty version", resp.Packs[1])
 	}
 }
 
 func TestPackListEmpty(t *testing.T) {
+	orig := packListImports
+	packListImports = func(_ fsys.FS, _ string) (map[string]config.Import, error) {
+		return map[string]config.Import{}, nil
+	}
+	defer func() { packListImports = orig }()
+
 	state := newFakeState(t)
 	h := newTestCityHandler(t, state)
 
@@ -1443,5 +2348,100 @@ func TestPackListEmpty(t *testing.T) {
 	json.NewDecoder(rec.Body).Decode(&resp) //nolint:errcheck
 	if len(resp.Packs) != 0 {
 		t.Errorf("packs count = %d, want 0", len(resp.Packs))
+	}
+}
+
+// TestPackListAddRemoveShareNamespace is the regression for the red-team
+// MUST-FIX: a binding surfaced by add must be listable by GET and removable by
+// DELETE {name}. All three handlers are stubbed at the importsvc seam, and the
+// stub's in-memory binding store is the single namespace they share.
+func TestPackListAddRemoveShareNamespace(t *testing.T) {
+	bindings := map[string]config.Import{}
+
+	origList, origAdd, origRemove := packListImports, packAddImport, packRemoveImport
+	packListImports = func(_ fsys.FS, _ string) (map[string]config.Import, error) {
+		out := make(map[string]config.Import, len(bindings))
+		for k, v := range bindings {
+			out[k] = v
+		}
+		return out, nil
+	}
+	packAddImport = func(_ fsys.FS, _, source, name, version string) (*importsvc.AddResult, error) {
+		if name == "" {
+			name = "review"
+		}
+		bindings[name] = config.Import{Source: source, Version: version}
+		return &importsvc.AddResult{Name: name, Source: source, Version: version, GitBacked: true}, nil
+	}
+	packRemoveImport = func(_ fsys.FS, _, name string) (*importsvc.RemoveResult, error) {
+		if _, ok := bindings[name]; !ok {
+			return nil, importsvc.ErrNotFound
+		}
+		delete(bindings, name)
+		return &importsvc.RemoveResult{Name: name}, nil
+	}
+	defer func() {
+		packListImports, packAddImport, packRemoveImport = origList, origAdd, origRemove
+	}()
+
+	state := newFakeMutatorState(t)
+	h := newTestCityHandler(t, state)
+
+	doReq := func(method, path, body string) *httptest.ResponseRecorder {
+		var rdr io.Reader
+		if body != "" {
+			rdr = strings.NewReader(body)
+		}
+		req := httptest.NewRequest(method, cityURL(state, path), rdr)
+		req.Header.Set("X-GC-Request", "true")
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		return rec
+	}
+
+	// POST a pack -> it must appear in the GET listing by the same binding name.
+	if rec := doReq("POST", "/packs", `{"source":"https://github.com/org/repo/tree/main/packs/review"}`); rec.Code != http.StatusCreated {
+		t.Fatalf("POST status = %d, want 201; body = %s", rec.Code, rec.Body.String())
+	}
+	rec := doReq("GET", "/packs", "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET status = %d, want 200", rec.Code)
+	}
+	var resp struct {
+		Packs []packResponse `json:"packs"`
+	}
+	json.NewDecoder(rec.Body).Decode(&resp) //nolint:errcheck
+	if len(resp.Packs) != 1 || resp.Packs[0].Name != "review" {
+		t.Fatalf("GET after POST = %#v, want one binding named review", resp.Packs)
+	}
+
+	// DELETE by that listed name -> the GET listing is empty again.
+	if rec := doReq("DELETE", "/packs/review", ""); rec.Code != http.StatusOK {
+		t.Fatalf("DELETE status = %d, want 200; body = %s", rec.Code, rec.Body.String())
+	}
+	rec = doReq("GET", "/packs", "")
+	json.NewDecoder(rec.Body).Decode(&resp) //nolint:errcheck
+	if len(resp.Packs) != 0 {
+		t.Fatalf("GET after DELETE = %#v, want empty", resp.Packs)
+	}
+}
+
+func TestBeadPrefixAPI(t *testing.T) {
+	tests := []struct {
+		id   string
+		want string
+	}{
+		{"ga-5b8i", "ga"},
+		{"pieces-annotator-x8o", "pieces-annotator"},
+		{"pieces-cli-5b8i", "pieces-cli"},
+		{"ga-123", "ga"},
+		{"", ""},
+		{"nohyphen", ""},
+	}
+	for _, tt := range tests {
+		got := beadPrefix(tt.id)
+		if got != tt.want {
+			t.Errorf("beadPrefix(%q) = %q, want %q", tt.id, got, tt.want)
+		}
 	}
 }

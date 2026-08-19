@@ -13,6 +13,8 @@ import (
 
 func writeExecStoreCityConfig(t *testing.T, cityDir, cityName, cityPrefix string, rigs []config.Rig) {
 	t.Helper()
+	clearInheritedBeadsEnv(t)
+	requireNoLeakedDoltAfterForPaths(t, cityDir)
 
 	content := fmt.Sprintf("[workspace]\nname = %q\n", cityName)
 	if cityPrefix != "" {
@@ -56,7 +58,14 @@ GC_PROVIDER=%%s
 BEADS_DIR=%%s
 GC_DOLT_HOST=%%s
 GC_DOLT_PORT=%%s
-'       "${GC_STORE_ROOT:-}" "${GC_STORE_SCOPE:-}" "${GC_BEADS_PREFIX:-}" "${GC_CITY:-}" "${GC_CITY_PATH:-}" "${GC_RIG:-}" "${GC_RIG_ROOT:-}" "${GC_PROVIDER:-}" "${BEADS_DIR:-}" "${GC_DOLT_HOST:-}" "${GC_DOLT_PORT:-}" > "$out"
+BEADS_POSTGRES_HOST=%%s
+BEADS_POSTGRES_PORT=%%s
+BEADS_POSTGRES_USER=%%s
+BEADS_POSTGRES_DATABASE=%%s
+BEADS_POSTGRES_PASSWORD=%%s
+BD_DOLT_SYNC_CLI_REMOTES=%%s
+BEADS_DOLT_SYNC_CLI_REMOTES=%%s
+'       "${GC_STORE_ROOT:-}" "${GC_STORE_SCOPE:-}" "${GC_BEADS_PREFIX:-}" "${GC_CITY:-}" "${GC_CITY_PATH:-}" "${GC_RIG:-}" "${GC_RIG_ROOT:-}" "${GC_PROVIDER:-}" "${BEADS_DIR:-}" "${GC_DOLT_HOST:-}" "${GC_DOLT_PORT:-}" "${BEADS_POSTGRES_HOST:-}" "${BEADS_POSTGRES_PORT:-}" "${BEADS_POSTGRES_USER:-}" "${BEADS_POSTGRES_DATABASE:-}" "${BEADS_POSTGRES_PASSWORD:-}" "${BD_DOLT_SYNC_CLI_REMOTES:-}" "${BEADS_DOLT_SYNC_CLI_REMOTES:-}" > "$out"
     cat >/dev/null
     echo '{"id":"EX-1","title":"captured","status":"open","type":"task","created_at":"2026-02-27T10:00:00Z"}'
     ;;
@@ -104,6 +113,41 @@ func envSliceValue(env []string, key string) string {
 		}
 	}
 	return ""
+}
+
+func TestSetExecProjectedBackendEnvEmptyDisablesAutoBackup(t *testing.T) {
+	// The exec-store projection is the 5th bd env-projection site (alongside
+	// bdRuntimeEnv, cityRuntimeProcessEnv, sessionBackendEnv, and recovery).
+	// It must force bd's PersistentPostRun auto-backup off (ga-0eq), even when
+	// the ambient env tries to enable it.
+	env := map[string]string{
+		"BD_BACKUP_ENABLED":    "true",
+		"BEADS_BACKUP_ENABLED": "true",
+	}
+	setExecProjectedBackendEnvEmpty(env)
+	if got := env["BD_BACKUP_ENABLED"]; got != "false" {
+		t.Fatalf("BD_BACKUP_ENABLED = %q, want false", got)
+	}
+	if got := env["BEADS_BACKUP_ENABLED"]; got != "false" {
+		t.Fatalf("BEADS_BACKUP_ENABLED = %q, want false", got)
+	}
+}
+
+func TestSetExecProjectedBackendEnvEmptyDisablesContributorRouting(t *testing.T) {
+	// The exec-store projection must also force bd's fork/contributor
+	// auto-routing off, mirroring the other bd env-projection sites, so a
+	// gcy-style store cannot siphon create/list/update to ~/.beads-planning.
+	env := map[string]string{
+		"BD_ROUTING_MODE":    "auto",
+		"BEADS_ROUTING_MODE": "auto",
+	}
+	setExecProjectedBackendEnvEmpty(env)
+	if got := env["BD_ROUTING_MODE"]; got != "off" {
+		t.Fatalf("BD_ROUTING_MODE = %q, want off", got)
+	}
+	if got := env["BEADS_ROUTING_MODE"]; got != "off" {
+		t.Fatalf("BEADS_ROUTING_MODE = %q, want off", got)
+	}
 }
 
 func TestProviderUsesBdStoreContract(t *testing.T) {
@@ -155,6 +199,7 @@ func TestGcExecLifecycleInitProcessEnvDoesNotLeakAmbientBEADS_DIRForGcBeadsK8s(t
 		Prefix: "fe",
 	}})
 
+	disableManagedDoltRecoveryForTest(t)
 	t.Setenv("BEADS_DIR", "/tmp/ambient-beads")
 	target := execStoreTarget{
 		ScopeRoot: rigDir,
@@ -349,6 +394,7 @@ func TestOpenStoreAtForCityExecProjectsConfiguredTargets(t *testing.T) {
 	provider := "exec:" + script
 
 	t.Setenv("GC_BEADS", provider)
+	t.Setenv("GC_BEADS_SCOPE_ROOT", "")
 	t.Setenv("BEADS_DIR", "/tmp/ambient-beads")
 	t.Setenv("GC_DOLT_HOST", "ambient-dolt")
 	t.Setenv("GC_STORE_ROOT", "/tmp/ambient-store")
@@ -466,13 +512,20 @@ func TestOpenStoreAtForCityExecBeadsBdProjectsScopedExternalDoltEnv(t *testing.T
 	captureDir := t.TempDir()
 	script := writeNamedExecCaptureScript(t, captureDir, "gc-beads-bd")
 	t.Setenv("GC_BEADS", "exec:"+script)
+	t.Setenv("GC_BEADS_SCOPE_ROOT", "")
 	t.Setenv("GC_DOLT_HOST", "ambient-dolt")
 	t.Setenv("GC_DOLT_PORT", "9999")
+	t.Setenv("BD_DOLT_SYNC_CLI_REMOTES", "true")
+	t.Setenv("BEADS_DOLT_SYNC_CLI_REMOTES", "true")
 
-	store, err := openStoreAtForCity(rigDir, cityDir)
+	result, err := openStoreResultAtForCity(rigDir, cityDir)
 	if err != nil {
 		t.Fatalf("openStoreAtForCity: %v", err)
 	}
+	if result.Diagnostic.Store != "ExecStore" {
+		t.Fatalf("beads_store = %q, want ExecStore", result.Diagnostic.Store)
+	}
+	store := result.Store
 	if _, err := store.Create(beads.Bead{Title: "rig"}); err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -489,6 +542,88 @@ func TestOpenStoreAtForCityExecBeadsBdProjectsScopedExternalDoltEnv(t *testing.T
 	}
 	if got := rigEnv["BEADS_DIR"]; got != "" {
 		t.Fatalf("BEADS_DIR leaked as %q", got)
+	}
+	if got := rigEnv["BD_DOLT_SYNC_CLI_REMOTES"]; got != "false" {
+		t.Fatalf("BD_DOLT_SYNC_CLI_REMOTES = %q, want false", got)
+	}
+	if got := rigEnv["BEADS_DOLT_SYNC_CLI_REMOTES"]; got != "false" {
+		t.Fatalf("BEADS_DOLT_SYNC_CLI_REMOTES = %q, want false", got)
+	}
+}
+
+// TestCopyExecProjectedBackendEnvWithholdsEveryKeyForABoundRig proves the
+// exec-provider copy path carries the withholding, not just the projection.
+//
+// A rig bound to a backend gc does not implement has no connection values to
+// copy — the point is that every key gc would otherwise project arrives
+// present-and-empty, so an exec provider's child process cannot inherit a
+// stale endpoint from the controller's own environment. An ambient
+// GC_DOLT_HOST is set here precisely because that is the value a leak would
+// smuggle through.
+func TestCopyExecProjectedBackendEnvWithholdsEveryKeyForABoundRig(t *testing.T) {
+	cityDir := t.TempDir()
+	rigDir := filepath.Join(cityDir, "rigs", "frontend")
+	if err := os.MkdirAll(filepath.Join(cityDir, ".beads"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cityDir, ".beads", "config.yaml"), []byte(`issue_prefix: ct
+gc.endpoint_origin: managed_city
+gc.endpoint_status: verified
+dolt.auto-start: false
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeOpaqueBindingScopeFixture(t, rigDir)
+	if err := os.WriteFile(filepath.Join(rigDir, ".beads", "config.yaml"), []byte(`issue_prefix: fe
+gc.endpoint_origin: inherited_city
+gc.endpoint_status: verified
+dolt.auto-start: false
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeExecStoreCityConfig(t, cityDir, "metro-city", "ct", []config.Rig{{
+		Name:   "frontend",
+		Path:   "rigs/frontend",
+		Prefix: "fe",
+	}})
+	t.Setenv("GC_DOLT_HOST", "ambient-dolt")
+
+	env := gcExecStoreEnv(cityDir, execStoreTarget{
+		ScopeRoot: rigDir,
+		ScopeKind: "rig",
+		Prefix:    "fe",
+		RigName:   "frontend",
+	}, "exec:/tmp/gc-beads-bd")
+	projected, err := bdRuntimeEnvForRigWithError(cityDir, &config.City{Rigs: []config.Rig{{
+		Name:   "frontend",
+		Path:   "rigs/frontend",
+		Prefix: "fe",
+	}}}, rigDir)
+	if err != nil {
+		t.Fatalf("bdRuntimeEnvForRigWithError: %v", err)
+	}
+	copyExecProjectedBackendEnv(env, projected)
+
+	if got := env["GC_RIG"]; got != "frontend" {
+		t.Fatalf("GC_RIG = %q, want frontend", got)
+	}
+	for _, key := range execProjectedBackendEnvKeys() {
+		switch key {
+		case "BD_EXPORT_AUTO", "BD_BACKUP_ENABLED", "BEADS_BACKUP_ENABLED",
+			"BD_DOLT_SYNC_CLI_REMOTES", "BEADS_DOLT_SYNC_CLI_REMOTES",
+			"BD_ROUTING_MODE", "BEADS_ROUTING_MODE":
+			// The bd opt-out keys are policy gc always states, not connection
+			// values it withholds.
+			continue
+		}
+		value, ok := env[key]
+		if !ok {
+			t.Errorf("env[%q] absent; a withheld key must be present and empty so the child cannot inherit one", key)
+			continue
+		}
+		if value != "" {
+			t.Errorf("env[%q] = %q, want empty for a rig gc does not serve", key, value)
+		}
 	}
 }
 
@@ -535,6 +670,83 @@ func TestControllerStateOpenRigStoreExecProjectsRigTarget(t *testing.T) {
 	}
 }
 
+func TestControllerStateOpenRigStoreExecBdProjectsRigDoltEnv(t *testing.T) {
+	cityDir := t.TempDir()
+	rigDir := t.TempDir()
+	captureDir := t.TempDir()
+	script := writeNamedExecCaptureScript(t, captureDir, "gc-beads-bd.sh")
+	provider := "exec:" + script
+
+	cfg := &config.City{
+		Rigs: []config.Rig{{
+			Name:     "frontend",
+			Path:     rigDir,
+			Prefix:   "fe",
+			DoltHost: "rig-db.example.com",
+			DoltPort: "3308",
+		}},
+	}
+
+	t.Setenv("GC_DOLT_HOST", "ambient-dolt")
+	t.Setenv("GC_DOLT_PORT", "9911")
+
+	cs := &controllerState{cityPath: cityDir, cfg: cfg}
+	store := cs.openRigStore(provider, "frontend", rigDir, "fe", cfg)
+	if _, err := store.Create(beads.Bead{Title: "rig"}); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	rigEnv := readExecCaptureEnv(t, filepath.Join(captureDir, "frontend.env"))
+	if got := rigEnv["GC_DOLT_HOST"]; got != "rig-db.example.com" {
+		t.Fatalf("GC_DOLT_HOST = %q, want rig-db.example.com", got)
+	}
+	if got := rigEnv["GC_DOLT_PORT"]; got != "3308" {
+		t.Fatalf("GC_DOLT_PORT = %q, want 3308", got)
+	}
+}
+
+func TestControllerStateOpenRigStoreExecBdRefusesAnUnregisteredBackend(t *testing.T) {
+	t.Setenv("GC_BEADS", "bd")
+
+	cityDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(cityDir, ".beads"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cityDir, ".beads", "config.yaml"), []byte(`issue_prefix: ct
+gc.endpoint_origin: managed_city
+gc.endpoint_status: verified
+dolt.auto-start: false
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rigDir := filepath.Join(cityDir, "rigs", "frontend")
+	writeUnregisteredBackendMetadata(t, rigDir)
+	if err := os.WriteFile(filepath.Join(rigDir, ".beads", "config.yaml"), []byte(`issue_prefix: fe
+gc.endpoint_origin: inherited_city
+gc.endpoint_status: verified
+dolt.auto-start: false
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	captureDir := t.TempDir()
+	script := writeNamedExecCaptureScript(t, captureDir, "gc-beads-bd.sh")
+	provider := "exec:" + script
+	cfg := &config.City{Rigs: []config.Rig{{
+		Name:   "frontend",
+		Path:   "rigs/frontend",
+		Prefix: "fe",
+	}}}
+
+	cs := &controllerState{cityPath: cityDir, cfg: cfg}
+	store := cs.openRigStore(provider, "frontend", rigDir, "fe", cfg)
+	_, err := store.Create(beads.Bead{Title: "rig"})
+
+	assertRefusesUnregisteredBackend(t, err)
+	if _, statErr := os.Stat(filepath.Join(captureDir, "frontend.env")); !os.IsNotExist(statErr) {
+		t.Fatalf("capture script ran despite projection failure; stat err=%v", statErr)
+	}
+}
+
 func TestOpenStoreAtForCityExecUsesUniversalStoreTargetEnv(t *testing.T) {
 	cityDir := t.TempDir()
 	rigDir := filepath.Join(cityDir, "rigs", "frontend")
@@ -549,6 +761,7 @@ func TestOpenStoreAtForCityExecUsesUniversalStoreTargetEnv(t *testing.T) {
 	captureDir := t.TempDir()
 	script := writeExecCaptureScript(t, captureDir)
 	t.Setenv("GC_BEADS", "exec:"+script)
+	t.Setenv("GC_BEADS_SCOPE_ROOT", "")
 	t.Setenv("BEADS_DIR", "/tmp/ambient-beads")
 	t.Setenv("GC_DOLT_HOST", "ambient-dolt")
 

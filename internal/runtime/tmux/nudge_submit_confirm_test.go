@@ -9,9 +9,9 @@ import (
 // noSleep is a sleep stub so the confirm loop runs instantly under test.
 func noSleep(time.Duration) {}
 
-// TestSubmitEnterAndConfirmReEntersWhileIdle proves: when the first Enter is
-// lost (the pane stays idle with the message still drafted), the loop re-sends
-// Enter, and the send that lands drives the agent busy.
+// TestSubmitEnterAndConfirmReEntersWhileIdle proves the ga-bwm fix: when the
+// first Enter is lost (the pane stays idle with the message still drafted), the
+// loop re-sends Enter, and the send that lands drives the agent busy.
 func TestSubmitEnterAndConfirmReEntersWhileIdle(t *testing.T) {
 	var enters int
 	// Busy only becomes true once a second Enter has been sent, i.e. the first
@@ -77,9 +77,7 @@ func TestSubmitEnterAndConfirmNoDoubleSubmitOnFastTurn(t *testing.T) {
 
 // TestSubmitEnterAndConfirmBestEffortWhenNeverBusy proves that a pane which
 // never reports busy is delivered best-effort (bounded re-sends, no error) so
-// the caller's contract (nil == delivered to tmux) is preserved at this seam.
-// NudgeSession maps (false, nil) to ErrNudgeSubmitUnconfirmed for eligible
-// providers — that fail-closed step is covered separately.
+// the caller's contract (nil == delivered to tmux) is preserved.
 func TestSubmitEnterAndConfirmBestEffortWhenNeverBusy(t *testing.T) {
 	var enters int
 	busy := func() (bool, error) { return false, nil }
@@ -99,7 +97,8 @@ func TestSubmitEnterAndConfirmBestEffortWhenNeverBusy(t *testing.T) {
 
 // TestSubmitEnterAndConfirmClearsStaleSendError proves a transient first-send
 // failure followed by a successful send (busy never observed) is reported as
-// best-effort delivery (false, nil), not a stale error.
+// best-effort delivery (false, nil), not a stale error — matching the
+// historical "nil == handed to tmux" contract.
 func TestSubmitEnterAndConfirmClearsStaleSendError(t *testing.T) {
 	var enters int
 	sendEnter := func() error {
@@ -124,7 +123,7 @@ func TestSubmitEnterAndConfirmClearsStaleSendError(t *testing.T) {
 }
 
 // TestSubmitEnterAndConfirmReturnsSendError proves a genuine tmux-layer send
-// failure (session gone) is surfaced.
+// failure (session gone) is surfaced, matching the pre-fix contract.
 func TestSubmitEnterAndConfirmReturnsSendError(t *testing.T) {
 	sendErr := errors.New("no server")
 	var enters int
@@ -140,20 +139,5 @@ func TestSubmitEnterAndConfirmReturnsSendError(t *testing.T) {
 	}
 	if enters != submitEnterMaxSends {
 		t.Fatalf("enters = %d, want %d", enters, submitEnterMaxSends)
-	}
-}
-
-func TestSubmitVerifyEligibleFamily(t *testing.T) {
-	if !submitVerifyEligibleFamily("claude") {
-		t.Fatal("claude should be verify-eligible")
-	}
-	if !submitVerifyEligibleFamily("codex") {
-		t.Fatal("codex should be verify-eligible")
-	}
-	if submitVerifyEligibleFamily("gemini") {
-		t.Fatal("gemini should not be verify-eligible (no reliable busy indicator)")
-	}
-	if submitVerifyEligibleFamily("") {
-		t.Fatal("empty family should not be verify-eligible")
 	}
 }

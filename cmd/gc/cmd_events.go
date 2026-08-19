@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -28,6 +29,11 @@ type eventsAPIScope struct {
 	explicitAPI        bool
 	localOnly          bool
 	localSupervisorAPI bool
+	// gen, when non-nil, is a pre-built AUTHENTICATED genclient for a remote
+	// --context/--city-url city (bearer + TLS + 401 re-mint, backed by the
+	// no-timeout stream client). client() returns it instead of the bare local
+	// genclient so `gc events --context` streams from a hosted city.
+	gen *genclient.ClientWithResponses
 }
 
 type eventsAPIError struct {
@@ -39,6 +45,62 @@ type eventsAPIError struct {
 type eventsAPITransportError struct {
 	err error
 }
+
+type cliWireEvent struct {
+	Actor            string          `json:"actor"`
+	Message          string          `json:"message,omitempty"`
+	Payload          json.RawMessage `json:"payload,omitempty"`
+	RunID            string          `json:"run_id,omitempty"`
+	SessionID        string          `json:"session_id,omitempty"`
+	StepID           string          `json:"step_id,omitempty"`
+	DependsOnStepIDs *[]string       `json:"depends_on_step_ids,omitempty"`
+	Seq              int64           `json:"seq"`
+	Subject          string          `json:"subject,omitempty"`
+	Ts               time.Time       `json:"ts"`
+	Type             string          `json:"type"`
+	OK               bool            `json:"ok"`
+}
+
+type cliWireTaggedEvent struct {
+	Actor            string          `json:"actor"`
+	City             string          `json:"city"`
+	Message          string          `json:"message,omitempty"`
+	Payload          json.RawMessage `json:"payload,omitempty"`
+	RunID            string          `json:"run_id,omitempty"`
+	SessionID        string          `json:"session_id,omitempty"`
+	StepID           string          `json:"step_id,omitempty"`
+	DependsOnStepIDs *[]string       `json:"depends_on_step_ids,omitempty"`
+	Seq              int64           `json:"seq"`
+	Subject          string          `json:"subject,omitempty"`
+	Ts               time.Time       `json:"ts"`
+	Type             string          `json:"type"`
+	OK               bool            `json:"ok"`
+}
+
+type cliEventsRotateResponse struct {
+	Rotated     bool                    `json:"rotated"`
+	Reason      string                  `json:"reason,omitempty"`
+	Archive     *cliEventsRotateArchive `json:"archive,omitempty"`
+	AnchorEvent *cliEventsRotateAnchor  `json:"anchor_event,omitempty"`
+	OK          bool                    `json:"ok"`
+}
+
+type cliEventsRotateArchive struct {
+	Path              string `json:"path"`
+	FirstSeq          uint64 `json:"first_seq"`
+	LastSeq           uint64 `json:"last_seq"`
+	CompressionStatus string `json:"compression_status"`
+}
+
+type cliEventsRotateAnchor struct {
+	Seq  uint64    `json:"seq"`
+	Type string    `json:"type"`
+	Ts   time.Time `json:"ts"`
+}
+
+type cliEventEnvelope = cliWireEvent
+
+type cliTaggedEventEnvelope = cliWireTaggedEvent
 
 func (e *eventsAPIError) Error() string {
 	if e == nil {
@@ -75,6 +137,9 @@ var eventsControllerAliveHook = controllerAlive
 func (s eventsAPIScope) isSupervisor() bool { return s.cityName == "" }
 
 func (s eventsAPIScope) client() (*genclient.ClientWithResponses, error) {
+	if s.gen != nil {
+		return s.gen, nil // authenticated remote (--context/--city-url) client
+	}
 	httpClient := &http.Client{}
 	return genclient.NewClientWithResponses(
 		s.apiURL,
@@ -119,6 +184,14 @@ DTO or SSE envelope.`,
 				fmt.Fprintln(stderr, "gc events: --after and --after-cursor are mutually exclusive") //nolint:errcheck
 				return errExit
 			}
+			// --after/--after-cursor resume a stream; the plain list and --seq
+			// paths do not consume them. Reject rather than silently ignore
+			// (a dropped --after otherwise returns the newest tail, masquerading
+			// as an events-after-N result). Time-bound a list with --since.
+			if (afterFlag > 0 || strings.TrimSpace(afterCursor) != "") && !followFlag && !watchFlag {
+				fmt.Fprintln(stderr, "gc events: --after/--after-cursor require --follow or --watch (they resume a stream); use --since to bound a list by time") //nolint:errcheck
+				return errExit
+			}
 			if seqFlag {
 				if cmdEventsSeq(apiURL, stdout, stderr) != 0 {
 					return errExit
@@ -152,9 +225,36 @@ DTO or SSE envelope.`,
 	cmd.Flags().StringVar(&timeoutFlag, "timeout", "30s", "Max wait duration for --watch (e.g. 30s, 5m)")
 	cmd.Flags().Uint64Var(&afterFlag, "after", 0, "Resume from this city event sequence number (city scope only)")
 	cmd.Flags().StringVar(&afterCursor, "after-cursor", "", "Resume from this supervisor event cursor (supervisor scope only)")
-	cmd.Flags().StringArrayVar(&payloadMatch, "payload-match", nil, "Filter by payload field (key=value, repeatable)")
+	cmd.Flags().StringArrayVar(&payloadMatch, "payload-match", nil, "Filter by payload field (key=value or key.subkey=value, repeatable)")
 	cmd.Flags().BoolVar(&jsonFlagDeprecated, "json", false, "Deprecated: output is always JSONL. Accepted for back-compat.")
 	_ = cmd.Flags().MarkDeprecated("json", "output is always JSONL; the flag is now a no-op and will be removed in a future release")
+	cmd.AddCommand(newEventsRotateCmd(stdout, stderr))
+	cmd.AddCommand(newEventsReemitExecutionCmd(stdout, stderr))
+	return cmd
+}
+
+func newEventsRotateCmd(stdout, stderr io.Writer) *cobra.Command {
+	var apiURL string
+	var wait bool
+	cmd := &cobra.Command{
+		Use:   "rotate",
+		Short: "Force rotate the city event log",
+		Long: `Force rotate the city event log through the running supervisor.
+
+Output is one JSON line. Empty active logs are successful no-ops.`,
+		Example: `  gc events rotate
+  gc events rotate --wait
+  gc --city /path/to/city events rotate --api http://127.0.0.1:8080`,
+		Args: cobra.NoArgs,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			if cmdEventsRotate(apiURL, wait, stdout, stderr) != 0 {
+				return errExit
+			}
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&apiURL, "api", "", "GC API server URL override (auto-discovered by default)")
+	cmd.Flags().BoolVar(&wait, "wait", false, "Wait for archive compression to complete before returning")
 	return cmd
 }
 
@@ -222,6 +322,15 @@ func cmdEventsWatch(apiURLOverride, typeFilter string, payloadMatchArgs []string
 	return doEventsWatch(scope, typeFilter, pm, afterSeq, afterCursor, timeout, stdout, stderr)
 }
 
+func cmdEventsRotate(apiURLOverride string, wait bool, stdout, stderr io.Writer) int {
+	scope, err := resolveEventsScope(apiURLOverride)
+	if err != nil {
+		fmt.Fprintln(stderr, "gc events: rotate requires a running supervisor; start it with 'gc supervisor start'") //nolint:errcheck
+		return 1
+	}
+	return doEventsRotate(scope, wait, stdout, stderr)
+}
+
 func openEventsScope(apiURLOverride string, stderr io.Writer) (eventsAPIScope, int) {
 	scope, err := resolveEventsScope(apiURLOverride)
 	if err != nil {
@@ -232,15 +341,26 @@ func openEventsScope(apiURLOverride string, stderr io.Writer) (eventsAPIScope, i
 }
 
 func resolveEventsScope(apiURLOverride string) (eventsAPIScope, error) {
-	cityPath, cfg, err := resolveDashboardContext()
-	if err != nil {
-		return eventsAPIScope{}, err
+	// --api is an alias of --city-url: both name a remote terminus and share the
+	// flag tier, so combining them (or --api with --context) is a loud conflict
+	// rather than a silent shadow (gate G3, Decision 4). A remote target set
+	// WITHOUT --api is instead refused by the capability gate below, when
+	// resolveDashboardContext -> resolveCity resolves it.
+	if strings.TrimSpace(apiURLOverride) != "" && remoteFlagPresent() {
+		return eventsAPIScope{}, fmt.Errorf("cannot combine --api with --city-url/--context: both select a remote city; use one")
 	}
-
-	cityName := resolvedEventsCityName(cityPath, cfg)
 	if override := strings.TrimSpace(apiURLOverride); override != "" {
 		localSupervisorAPI := matchesLocalSupervisorAPI(override)
-		cityName = resolvedExplicitEventsCityName(override, cityPath, cityName)
+		// Try local city context for display (soft fail — no-city and remote-
+		// only scenarios must both work when --api is explicit).
+		var cityPath, cityName string
+		if cp, cfg, cityErr := resolveDashboardContext(); cityErr == nil {
+			cityPath = cp
+			cityName = resolvedEventsCityName(cp, cfg)
+			if localSupervisorAPI {
+				cityName = resolvedManagedEventsCityName(cp, cityName)
+			}
+		}
 		return eventsAPIScope{
 			apiURL:             strings.TrimRight(override, "/"),
 			cityName:           cityName,
@@ -249,6 +369,39 @@ func resolveEventsScope(apiURLOverride string) (eventsAPIScope, error) {
 			localSupervisorAPI: localSupervisorAPI,
 		}, nil
 	}
+
+	// Remote target (--context/--city-url/env/sticky default): stream events from
+	// the hosted city with its context auth. Intercept here, before the local
+	// resolveDashboardContext path (which gates a remote target loudly). A
+	// city-discovery "not in a city directory" error is NOT fatal — the local
+	// path soft-fails it into the supervisor scope, so fall through instead of
+	// breaking `gc events` run outside a city directory against a supervisor.
+	rctx, rerr := resolveContextAllowRemote()
+	if rerr != nil && !isCityDiscoveryNotFound(rerr) {
+		return eventsAPIScope{}, rerr
+	}
+	if rerr == nil && rctx.Remote != nil {
+		opts, oerr := remoteClientOptions(rctx.Remote)
+		if oerr != nil {
+			return eventsAPIScope{}, oerr
+		}
+		gen, gerr := gcapi.NewRemoteEventsClient(rctx.Remote.BaseURL, opts)
+		if gerr != nil {
+			return eventsAPIScope{}, gerr
+		}
+		return eventsAPIScope{
+			apiURL:   strings.TrimRight(rctx.Remote.BaseURL, "/"),
+			cityName: rctx.Remote.CityName,
+			gen:      gen,
+		}, nil
+	}
+
+	cityPath, cfg, err := resolveDashboardContext()
+	if err != nil {
+		return eventsAPIScope{}, err
+	}
+
+	cityName := resolvedEventsCityName(cityPath, cfg)
 
 	if supervisorAliveHook() != 0 {
 		cityName = resolvedManagedEventsCityName(cityPath, cityName)
@@ -292,13 +445,6 @@ func resolveEventsScope(apiURLOverride string) (eventsAPIScope, error) {
 		cityPath,
 		"gc supervisor start",
 	)
-}
-
-func resolvedExplicitEventsCityName(apiURLOverride, cityPath, fallback string) string {
-	if !matchesLocalSupervisorAPI(apiURLOverride) {
-		return fallback
-	}
-	return resolvedManagedEventsCityName(cityPath, fallback)
 }
 
 func matchesLocalSupervisorAPI(apiURLOverride string) bool {
@@ -431,7 +577,7 @@ func doEvents(scope eventsAPIScope, typeFilter, sinceFlag string, payloadMatch m
 		return printJSONLines(items, stdout, stderr)
 	}
 
-	items, err := fetchCityEvents(ctx, client, scope.cityName, typeFilter, sinceFlag)
+	items, err := fetchCityEvents(ctx, client, scope.cityName, typeFilter, sinceFlag, stderr)
 	if err != nil {
 		if fallback, ok, fallbackErr := readLocalCityEvents(scope, err, typeFilter, sinceFlag, stderr); ok {
 			if fallbackErr != nil {
@@ -498,7 +644,7 @@ func doEventsSeq(scope eventsAPIScope, stdout, stderr io.Writer) int {
 	return 0
 }
 
-func readLocalCityEvents(scope eventsAPIScope, apiErr error, typeFilter, sinceFlag string, warningWriter io.Writer) ([]genclient.WireEvent, bool, error) {
+func readLocalCityEvents(scope eventsAPIScope, apiErr error, typeFilter, sinceFlag string, warningWriter io.Writer) ([]cliWireEvent, bool, error) {
 	if !shouldUseLocalCityEventsFallback(scope, apiErr) {
 		return nil, false, nil
 	}
@@ -512,7 +658,7 @@ func readLocalCityEvents(scope eventsAPIScope, apiErr error, typeFilter, sinceFl
 	if err != nil {
 		return nil, true, fmt.Errorf("reading local city events: %w", err)
 	}
-	items := make([]genclient.WireEvent, 0, len(all))
+	items := make([]cliWireEvent, 0, len(all))
 	for _, item := range all {
 		items = append(items, localWireEvent(item, warningWriter))
 	}
@@ -603,28 +749,63 @@ func eventsSinceCutoff(sinceFlag string) (time.Time, error) {
 	return time.Now().Add(-d), nil
 }
 
-func localWireEvent(e events.Event, warningWriter io.Writer) genclient.WireEvent {
-	item := genclient.WireEvent{
-		Actor: e.Actor,
-		Seq:   int64(e.Seq),
-		Ts:    e.Ts,
-		Type:  e.Type,
+func localWireEvent(e events.Event, _ io.Writer) cliWireEvent {
+	item := cliWireEvent{
+		Actor:            e.Actor,
+		Seq:              int64(e.Seq),
+		Ts:               e.Ts,
+		Type:             e.Type,
+		RunID:            e.RunID,
+		SessionID:        e.SessionID,
+		StepID:           e.StepID,
+		DependsOnStepIDs: cloneCLIEventStepDependencies(e.DependsOnStepIDs),
+		OK:               true,
 	}
 	if e.Subject != "" {
-		item.Subject = &e.Subject
+		item.Subject = e.Subject
 	}
 	if e.Message != "" {
-		item.Message = &e.Message
+		item.Message = e.Message
 	}
 	if len(e.Payload) > 0 && string(e.Payload) != "null" {
-		var payload genclient.EventPayload
-		if err := payload.UnmarshalJSON(e.Payload); err == nil {
-			item.Payload = &payload
-		} else if warningWriter != nil {
-			fmt.Fprintf(warningWriter, "gc events: warning: decoding local event payload for seq %d type %s: %v\n", e.Seq, e.Type, err) //nolint:errcheck // best-effort stderr
-		}
+		item.Payload = append(json.RawMessage(nil), e.Payload...)
 	}
 	return item
+}
+
+func cloneCLIEventStepDependencies(dependencies *[]string) *[]string {
+	if dependencies == nil {
+		return nil
+	}
+	clone := make([]string, len(*dependencies))
+	copy(clone, *dependencies)
+	return &clone
+}
+
+func cityWireEventFromTyped(item genclient.TypedEventStreamEnvelope) (cliWireEvent, error) {
+	data, err := json.Marshal(item)
+	if err != nil {
+		return cliWireEvent{}, err
+	}
+	var out cliWireEvent
+	if err := json.Unmarshal(data, &out); err != nil {
+		return cliWireEvent{}, err
+	}
+	out.OK = true
+	return out, nil
+}
+
+func supervisorWireEventFromTyped(item genclient.TypedTaggedEventStreamEnvelope) (cliWireTaggedEvent, error) {
+	data, err := json.Marshal(item)
+	if err != nil {
+		return cliWireTaggedEvent{}, err
+	}
+	var out cliWireTaggedEvent
+	if err := json.Unmarshal(data, &out); err != nil {
+		return cliWireTaggedEvent{}, err
+	}
+	out.OK = true
+	return out, nil
 }
 
 func doEventsFollow(scope eventsAPIScope, typeFilter string, payloadMatch map[string][]string, afterSeq uint64, afterCursor string, stdout, stderr io.Writer) int {
@@ -708,7 +889,7 @@ func doEventsWatch(scope eventsAPIScope, typeFilter string, payloadMatch map[str
 
 	resumeSeq := afterSeq
 	if resumeSeq > 0 {
-		items, err := fetchCityEvents(ctx, client, scope.cityName, "", "")
+		items, err := fetchCityEventsAfterSeq(ctx, client, scope.cityName, resumeSeq)
 		if err != nil {
 			if shouldUseLocalCityEventsFallback(scope, err) {
 				printStreamingCityAPIRequirement("--watch", stderr)
@@ -736,6 +917,112 @@ func doEventsWatch(scope eventsAPIScope, typeFilter string, payloadMatch map[str
 	return streamCityEvents(ctx, client, scope.cityName, resumeSeq, typeFilter, payloadMatch, true, stdout, stderr)
 }
 
+func doEventsRotate(scope eventsAPIScope, wait bool, stdout, stderr io.Writer) int {
+	if scope.localOnly || strings.TrimSpace(scope.apiURL) == "" {
+		printEventsRotateSupervisorRequired(stderr)
+		return 1
+	}
+	if scope.isSupervisor() {
+		fmt.Fprintln(stderr, "gc events: rotate requires a city in scope; run from a city directory or pass --city") //nolint:errcheck
+		return 1
+	}
+	// rotate is a MUTATION (POST /events/rotate). The remote events client is
+	// read-only (no city-write grant), so a hardened city would 401 even with a
+	// configured grant_command. Refuse it clearly rather than route a mutation
+	// through the read lane; the read events subcommands still stream remotely.
+	if scope.gen != nil {
+		fmt.Fprintln(stderr, "gc events rotate: not supported for a remote city (it mutates the events log; run it from the city's own host)") //nolint:errcheck
+		return 1
+	}
+
+	client, err := scope.client()
+	if err != nil {
+		fmt.Fprintf(stderr, "gc events: %v\n", err) //nolint:errcheck
+		return 1
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	resp, err := rotateCityEvents(ctx, client, scope.cityName, wait)
+	if err != nil {
+		printEventsRotateError(scope, err, stderr)
+		return 1
+	}
+	if wait && resp.Rotated && resp.Archive != nil && resp.Archive.CompressionStatus != "complete" {
+		_, _ = fmt.Fprintf(
+			stderr,
+			"gc events: rotation succeeded but compression did not complete within 30s; archive_path=%s; check disk space and retry\n",
+			resp.Archive.Path,
+		)
+		return 1
+	}
+	return printJSONLines(resp, stdout, stderr)
+}
+
+func rotateCityEvents(ctx context.Context, client *genclient.ClientWithResponses, cityName string, wait bool) (cliEventsRotateResponse, error) {
+	params := &genclient.RotateEventsParams{XGCRequest: "true"}
+	if wait {
+		params.Wait = &wait
+	}
+	resp, err := client.RotateEventsWithResponse(ctx, cityName, params)
+	if err != nil {
+		return cliEventsRotateResponse{}, &eventsAPITransportError{err: err}
+	}
+	if err := eventsListError(resp.StatusCode(), resp.Body); err != nil {
+		return cliEventsRotateResponse{}, err
+	}
+	if resp.JSON200 == nil {
+		return cliEventsRotateResponse{}, fmt.Errorf("empty rotate response")
+	}
+	return cliRotateResponseFromGen(*resp.JSON200)
+}
+
+func cliRotateResponseFromGen(item genclient.EventRotateResponse) (cliEventsRotateResponse, error) {
+	data, err := json.Marshal(item)
+	if err != nil {
+		return cliEventsRotateResponse{}, err
+	}
+	var out cliEventsRotateResponse
+	if err := json.Unmarshal(data, &out); err != nil {
+		return cliEventsRotateResponse{}, err
+	}
+	out.OK = true
+	return out, nil
+}
+
+func printEventsRotateError(scope eventsAPIScope, err error, stderr io.Writer) {
+	if isEventsRotateSupervisorRequired(err) {
+		printEventsRotateSupervisorRequired(stderr)
+		return
+	}
+
+	var apiErr *eventsAPIError
+	if errors.As(err, &apiErr) {
+		msg := strings.TrimSpace(apiErr.Error())
+		if apiErr.statusCode == http.StatusNotFound && gcapi.IsCityNotFoundOrNotRunningDetail(apiErr.detail) {
+			fmt.Fprintf(stderr, "gc events: city '%s' not found; run 'gc supervisor cities' to list registered cities\n", scope.cityName) //nolint:errcheck
+			return
+		}
+		if apiErr.statusCode == http.StatusMethodNotAllowed && strings.HasPrefix(msg, "rotation is only supported") {
+			msg = "rotate" + strings.TrimPrefix(msg, "rotation")
+		}
+		fmt.Fprintf(stderr, "gc events: %s\n", msg) //nolint:errcheck
+		return
+	}
+
+	fmt.Fprintf(stderr, "gc events: %v\n", err) //nolint:errcheck
+}
+
+func isEventsRotateSupervisorRequired(err error) bool {
+	var transport *eventsAPITransportError
+	return errors.As(err, &transport)
+}
+
+func printEventsRotateSupervisorRequired(stderr io.Writer) {
+	fmt.Fprintln(stderr, "gc events: rotate requires a running supervisor; start it with 'gc supervisor start'") //nolint:errcheck
+}
+
 func probeCityEventsReachable(ctx context.Context, client *genclient.ClientWithResponses, cityName string) error {
 	limit := int64(1)
 	resp, err := client.GetV0CityByCityNameEventsWithResponse(ctx, cityName, &genclient.GetV0CityByCityNameEventsParams{
@@ -744,18 +1031,35 @@ func probeCityEventsReachable(ctx context.Context, client *genclient.ClientWithR
 	if err != nil {
 		return &eventsAPITransportError{err: err}
 	}
-	return eventsListError(resp.StatusCode(), resp.ApplicationproblemJSONDefault)
+	return eventsListError(resp.StatusCode(), resp.Body)
 }
 
-func fetchCityEvents(ctx context.Context, client *genclient.ClientWithResponses, cityName, typeFilter, sinceFlag string) ([]genclient.WireEvent, error) {
-	limit := int64(500)
-	var all []genclient.WireEvent
-	var cursor *string
+// cityEventsPageLimit bounds one page of the city event list. The endpoint
+// serves seq-DESC pages and mints next_cursor when more matching rows exist
+// strictly below the page's oldest seq (#4194).
+const cityEventsPageLimit = int64(500)
 
+// fetchCityEvents fetches city events matching the type/since filter and
+// returns them chronologically (ascending seq). The endpoint is a keyset,
+// seq-DESC (newest first) paginated list; a truncated page carries a
+// next_cursor pointing strictly below the page's oldest seq.
+//
+// A bounded --since window is drained across pages so the requested window is
+// reported in full — otherwise any window holding more than one page of events
+// silently under-reports (the bug this fixes). Without --since the request is
+// unbounded, so the fetch stays a single page: gc events means "recent
+// activity", and a full descending drain of a 100 MB+ event history would blow
+// the command timeout for no user benefit. In that single-page case, when the
+// server signals more via next_cursor, an explicit truncation notice is written
+// to warn rather than silently dropping the older matches.
+func fetchCityEvents(ctx context.Context, client *genclient.ClientWithResponses, cityName, typeFilter, sinceFlag string, warn io.Writer) ([]cliWireEvent, error) {
+	paginate := strings.TrimSpace(sinceFlag) != ""
+	var all []cliWireEvent
+	cursor := ""
 	for {
+		limit := cityEventsPageLimit
 		params := &genclient.GetV0CityByCityNameEventsParams{
-			Cursor: cursor,
-			Limit:  &limit,
+			Limit: &limit,
 		}
 		if strings.TrimSpace(typeFilter) != "" {
 			params.Type = &typeFilter
@@ -763,22 +1067,106 @@ func fetchCityEvents(ctx context.Context, client *genclient.ClientWithResponses,
 		if strings.TrimSpace(sinceFlag) != "" {
 			params.Since = &sinceFlag
 		}
+		if cursor != "" {
+			params.Cursor = &cursor
+		}
 		resp, err := client.GetV0CityByCityNameEventsWithResponse(ctx, cityName, params)
 		if err != nil {
 			return nil, &eventsAPITransportError{err: err}
 		}
-		if err := eventsListError(resp.StatusCode(), resp.ApplicationproblemJSONDefault); err != nil {
+		if err := eventsListError(resp.StatusCode(), resp.Body); err != nil {
 			return nil, err
 		}
 		if resp.JSON200 == nil || resp.JSON200.Items == nil {
-			return all, nil
+			break
 		}
-		all = append(all, *resp.JSON200.Items...)
-		if resp.JSON200.NextCursor == nil || strings.TrimSpace(*resp.JSON200.NextCursor) == "" {
-			return all, nil
+		for _, item := range *resp.JSON200.Items {
+			wire, err := cityWireEventFromTyped(item)
+			if err != nil {
+				return nil, fmt.Errorf("decoding city event list item: %w", err)
+			}
+			all = append(all, wire)
 		}
-		cursor = resp.JSON200.NextCursor
+		next := ""
+		if resp.JSON200.NextCursor != nil {
+			next = strings.TrimSpace(*resp.JSON200.NextCursor)
+		}
+		if next == "" {
+			break // window (or the whole history) exhausted
+		}
+		if !paginate {
+			fmt.Fprintf(warn, "gc events: showing the newest %d events; older matching events were omitted. Use --since <duration> to fetch a full time window.\n", len(all)) //nolint:errcheck
+			break
+		}
+		if next == cursor {
+			// Defensive: a conforming server advances the keyset boundary
+			// strictly downward each page, so the cursor never repeats. Bail
+			// rather than spin forever on a misbehaving server.
+			break
+		}
+		cursor = next
 	}
+	sort.Slice(all, func(i, j int) bool { return all[i].Seq < all[j].Seq })
+	return all, nil
+}
+
+// fetchCityEventsAfterSeq returns every city event with Seq > afterSeq in
+// ascending seq order, walking the seq-DESC keyset list (#4194) from the head
+// and following next_cursor until a page descends to afterSeq (or the history
+// is exhausted). Unlike fetchCityEvents this paginates: the --watch buffered
+// replay needs the whole gap since the resume seq, and a single newest page
+// would silently drop events whenever more than one page arrived since afterSeq.
+// The walk is bounded by (head - afterSeq); --watch resumes are normally recent.
+func fetchCityEventsAfterSeq(ctx context.Context, client *genclient.ClientWithResponses, cityName string, afterSeq uint64) ([]cliWireEvent, error) {
+	var all []cliWireEvent
+	cursor := ""
+	for {
+		limit := int64(500)
+		params := &genclient.GetV0CityByCityNameEventsParams{
+			Limit: &limit,
+		}
+		if cursor != "" {
+			params.Cursor = &cursor
+		}
+		resp, err := client.GetV0CityByCityNameEventsWithResponse(ctx, cityName, params)
+		if err != nil {
+			return nil, &eventsAPITransportError{err: err}
+		}
+		if err := eventsListError(resp.StatusCode(), resp.Body); err != nil {
+			return nil, err
+		}
+		if resp.JSON200 == nil || resp.JSON200.Items == nil {
+			break
+		}
+		// Collect every event above the resume seq; note if this page reached
+		// down to or below it. Order-agnostic: a page that already spans the
+		// resume seq needs no older page, whichever way its rows are ordered.
+		reachedFloor := false
+		for _, item := range *resp.JSON200.Items {
+			wire, err := cityWireEventFromTyped(item)
+			if err != nil {
+				return nil, fmt.Errorf("decoding city event list item: %w", err)
+			}
+			if wire.Seq <= int64(afterSeq) {
+				reachedFloor = true
+				continue
+			}
+			all = append(all, wire)
+		}
+		if reachedFloor {
+			break // the page descended past the resume seq — history below is covered
+		}
+		next := ""
+		if resp.JSON200.NextCursor != nil {
+			next = strings.TrimSpace(*resp.JSON200.NextCursor)
+		}
+		if next == "" || next == cursor {
+			break // history exhausted (or a non-advancing cursor — bail rather than spin)
+		}
+		cursor = next
+	}
+	sort.Slice(all, func(i, j int) bool { return all[i].Seq < all[j].Seq })
+	return all, nil
 }
 
 func fetchCityHeadIndex(ctx context.Context, client *genclient.ClientWithResponses, cityName string) (string, error) {
@@ -789,7 +1177,7 @@ func fetchCityHeadIndex(ctx context.Context, client *genclient.ClientWithRespons
 	if err != nil {
 		return "", &eventsAPITransportError{err: err}
 	}
-	if err := eventsListError(resp.StatusCode(), resp.ApplicationproblemJSONDefault); err != nil {
+	if err := eventsListError(resp.StatusCode(), resp.Body); err != nil {
 		return "", err
 	}
 	if resp.HTTPResponse == nil {
@@ -802,7 +1190,7 @@ func fetchCityHeadIndex(ctx context.Context, client *genclient.ClientWithRespons
 	return index, nil
 }
 
-func fetchSupervisorEvents(ctx context.Context, client *genclient.ClientWithResponses, typeFilter, sinceFlag string) ([]genclient.WireTaggedEvent, error) {
+func fetchSupervisorEvents(ctx context.Context, client *genclient.ClientWithResponses, typeFilter, sinceFlag string) ([]cliWireTaggedEvent, error) {
 	return fetchSupervisorEventsWithLimit(ctx, client, typeFilter, sinceFlag, 0)
 }
 
@@ -811,7 +1199,7 @@ func fetchSupervisorEvents(ctx context.Context, client *genclient.ClientWithResp
 // most recent `limit` events. Used by fetchSupervisorHeadCursor so
 // computing the head cursor is a cheap round-trip instead of downloading
 // every event in the supervisor's history.
-func fetchSupervisorEventsWithLimit(ctx context.Context, client *genclient.ClientWithResponses, typeFilter, sinceFlag string, limit int64) ([]genclient.WireTaggedEvent, error) {
+func fetchSupervisorEventsWithLimit(ctx context.Context, client *genclient.ClientWithResponses, typeFilter, sinceFlag string, limit int64) ([]cliWireTaggedEvent, error) {
 	params := &genclient.GetV0EventsParams{}
 	if strings.TrimSpace(typeFilter) != "" {
 		params.Type = &typeFilter
@@ -826,13 +1214,21 @@ func fetchSupervisorEventsWithLimit(ctx context.Context, client *genclient.Clien
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	if err := eventsListError(resp.StatusCode(), resp.ApplicationproblemJSONDefault); err != nil {
+	if err := eventsListError(resp.StatusCode(), resp.Body); err != nil {
 		return nil, err
 	}
 	if resp.JSON200 == nil || resp.JSON200.Items == nil {
-		return []genclient.WireTaggedEvent{}, nil
+		return []cliWireTaggedEvent{}, nil
 	}
-	return *resp.JSON200.Items, nil
+	items := make([]cliWireTaggedEvent, 0, len(*resp.JSON200.Items))
+	for _, item := range *resp.JSON200.Items {
+		wire, err := supervisorWireEventFromTyped(item)
+		if err != nil {
+			return nil, fmt.Errorf("decoding supervisor event list item: %w", err)
+		}
+		items = append(items, wire)
+	}
+	return items, nil
 }
 
 // fetchSupervisorHeadCursor asks the supervisor for its current head
@@ -859,13 +1255,19 @@ func fetchSupervisorHeadCursor(ctx context.Context, client *genclient.ClientWith
 	return supervisorCursorFor(items), nil
 }
 
-func eventsListError(statusCode int, problem *genclient.ErrorModel) error {
+// eventsListError converts a non-2xx events response into a typed
+// eventsAPIError. It reads the problem+json body directly from the raw
+// response bytes rather than a generated per-status field: the events ops
+// enumerate their error statuses (no catch-all `default` response), so the
+// populated field varies by status, but the body is always an ErrorModel.
+func eventsListError(statusCode int, body []byte) error {
 	if statusCode >= 200 && statusCode < 300 {
 		return nil
 	}
 
 	err := &eventsAPIError{statusCode: statusCode}
-	if problem != nil {
+	var problem genclient.ErrorModel
+	if len(body) > 0 && json.Unmarshal(body, &problem) == nil {
 		if problem.Detail != nil {
 			err.detail = strings.TrimSpace(*problem.Detail)
 		}
@@ -878,14 +1280,14 @@ func eventsListError(statusCode int, problem *genclient.ErrorModel) error {
 
 func printJSONLines(items any, stdout, stderr io.Writer) int {
 	switch typed := items.(type) {
-	case []genclient.WireEvent:
+	case []cliWireEvent:
 		for _, item := range typed {
 			if err := writeJSONLValue(stdout, item); err != nil {
 				fmt.Fprintf(stderr, "gc events: marshal: %v\n", err) //nolint:errcheck
 				return 1
 			}
 		}
-	case []genclient.WireTaggedEvent:
+	case []cliWireTaggedEvent:
 		for _, item := range typed {
 			if err := writeJSONLValue(stdout, item); err != nil {
 				fmt.Fprintf(stderr, "gc events: marshal: %v\n", err) //nolint:errcheck
@@ -916,7 +1318,7 @@ func printJSONLines(items any, stdout, stderr io.Writer) int {
 }
 
 func writeJSONLValue(stdout io.Writer, value any) error {
-	data, err := json.Marshal(value)
+	data, err := json.Marshal(withDefaultSuccessOK(value))
 	if err != nil {
 		return err
 	}
@@ -924,11 +1326,11 @@ func writeJSONLValue(stdout io.Writer, value any) error {
 	return err
 }
 
-func filterCityEvents(items []genclient.WireEvent, afterSeq uint64, typeFilter string, payloadMatch map[string][]string) []genclient.WireEvent {
+func filterCityEvents(items []cliWireEvent, afterSeq uint64, typeFilter string, payloadMatch map[string][]string) []cliWireEvent {
 	if len(items) == 0 {
-		return []genclient.WireEvent{}
+		return []cliWireEvent{}
 	}
-	out := make([]genclient.WireEvent, 0, len(items))
+	out := make([]cliWireEvent, 0, len(items))
 	for _, item := range items {
 		if uint64(item.Seq) <= afterSeq {
 			continue
@@ -944,11 +1346,11 @@ func filterCityEvents(items []genclient.WireEvent, afterSeq uint64, typeFilter s
 	return out
 }
 
-func filterSupervisorEvents(items []genclient.WireTaggedEvent, typeFilter string, payloadMatch map[string][]string) []genclient.WireTaggedEvent {
+func filterSupervisorEvents(items []cliWireTaggedEvent, typeFilter string, payloadMatch map[string][]string) []cliWireTaggedEvent {
 	if len(items) == 0 {
-		return []genclient.WireTaggedEvent{}
+		return []cliWireTaggedEvent{}
 	}
-	out := make([]genclient.WireTaggedEvent, 0, len(items))
+	out := make([]cliWireTaggedEvent, 0, len(items))
 	for _, item := range items {
 		if typeFilter != "" && item.Type != typeFilter {
 			continue
@@ -961,9 +1363,9 @@ func filterSupervisorEvents(items []genclient.WireTaggedEvent, typeFilter string
 	return out
 }
 
-func filterSupervisorEventsAfterCursor(items []genclient.WireTaggedEvent, cursor, typeFilter string, payloadMatch map[string][]string) []genclient.WireTaggedEvent {
+func filterSupervisorEventsAfterCursor(items []cliWireTaggedEvent, cursor, typeFilter string, payloadMatch map[string][]string) []cliWireTaggedEvent {
 	cursors := events.ParseCursor(cursor)
-	out := make([]genclient.WireTaggedEvent, 0, len(items))
+	out := make([]cliWireTaggedEvent, 0, len(items))
 	for _, item := range items {
 		if uint64(item.Seq) <= cursors[item.City] {
 			continue
@@ -1000,6 +1402,92 @@ func streamReconnectBackoff(attempt int) time.Duration {
 		}
 	}
 	return d
+}
+
+// streamRetry is the decision for a non-200 SSE response: whether to reconnect,
+// an explicit backoff floor from a Retry-After header, and whether the failure
+// was a credential rejection (401) that a re-auth could recover.
+type streamRetry struct {
+	reconnect bool          // retry the connection (a transient server condition)
+	delay     time.Duration // Retry-After floor; 0 => use the caller's exponential backoff
+	reauth    bool          // 401 — the presented credential was rejected
+}
+
+// classifyStreamStatus maps a non-200 SSE status to a retry decision, shared by
+// the city and supervisor streams so both react identically. 429 (rate limited)
+// and 503 (server priming/unavailable) are transient → reconnect, honoring a
+// Retry-After header. 401 is a credential rejection → reauth (recoverable only
+// with a fresh credential, which the remote-events path supplies). 403/404/421
+// and any other status are permanent → no reconnect.
+func classifyStreamStatus(statusCode int, retryAfter string) streamRetry {
+	switch statusCode {
+	case http.StatusTooManyRequests, http.StatusServiceUnavailable:
+		return streamRetry{reconnect: true, delay: parseRetryAfter(retryAfter)}
+	case http.StatusUnauthorized:
+		return streamRetry{reauth: true}
+	default:
+		return streamRetry{}
+	}
+}
+
+// parseRetryAfter parses a Retry-After header value. Only the delta-seconds form
+// is honored (an HTTP-date is over-precise for a client backoff and is ignored);
+// the result is bounded so a hostile server cannot pin a client offline.
+func parseRetryAfter(v string) time.Duration {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return 0
+	}
+	secs, err := strconv.Atoi(v)
+	if err != nil || secs < 0 {
+		return 0
+	}
+	d := time.Duration(secs) * time.Second
+	if maxDelay := streamReconnectMax * 4; d > maxDelay {
+		d = maxDelay
+	}
+	return d
+}
+
+// waitForReconnectDelay sleeps for delay honoring ctx cancellation. It returns
+// false when ctx was canceled during the wait (the caller should stop). A zero
+// delay returns true immediately, leaving the caller's own backoff to apply.
+func waitForReconnectDelay(ctx context.Context, delay time.Duration) bool {
+	if delay <= 0 {
+		return true
+	}
+	select {
+	case <-ctx.Done():
+		return false
+	case <-time.After(delay):
+		return true
+	}
+}
+
+// handleStreamNon200 decides what a non-200 SSE response means for a follow/
+// watch stream, shared by the city and supervisor streams. A transient status
+// (429/503) reconnects after any Retry-After floor; a 401 is a terminal
+// credential rejection on this (unauthenticated) local path — the remote-events
+// path re-invokes the credential command instead; anything else prints the
+// server's error. --watch (stopAfterMatch) never reconnects: it is bounded by
+// its own timeout and exits on any setup failure, matching the connect-failed
+// path. Returns (exitCode, reconnect).
+func handleStreamNon200(ctx context.Context, resp *http.Response, stopAfterMatch bool, stderr io.Writer) (int, bool) {
+	class := classifyStreamStatus(resp.StatusCode, resp.Header.Get("Retry-After"))
+	if class.reauth {
+		resp.Body.Close()                                                                            //nolint:errcheck
+		fmt.Fprintln(stderr, "gc events: unauthorized (401); the presented credential was rejected") //nolint:errcheck
+		return 1, false
+	}
+	if class.reconnect && !stopAfterMatch {
+		resp.Body.Close()                                                                    //nolint:errcheck
+		fmt.Fprintf(stderr, "gc events: transient HTTP %d, reconnecting\n", resp.StatusCode) //nolint:errcheck
+		if !waitForReconnectDelay(ctx, class.delay) {
+			return 0, false
+		}
+		return 0, true
+	}
+	return printStreamError(resp, stderr), false
 }
 
 func streamCityEvents(ctx context.Context, client *genclient.ClientWithResponses, cityName string, afterSeq uint64, typeFilter string, payloadMatch map[string][]string, stopAfterMatch bool, stdout, stderr io.Writer) int {
@@ -1051,7 +1539,8 @@ func streamCityEventsOnce(ctx context.Context, client *genclient.ClientWithRespo
 		return 1, afterSeq, false
 	}
 	if resp.StatusCode != http.StatusOK {
-		return printStreamError(resp, stderr), afterSeq, false
+		exit, reconnect := handleStreamNon200(ctx, resp, stopAfterMatch, stderr)
+		return exit, afterSeq, reconnect
 	}
 	defer resp.Body.Close() //nolint:errcheck
 
@@ -1149,7 +1638,8 @@ func streamSupervisorEventsOnce(ctx context.Context, client *genclient.ClientWit
 		return 1, afterCursor, false
 	}
 	if resp.StatusCode != http.StatusOK {
-		return printStreamError(resp, stderr), afterCursor, false
+		exit, reconnect := handleStreamNon200(ctx, resp, stopAfterMatch, stderr)
+		return exit, afterCursor, reconnect
 	}
 	defer resp.Body.Close() //nolint:errcheck
 
@@ -1302,7 +1792,7 @@ func (d *sseDecoder) Next() (sseFrame, error) {
 	return sseFrame{}, io.EOF
 }
 
-func supervisorCursorFor(items []genclient.WireTaggedEvent) string {
+func supervisorCursorFor(items []cliWireTaggedEvent) string {
 	if len(items) == 0 {
 		return ""
 	}
@@ -1320,39 +1810,16 @@ func supervisorCursorFor(items []genclient.WireTaggedEvent) string {
 // identical JSONL output. The only structural difference between the
 // two shapes is the optional Workflow projection that the stream
 // attaches to bead events; list results omit it.
-func cityEnvelopesFor(items []genclient.WireEvent) []genclient.EventStreamEnvelope {
-	out := make([]genclient.EventStreamEnvelope, 0, len(items))
-	for _, item := range items {
-		out = append(out, genclient.EventStreamEnvelope{
-			Actor:   item.Actor,
-			Message: item.Message,
-			Payload: item.Payload,
-			Seq:     item.Seq,
-			Subject: item.Subject,
-			Ts:      item.Ts,
-			Type:    item.Type,
-		})
-	}
-	return out
+func cityEnvelopesFor(items []cliWireEvent) []cliEventEnvelope {
+	out := make([]cliEventEnvelope, 0, len(items))
+	return append(out, items...)
 }
 
 // taggedEnvelopesFor is the supervisor-scope analog of cityEnvelopesFor,
 // preserving the City tag for the aggregated events stream.
-func taggedEnvelopesFor(items []genclient.WireTaggedEvent) []genclient.TaggedEventStreamEnvelope {
-	out := make([]genclient.TaggedEventStreamEnvelope, 0, len(items))
-	for _, item := range items {
-		out = append(out, genclient.TaggedEventStreamEnvelope{
-			Actor:   item.Actor,
-			City:    item.City,
-			Message: item.Message,
-			Payload: item.Payload,
-			Seq:     item.Seq,
-			Subject: item.Subject,
-			Ts:      item.Ts,
-			Type:    item.Type,
-		})
-	}
-	return out
+func taggedEnvelopesFor(items []cliWireTaggedEvent) []cliTaggedEventEnvelope {
+	out := make([]cliTaggedEventEnvelope, 0, len(items))
+	return append(out, items...)
 }
 
 func matchPayload(payload any, payloadMatch map[string][]string) bool {
@@ -1387,7 +1854,7 @@ func matchPayload(payload any, payloadMatch map[string][]string) bool {
 
 func matchPayloadObject(obj map[string]any, payloadMatch map[string][]string) bool {
 	for key, wants := range payloadMatch {
-		value, ok := obj[key]
+		value, ok := lookupPayloadKey(obj, key)
 		if !ok {
 			return false
 		}
@@ -1404,6 +1871,48 @@ func matchPayloadObject(obj map[string]any, payloadMatch map[string][]string) bo
 		}
 	}
 	return true
+}
+
+// lookupPayloadKey resolves a key against a payload object, supporting
+// dotted paths into nested map[string]any values. A flat key like "type"
+// looks up at the top level; "bead.issue_type" walks obj["bead"]["issue_type"].
+//
+// This allows --payload-match to filter nested event payloads such as
+// bead.closed (where the actually-filterable fields live under
+// payload.bead.*). At each object level, an exact match for the remaining
+// key wins before walking another segment, so literal dotted keys such as
+// "gc.root_bead_id" under bead.metadata remain filterable.
+//
+// Returns (value, true) if the path resolves; (nil, false) if any segment
+// is missing or an intermediate value is not an object.
+func lookupPayloadKey(obj map[string]any, key string) (any, bool) {
+	if value, ok := obj[key]; ok {
+		return value, true
+	}
+	if !strings.Contains(key, ".") {
+		return nil, false
+	}
+	parts := strings.Split(key, ".")
+	current := obj
+	for i, part := range parts {
+		remaining := strings.Join(parts[i:], ".")
+		if value, ok := current[remaining]; ok {
+			return value, true
+		}
+		value, ok := current[part]
+		if !ok {
+			return nil, false
+		}
+		if i == len(parts)-1 {
+			return value, true
+		}
+		next, ok := value.(map[string]any)
+		if !ok {
+			return nil, false
+		}
+		current = next
+	}
+	return nil, false
 }
 
 func payloadValueString(value any) string {

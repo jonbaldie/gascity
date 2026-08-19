@@ -1,16 +1,22 @@
 package main
 
 import (
+	"bytes"
+	"context"
 	"io"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/gastownhall/gascity/internal/beads"
 	"github.com/gastownhall/gascity/internal/bootstrap"
+	"github.com/gastownhall/gascity/internal/citylayout"
 	"github.com/gastownhall/gascity/internal/config"
+	"github.com/gastownhall/gascity/internal/convergence"
 	"github.com/gastownhall/gascity/internal/fsys"
 	"github.com/gastownhall/gascity/internal/materialize"
 	"github.com/gastownhall/gascity/internal/runtime"
@@ -70,6 +76,33 @@ func TestPassthroughEnvOmitsUnset(t *testing.T) {
 	}
 }
 
+// The controller token is GC_-prefixed, so the sweep above would otherwise read
+// the controller's real token out of os.Environ() and write it straight back
+// over the empty value providerProcessPassthroughEnv() pinned.
+//
+// Withholding means PRESENT AND EMPTY, not absent: this map is an overlay on an
+// environment the session already inherits, so an absent key leaves the
+// controller's value showing through from the tmux server env or from
+// os.Environ() on the subprocess/ACP paths. The neighboring GC_ key proves the
+// exclusion is by exact name — a prefix match would strand the identity anchors
+// and the Dolt vars agents need.
+func TestPassthroughEnvPinsControllerTokenEmpty(t *testing.T) {
+	t.Setenv(convergence.TokenEnvVar, "super-secret-controller-token")
+	t.Setenv("GC_BEADS", "file")
+
+	got := passthroughEnv()
+
+	val, ok := got[convergence.TokenEnvVar]
+	if !ok {
+		t.Errorf("passthroughEnv() omits %s; want present and empty so the session cannot inherit the controller's value", convergence.TokenEnvVar)
+	} else if val != "" {
+		t.Errorf("passthroughEnv()[%s] = %q, want empty", convergence.TokenEnvVar, val)
+	}
+	if got["GC_BEADS"] != "file" {
+		t.Errorf("passthroughEnv()[GC_BEADS] = %q, want %q (the exclusion must be by exact name)", got["GC_BEADS"], "file")
+	}
+}
+
 func TestComputePoolSessions_NamepoolMaxOneUsesPoolInstance(t *testing.T) {
 	cfg := &config.City{
 		Workspace: config.Workspace{},
@@ -91,6 +124,484 @@ func TestComputePoolSessions_NamepoolMaxOneUsesPoolInstance(t *testing.T) {
 	}
 	if len(got) != 1 {
 		t.Fatalf("computePoolSessions len = %d, want 1 (%v)", len(got), got)
+	}
+}
+
+func TestComputePoolSessions_CanonicalSingletonUsesCanonicalSessionName(t *testing.T) {
+	cfg := &config.City{
+		Workspace: config.Workspace{},
+		Agents: []config.Agent{
+			{
+				Name:              "refinery",
+				Dir:               "cashmaster",
+				MaxActiveSessions: intPtr(1),
+				ScaleCheck:        "echo 1",
+				DrainTimeout:      "2m",
+			},
+		},
+	}
+
+	got := computePoolSessions(cfg, "city", "", runtime.NewFake())
+	want := startupSessionName("city", "cashmaster/refinery", cfg.Workspace.SessionTemplate)
+	if _, ok := got[want]; !ok {
+		t.Fatalf("computePoolSessions missing %q in %v", want, got)
+	}
+	if _, ok := got[startupSessionName("city", "cashmaster/refinery-1", cfg.Workspace.SessionTemplate)]; ok {
+		t.Fatalf("computePoolSessions registered phantom singleton instance in %v", got)
+	}
+	if len(got) != 1 {
+		t.Fatalf("computePoolSessions len = %d, want 1 (%v)", len(got), got)
+	}
+}
+
+func TestBuildLifecycleTrackers_CanonicalSingletonUsesCanonicalSessionName(t *testing.T) {
+	cfg := &config.City{
+		Workspace: config.Workspace{},
+		Agents: []config.Agent{
+			{
+				Name:              "refinery",
+				Dir:               "cashmaster",
+				MaxActiveSessions: intPtr(1),
+				ScaleCheck:        "echo 1",
+				IdleTimeout:       "5m",
+				MaxSessionAge:     "1h",
+			},
+		},
+	}
+	canonical := startupSessionName("city", "cashmaster/refinery", cfg.Workspace.SessionTemplate)
+	phantom := startupSessionName("city", "cashmaster/refinery-1", cfg.Workspace.SessionTemplate)
+
+	idle, ok := buildIdleTracker(cfg, "city", "", runtime.NewFake()).(*memoryIdleTracker)
+	if !ok {
+		t.Fatalf("buildIdleTracker returned %T, want *memoryIdleTracker", idle)
+	}
+	if _, ok := idle.timeouts[canonical]; !ok {
+		t.Fatalf("idle tracker missing canonical session %q in %v", canonical, idle.timeouts)
+	}
+	if _, ok := idle.timeouts[phantom]; ok {
+		t.Fatalf("idle tracker registered phantom singleton instance %q in %v", phantom, idle.timeouts)
+	}
+
+	maxAge, ok := buildMaxSessionAgeTracker(cfg, "city", runtime.NewFake()).(*memoryMaxSessionAgeTracker)
+	if !ok {
+		t.Fatalf("buildMaxSessionAgeTracker returned %T, want *memoryMaxSessionAgeTracker", maxAge)
+	}
+	if _, ok := maxAge.configs[canonical]; !ok {
+		t.Fatalf("max-age tracker missing canonical session %q in %v", canonical, maxAge.configs)
+	}
+	if _, ok := maxAge.configs[phantom]; ok {
+		t.Fatalf("max-age tracker registered phantom singleton instance %q in %v", phantom, maxAge.configs)
+	}
+}
+
+func TestBuildLifecycleTrackers_CanonicalSingletonIncludesLiveStaleSuffix(t *testing.T) {
+	cfg := &config.City{
+		Workspace: config.Workspace{},
+		Agents: []config.Agent{
+			{
+				Name:              "refinery",
+				Dir:               "cashmaster",
+				MaxActiveSessions: intPtr(1),
+				ScaleCheck:        "echo 1",
+				IdleTimeout:       "5m",
+				MaxSessionAge:     "1h",
+			},
+		},
+	}
+	stale := startupSessionName("city", "cashmaster/refinery-1", cfg.Workspace.SessionTemplate)
+	sp := runtime.NewFake()
+	if err := sp.Start(context.Background(), stale, runtime.Config{}); err != nil {
+		t.Fatalf("Start(%q): %v", stale, err)
+	}
+
+	idle, ok := buildIdleTracker(cfg, "city", "", sp).(*memoryIdleTracker)
+	if !ok {
+		t.Fatalf("buildIdleTracker returned %T, want *memoryIdleTracker", idle)
+	}
+	if _, ok := idle.timeouts[stale]; !ok {
+		t.Fatalf("idle tracker missing live stale singleton suffix %q in %v", stale, idle.timeouts)
+	}
+
+	maxAge, ok := buildMaxSessionAgeTracker(cfg, "city", sp).(*memoryMaxSessionAgeTracker)
+	if !ok {
+		t.Fatalf("buildMaxSessionAgeTracker returned %T, want *memoryMaxSessionAgeTracker", maxAge)
+	}
+	if _, ok := maxAge.configs[stale]; !ok {
+		t.Fatalf("max-age tracker missing live stale singleton suffix %q in %v", stale, maxAge.configs)
+	}
+}
+
+func TestBuildLifecycleTrackers_CanonicalSingletonNamedSessionOverlayOneKey(t *testing.T) {
+	cfg := &config.City{
+		Workspace: config.Workspace{},
+		Agents: []config.Agent{
+			{
+				Name:              "refinery",
+				Dir:               "cashmaster",
+				MaxActiveSessions: intPtr(1),
+				ScaleCheck:        "echo 1",
+				IdleTimeout:       "5m",
+				MaxSessionAge:     "1h",
+			},
+		},
+		NamedSessions: []config.NamedSession{{
+			Template: "refinery",
+			Dir:      "cashmaster",
+		}},
+	}
+	canonical := startupSessionName("city", "cashmaster/refinery", cfg.Workspace.SessionTemplate)
+
+	idle, ok := buildIdleTracker(cfg, "city", "", runtime.NewFake()).(*memoryIdleTracker)
+	if !ok {
+		t.Fatalf("buildIdleTracker returned %T, want *memoryIdleTracker", idle)
+	}
+	if len(idle.timeouts) != 1 {
+		t.Fatalf("idle tracker registered %d keys, want 1: %v", len(idle.timeouts), idle.timeouts)
+	}
+	if _, ok := idle.timeouts[canonical]; !ok {
+		t.Fatalf("idle tracker missing canonical session %q in %v", canonical, idle.timeouts)
+	}
+
+	maxAge, ok := buildMaxSessionAgeTracker(cfg, "city", runtime.NewFake()).(*memoryMaxSessionAgeTracker)
+	if !ok {
+		t.Fatalf("buildMaxSessionAgeTracker returned %T, want *memoryMaxSessionAgeTracker", maxAge)
+	}
+	if len(maxAge.configs) != 1 {
+		t.Fatalf("max-age tracker registered %d keys, want 1: %v", len(maxAge.configs), maxAge.configs)
+	}
+	if _, ok := maxAge.configs[canonical]; !ok {
+		t.Fatalf("max-age tracker missing canonical session %q in %v", canonical, maxAge.configs)
+	}
+}
+
+func TestBuildIdleTracker_PoolAgentTemplateFallbackMatchesReconcilerTemplate(t *testing.T) {
+	cfg := &config.City{
+		Workspace: config.Workspace{},
+		Agents: []config.Agent{
+			{
+				Name:              "builder",
+				Dir:               "local-core",
+				MinActiveSessions: intPtr(0),
+				MaxActiveSessions: intPtr(5),
+				IdleTimeout:       "1h",
+			},
+		},
+	}
+	template := cfg.Agents[0].QualifiedName()
+	sessionName := sessionNameFromBeadID("fm-r56l0x")
+	now := time.Date(2026, 5, 20, 12, 0, 0, 0, time.UTC)
+	sp := runtime.NewFake()
+	startFakeSession(t, sp, sessionName)
+	sp.SetActivity(sessionName, now.Add(-90*time.Minute))
+
+	idle, ok := buildIdleTracker(cfg, "city", "", sp).(*memoryIdleTracker)
+	if !ok {
+		t.Fatalf("buildIdleTracker returned %T, want *memoryIdleTracker", idle)
+	}
+	if _, ok := idle.templateTimeouts[template]; !ok {
+		t.Fatalf("idle tracker missing template %q in %v", template, idle.templateTimeouts)
+	}
+	if !idle.checkIdle(sessionName, template, sp, now) {
+		t.Fatalf("pool session %q did not idle out via template %q", sessionName, template)
+	}
+}
+
+func TestBuildIdleTracker_NamedOnDemandPoolRegistersNameAndTemplate(t *testing.T) {
+	cfg := &config.City{
+		Workspace: config.Workspace{},
+		Agents: []config.Agent{
+			{
+				Name:              "builder",
+				Dir:               "local-core",
+				MinActiveSessions: intPtr(0),
+				MaxActiveSessions: intPtr(5),
+				IdleTimeout:       "1h",
+			},
+		},
+		NamedSessions: []config.NamedSession{{
+			Template: "builder",
+			Dir:      "local-core",
+		}},
+	}
+	template := cfg.Agents[0].QualifiedName()
+	namedSession := config.NamedSessionRuntimeName("city", cfg.Workspace, template)
+	poolSession := sessionNameFromBeadID("fm-r56l0x")
+	now := time.Date(2026, 5, 20, 12, 0, 0, 0, time.UTC)
+	sp := runtime.NewFake()
+	startFakeSession(t, sp, namedSession)
+	startFakeSession(t, sp, poolSession)
+	sp.SetActivity(namedSession, now.Add(-90*time.Minute))
+	sp.SetActivity(poolSession, now.Add(-90*time.Minute))
+
+	idle, ok := buildIdleTracker(cfg, "city", "", sp).(*memoryIdleTracker)
+	if !ok {
+		t.Fatalf("buildIdleTracker returned %T, want *memoryIdleTracker", idle)
+	}
+	if _, ok := idle.timeouts[namedSession]; !ok {
+		t.Fatalf("idle tracker missing named session %q in %v", namedSession, idle.timeouts)
+	}
+	if _, ok := idle.templateTimeouts[template]; !ok {
+		t.Fatalf("idle tracker missing named pool template %q in %v", template, idle.templateTimeouts)
+	}
+	if !idle.checkIdle(namedSession, template, sp, now) {
+		t.Fatalf("named session %q did not idle out via per-name timeout", namedSession)
+	}
+	if !idle.checkIdle(poolSession, template, sp, now) {
+		t.Fatalf("pool session %q did not inherit template idle timeout", poolSession)
+	}
+}
+
+func TestBuildIdleTracker_NamedAlwaysPoolExemptsNamedOnly(t *testing.T) {
+	cfg := &config.City{
+		Workspace: config.Workspace{},
+		Agents: []config.Agent{
+			{
+				Name:              "builder",
+				Dir:               "local-core",
+				MinActiveSessions: intPtr(0),
+				MaxActiveSessions: intPtr(5),
+				IdleTimeout:       "1h",
+			},
+		},
+		NamedSessions: []config.NamedSession{{
+			Template: "builder",
+			Dir:      "local-core",
+			Mode:     "always",
+		}},
+	}
+	template := cfg.Agents[0].QualifiedName()
+	namedSession := config.NamedSessionRuntimeName("city", cfg.Workspace, template)
+	poolSession := sessionNameFromBeadID("fm-r56l0x")
+	now := time.Date(2026, 5, 20, 12, 0, 0, 0, time.UTC)
+	sp := runtime.NewFake()
+	startFakeSession(t, sp, namedSession)
+	startFakeSession(t, sp, poolSession)
+	sp.SetActivity(namedSession, now.Add(-90*time.Minute))
+	sp.SetActivity(poolSession, now.Add(-90*time.Minute))
+
+	idle, ok := buildIdleTracker(cfg, "city", "", sp).(*memoryIdleTracker)
+	if !ok {
+		t.Fatalf("buildIdleTracker returned %T, want *memoryIdleTracker", idle)
+	}
+	if _, ok := idle.templateTimeouts[template]; !ok {
+		t.Fatalf("idle tracker missing named pool template %q in %v", template, idle.templateTimeouts)
+	}
+	if idle.checkIdle(namedSession, template, sp, now) {
+		t.Fatalf("always named session %q must not inherit template idle timeout", namedSession)
+	}
+	if !idle.checkIdle(poolSession, template, sp, now) {
+		t.Fatalf("pool session %q did not inherit template idle timeout", poolSession)
+	}
+}
+
+func TestBuildIdleTracker_AliasAlwaysNamedPoolExemptsAliasOnly(t *testing.T) {
+	cfg := &config.City{
+		Workspace: config.Workspace{},
+		Agents: []config.Agent{
+			{
+				Name:              "builder",
+				Dir:               "local-core",
+				MinActiveSessions: intPtr(0),
+				MaxActiveSessions: intPtr(5),
+				IdleTimeout:       "1h",
+			},
+		},
+		NamedSessions: []config.NamedSession{{
+			Name:     "primary",
+			Template: "builder",
+			Dir:      "local-core",
+			Mode:     "always",
+		}},
+	}
+	template := cfg.Agents[0].QualifiedName()
+	namedSession := config.NamedSessionRuntimeName("city", cfg.Workspace, cfg.NamedSessions[0].QualifiedName())
+	poolSession := sessionNameFromBeadID("fm-r56l0x")
+	now := time.Date(2026, 5, 20, 12, 0, 0, 0, time.UTC)
+	sp := runtime.NewFake()
+	startFakeSession(t, sp, namedSession)
+	startFakeSession(t, sp, poolSession)
+	sp.SetActivity(namedSession, now.Add(-90*time.Minute))
+	sp.SetActivity(poolSession, now.Add(-90*time.Minute))
+
+	idle, ok := buildIdleTracker(cfg, "city", "", sp).(*memoryIdleTracker)
+	if !ok {
+		t.Fatalf("buildIdleTracker returned %T, want *memoryIdleTracker", idle)
+	}
+	if idle.checkIdle(namedSession, template, sp, now) {
+		t.Fatalf("alias always-named session %q must not inherit template idle timeout", namedSession)
+	}
+	if !idle.checkIdle(poolSession, template, sp, now) {
+		t.Fatalf("pool session %q did not inherit template idle timeout", poolSession)
+	}
+}
+
+func TestBuildIdleTracker_NamedAlwaysNoExplicitPoolRegistersTemplateFallback(t *testing.T) {
+	cfg := &config.City{
+		Workspace: config.Workspace{},
+		Agents: []config.Agent{
+			{
+				Name:        "builder",
+				Dir:         "local-core",
+				IdleTimeout: "1h",
+			},
+		},
+		NamedSessions: []config.NamedSession{{
+			Template: "builder",
+			Dir:      "local-core",
+			Mode:     "always",
+		}},
+	}
+	template := cfg.Agents[0].QualifiedName()
+	namedSession := config.NamedSessionRuntimeName("city", cfg.Workspace, template)
+	poolSession := sessionNameFromBeadID("fm-r56l0x")
+	now := time.Date(2026, 5, 20, 12, 0, 0, 0, time.UTC)
+	sp := runtime.NewFake()
+	startFakeSession(t, sp, namedSession)
+	startFakeSession(t, sp, poolSession)
+	sp.SetActivity(namedSession, now.Add(-90*time.Minute))
+	sp.SetActivity(poolSession, now.Add(-90*time.Minute))
+
+	idle, ok := buildIdleTracker(cfg, "city", "", sp).(*memoryIdleTracker)
+	if !ok {
+		t.Fatalf("buildIdleTracker returned %T, want *memoryIdleTracker", idle)
+	}
+	if _, ok := idle.templateTimeouts[template]; !ok {
+		t.Fatalf("idle tracker missing template %q in %v", template, idle.templateTimeouts)
+	}
+	if idle.checkIdle(namedSession, template, sp, now) {
+		t.Fatalf("always named session %q must not inherit template idle timeout", namedSession)
+	}
+	if !idle.checkIdle(poolSession, template, sp, now) {
+		t.Fatalf("pool session %q did not inherit template idle timeout", poolSession)
+	}
+}
+
+func TestBuildMaxSessionAgeTracker_PoolAgentTemplateFallback(t *testing.T) {
+	cfg := &config.City{
+		Workspace: config.Workspace{},
+		Agents: []config.Agent{
+			{
+				Name:              "builder",
+				Dir:               "local-core",
+				MinActiveSessions: intPtr(0),
+				MaxActiveSessions: intPtr(5),
+				MaxSessionAge:     "1h",
+			},
+		},
+	}
+	template := cfg.Agents[0].QualifiedName()
+	sessionName := sessionNameFromBeadID("fm-r56l0x")
+	now := time.Date(2026, 5, 20, 12, 0, 0, 0, time.UTC)
+
+	maxAge, ok := buildMaxSessionAgeTracker(cfg, "city", runtime.NewFake()).(*memoryMaxSessionAgeTracker)
+	if !ok {
+		t.Fatalf("buildMaxSessionAgeTracker returned %T, want *memoryMaxSessionAgeTracker", maxAge)
+	}
+	if _, ok := maxAge.templateConfigs[template]; !ok {
+		t.Fatalf("max-age tracker missing template %q in %v", template, maxAge.templateConfigs)
+	}
+	if !maxAge.shouldRestart(sessionName, template, now.Add(-2*time.Hour), now) {
+		t.Fatalf("pool session %q did not max-age restart via template %q", sessionName, template)
+	}
+}
+
+func TestBuildMaxSessionAgeTracker_NamedAlwaysNoExplicitPoolRegistersTemplateFallback(t *testing.T) {
+	cfg := &config.City{
+		Workspace: config.Workspace{},
+		Agents: []config.Agent{
+			{
+				Name:          "builder",
+				Dir:           "local-core",
+				MaxSessionAge: "1h",
+			},
+		},
+		NamedSessions: []config.NamedSession{{
+			Template: "builder",
+			Dir:      "local-core",
+			Mode:     "always",
+		}},
+	}
+	template := cfg.Agents[0].QualifiedName()
+	namedSession := config.NamedSessionRuntimeName("city", cfg.Workspace, template)
+	poolSession := sessionNameFromBeadID("fm-r56l0x")
+	now := time.Date(2026, 5, 20, 12, 0, 0, 0, time.UTC)
+
+	maxAge, ok := buildMaxSessionAgeTracker(cfg, "city", runtime.NewFake()).(*memoryMaxSessionAgeTracker)
+	if !ok {
+		t.Fatalf("buildMaxSessionAgeTracker returned %T, want *memoryMaxSessionAgeTracker", maxAge)
+	}
+	if _, ok := maxAge.templateConfigs[template]; !ok {
+		t.Fatalf("max-age tracker missing template %q in %v", template, maxAge.templateConfigs)
+	}
+	if maxAge.shouldRestart(namedSession, template, now.Add(-2*time.Hour), now) {
+		t.Fatalf("always named session %q must not inherit template max age", namedSession)
+	}
+	if !maxAge.shouldRestart(poolSession, template, now.Add(-2*time.Hour), now) {
+		t.Fatalf("pool session %q did not max-age restart via template %q", poolSession, template)
+	}
+}
+
+func TestLifecycleTemplateFallbackKeyMatchesTemplateParamsTemplateName(t *testing.T) {
+	agent := config.Agent{
+		Name:              "builder",
+		Dir:               "local-core",
+		MaxActiveSessions: intPtr(5),
+	}
+	template := lifecycleTemplateFallbackKey(agent)
+	if want := agent.QualifiedName(); template != want {
+		t.Fatalf("lifecycleTemplateFallbackKey = %q, want %q", template, want)
+	}
+
+	poolAgent, qualifiedInstance, _ := poolDesiredRequestIdentity(&agent, 1)
+	if got := templateNameFor(poolAgent, qualifiedInstance); got != template {
+		t.Fatalf("pool TemplateName = %q, want lifecycle fallback key %q", got, template)
+	}
+	namedIdentity := "local-core/primary"
+	if got := templateNameFor(&agent, namedIdentity); got != template {
+		t.Fatalf("named TemplateName = %q, want lifecycle fallback key %q", got, template)
+	}
+	if got := templateNameFor(&agent, agent.QualifiedName()); got != template {
+		t.Fatalf("base TemplateName = %q, want lifecycle fallback key %q", got, template)
+	}
+}
+
+func TestExemptAlwaysNamedTemplateFallbacksUsesBindingQualifiedRuntimeName(t *testing.T) {
+	cfg := &config.City{
+		Workspace: config.Workspace{},
+		NamedSessions: []config.NamedSession{
+			{
+				Name:     "primary",
+				Template: "builder",
+				Dir:      "local-core",
+				Mode:     "always",
+			},
+			{
+				Name:     "secondary",
+				Template: "builder",
+				Dir:      "local-core",
+				Mode:     "on_demand",
+			},
+			{
+				Name:     "other",
+				Template: "reviewer",
+				Dir:      "local-core",
+				Mode:     "always",
+			},
+		},
+	}
+	template := "local-core/builder"
+	want := config.NamedSessionRuntimeName("city", cfg.Workspace, "local-core/primary")
+	var got []string
+
+	exemptAlwaysNamedTemplateFallbacks(cfg, "city", template, func(sessionName string) {
+		got = append(got, sessionName)
+	})
+
+	if len(got) != 1 {
+		t.Fatalf("exempt callback called %d times, want 1: %v", len(got), got)
+	}
+	if got[0] != want {
+		t.Fatalf("exempted session = %q, want %q", got[0], want)
 	}
 }
 
@@ -120,6 +631,98 @@ func TestStandaloneBuildAgentsFnWithSessionBeads_UsesRigStoresForAssignedWork(t 
 	}
 	if result.AssignedWorkBeads[0].ID != handoff.ID {
 		t.Fatalf("AssignedWorkBeads[0].ID = %q, want %q", result.AssignedWorkBeads[0].ID, handoff.ID)
+	}
+}
+
+func TestReleaseOrphanedPoolAssignmentsWhenSnapshotsComplete_PartialSkipsCompleteReleases(t *testing.T) {
+	store := beads.NewMemStore()
+	work, err := store.Create(beads.Bead{
+		ID:       "ga-live",
+		Title:    "live assigned work from partial snapshot",
+		Type:     "task",
+		Assignee: "worker-session",
+		Metadata: map[string]string{
+			"gc.routed_to": "worker",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Create work bead: %v", err)
+	}
+	inProgress := "in_progress"
+	if err := store.Update(work.ID, beads.UpdateOpts{Status: &inProgress}); err != nil {
+		t.Fatalf("mark work in_progress: %v", err)
+	}
+	work.Status = inProgress
+
+	released := releaseOrphanedPoolAssignmentsWhenSnapshotsComplete(
+		store,
+		beads.SessionStore{Store: store},
+		&config.City{Agents: []config.Agent{{Name: "worker", MinActiveSessions: intPtr(0), MaxActiveSessions: intPtr(5)}}},
+		"",
+		nil,
+		DesiredStateResult{
+			AssignedWorkBeads:  []beads.Bead{work},
+			AssignedWorkStores: []beads.Store{store},
+			StoreQueryPartial:  true,
+		},
+		nil,
+	)
+	if len(released) != 0 {
+		t.Fatalf("released %d work bead(s) from a partial snapshot, want none", len(released))
+	}
+	got, err := store.Get(work.ID)
+	if err != nil {
+		t.Fatalf("Get work after partial one-shot release: %v", err)
+	}
+	if got.Status != "in_progress" || got.Assignee != "worker-session" {
+		t.Fatalf("partial one-shot snapshot released work: status=%q assignee=%q", got.Status, got.Assignee)
+	}
+
+	released = releaseOrphanedPoolAssignmentsWhenSnapshotsComplete(
+		store,
+		beads.SessionStore{Store: store},
+		&config.City{Agents: []config.Agent{{Name: "worker", MinActiveSessions: intPtr(0), MaxActiveSessions: intPtr(5)}}},
+		"",
+		nil,
+		DesiredStateResult{
+			AssignedWorkBeads:   []beads.Bead{work},
+			AssignedWorkStores:  []beads.Store{store},
+			SessionQueryPartial: true,
+		},
+		nil,
+	)
+	if len(released) != 0 {
+		t.Fatalf("released %d work bead(s) from a partial session snapshot, want none", len(released))
+	}
+	got, err = store.Get(work.ID)
+	if err != nil {
+		t.Fatalf("Get work after partial session snapshot release: %v", err)
+	}
+	if got.Status != "in_progress" || got.Assignee != "worker-session" {
+		t.Fatalf("partial session snapshot released work: status=%q assignee=%q", got.Status, got.Assignee)
+	}
+
+	released = releaseOrphanedPoolAssignmentsWhenSnapshotsComplete(
+		store,
+		beads.SessionStore{Store: store},
+		&config.City{Agents: []config.Agent{{Name: "worker", MinActiveSessions: intPtr(0), MaxActiveSessions: intPtr(5)}}},
+		"",
+		nil,
+		DesiredStateResult{
+			AssignedWorkBeads:  []beads.Bead{work},
+			AssignedWorkStores: []beads.Store{store},
+		},
+		nil,
+	)
+	if len(released) != 1 {
+		t.Fatalf("complete one-shot snapshot released %d work bead(s), want 1", len(released))
+	}
+	got, err = store.Get(work.ID)
+	if err != nil {
+		t.Fatalf("Get work after complete one-shot release: %v", err)
+	}
+	if got.Status != "open" || got.Assignee != "" {
+		t.Fatalf("complete one-shot snapshot did not release orphaned work: status=%q assignee=%q", got.Status, got.Assignee)
 	}
 }
 
@@ -191,19 +794,35 @@ func TestPassthroughEnvIncludesClaudeAuthContext(t *testing.T) {
 	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "oauth-token")
 	t.Setenv("ANTHROPIC_API_KEY", "sk-ant-123")
 	t.Setenv("ANTHROPIC_AUTH_TOKEN", "anth-auth-token")
+	t.Setenv("ANTHROPIC_BASE_URL", "https://ollama.com")
+	t.Setenv("ANTHROPIC_DEFAULT_HAIKU_MODEL", "kimi-k2.5")
+	t.Setenv("ANTHROPIC_DEFAULT_SONNET_MODEL", "kimi-k2.5")
+	t.Setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", "kimi-k2.5")
+	t.Setenv("CLAUDE_CODE_SUBAGENT_MODEL", "kimi-k2.5")
+	t.Setenv("CLAUDE_CODE_EFFORT_LEVEL", "auto")
+	t.Setenv("CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", "1")
+	t.Setenv("OLLAMA_API_KEY", "ollama-token")
 
 	got := passthroughEnv()
 
 	for key, want := range map[string]string{
-		"HOME":                    "/tmp/gc-home",
-		"USER":                    "gcuser",
-		"LOGNAME":                 "gcuser",
-		"XDG_CONFIG_HOME":         "/tmp/gc-home/.config",
-		"XDG_STATE_HOME":          "/tmp/gc-home/.local/state",
-		"CLAUDE_CONFIG_DIR":       "/tmp/gc-home/.claude",
-		"CLAUDE_CODE_OAUTH_TOKEN": "oauth-token",
-		"ANTHROPIC_API_KEY":       "sk-ant-123",
-		"ANTHROPIC_AUTH_TOKEN":    "anth-auth-token",
+		"HOME":                                     "/tmp/gc-home",
+		"USER":                                     "gcuser",
+		"LOGNAME":                                  "gcuser",
+		"XDG_CONFIG_HOME":                          "/tmp/gc-home/.config",
+		"XDG_STATE_HOME":                           "/tmp/gc-home/.local/state",
+		"CLAUDE_CONFIG_DIR":                        "/tmp/gc-home/.claude",
+		"CLAUDE_CODE_OAUTH_TOKEN":                  "oauth-token",
+		"ANTHROPIC_API_KEY":                        "sk-ant-123",
+		"ANTHROPIC_AUTH_TOKEN":                     "anth-auth-token",
+		"ANTHROPIC_BASE_URL":                       "https://ollama.com",
+		"ANTHROPIC_DEFAULT_HAIKU_MODEL":            "kimi-k2.5",
+		"ANTHROPIC_DEFAULT_SONNET_MODEL":           "kimi-k2.5",
+		"ANTHROPIC_DEFAULT_OPUS_MODEL":             "kimi-k2.5",
+		"CLAUDE_CODE_SUBAGENT_MODEL":               "kimi-k2.5",
+		"CLAUDE_CODE_EFFORT_LEVEL":                 "auto",
+		"CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+		"OLLAMA_API_KEY":                           "ollama-token",
 	} {
 		if got[key] != want {
 			t.Errorf("passthroughEnv()[%s] = %q, want %q", key, got[key], want)
@@ -219,6 +838,10 @@ func TestPassthroughEnvIncludesProviderCredentialEnv(t *testing.T) {
 	t.Setenv("GOOGLE_API_KEY", "google-123")
 	t.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "/tmp/google-credentials.json")
 	t.Setenv("GOOGLE_CLOUD_PROJECT", "gc-project")
+	t.Setenv("DEEPSEEK_API_KEY", "ds-123")
+	t.Setenv("OLLAMA_HOST", "http://localhost:11434")
+	t.Setenv("AWS_ACCESS_KEY_ID", "AKIA123")
+	t.Setenv("AWS_PAGER", "less")
 
 	got := passthroughEnv()
 
@@ -230,10 +853,16 @@ func TestPassthroughEnvIncludesProviderCredentialEnv(t *testing.T) {
 		"GOOGLE_API_KEY":                 "google-123",
 		"GOOGLE_APPLICATION_CREDENTIALS": "/tmp/google-credentials.json",
 		"GOOGLE_CLOUD_PROJECT":           "gc-project",
+		"DEEPSEEK_API_KEY":               "ds-123",
+		"OLLAMA_HOST":                    "http://localhost:11434",
+		"AWS_ACCESS_KEY_ID":              "AKIA123",
 	} {
 		if got[key] != want {
 			t.Errorf("passthroughEnv()[%s] = %q, want %q", key, got[key], want)
 		}
+	}
+	if _, ok := got["AWS_PAGER"]; ok {
+		t.Errorf("passthroughEnv() should not include broad AWS runtime state")
 	}
 }
 
@@ -295,6 +924,19 @@ func TestPassthroughEnvClearsClaudeNestingUnconditionally(t *testing.T) {
 	}
 	if v, ok := got["CLAUDE_CODE_ENTRYPOINT"]; !ok || v != "" {
 		t.Errorf("CLAUDE_CODE_ENTRYPOINT should be present and empty, got ok=%v v=%q", ok, v)
+	}
+}
+
+func TestPassthroughEnvStripsCodexSessionContext(t *testing.T) {
+	t.Setenv("CODEX_THREAD_ID", "thread-123")
+	t.Setenv("CODEX_CI", "1")
+
+	got := passthroughEnv()
+
+	for _, key := range []string{"CODEX_THREAD_ID", "CODEX_CI"} {
+		if v, ok := got[key]; !ok || v != "" {
+			t.Errorf("%s should be present and empty, got ok=%v v=%q", key, ok, v)
+		}
 	}
 }
 
@@ -385,18 +1027,20 @@ func TestStageHookFilesIncludesCanonicalClaudeHook(t *testing.T) {
 		t.Fatalf("WriteFile(%q): %v", settingsPath, err)
 	}
 
-	got := stageHookFiles(nil, cityDir, workDir)
+	got := stageHookFiles(nil, cityDir, workDir, []string{"claude"})
 	for _, entry := range got {
 		// City-root-relative hook: no workDir prefix in RelDst.
 		if entry.RelDst == path.Join(".gc", "settings.json") {
 			if entry.Src != settingsPath {
 				t.Fatalf("stageHookFiles() staged %q, want %q", entry.Src, settingsPath)
 			}
-			if !entry.Probed {
-				t.Fatal("stageHookFiles() .gc/settings.json not marked Probed")
+			// .gc/settings.json must NOT be probed: binary-upgrade rewrites of the
+			// managed settings file must not cascade stale-session drains. (ga-zfm)
+			if entry.Probed {
+				t.Fatal("stageHookFiles() .gc/settings.json must not be marked Probed; content changes are ambient")
 			}
-			if entry.ContentHash == "" {
-				t.Fatal("stageHookFiles() .gc/settings.json has empty ContentHash")
+			if entry.ContentHash != "" {
+				t.Fatal("stageHookFiles() .gc/settings.json must have empty ContentHash when not probed")
 			}
 			return
 		}
@@ -415,7 +1059,7 @@ func TestStageHookFilesFallsBackToLegacyClaudeHook(t *testing.T) {
 		t.Fatalf("WriteFile(%q): %v", hookPath, err)
 	}
 
-	got := stageHookFiles(nil, cityDir, workDir)
+	got := stageHookFiles(nil, cityDir, workDir, []string{"claude"})
 	for _, entry := range got {
 		if entry.RelDst == path.Join("hooks", "claude.json") {
 			if entry.Src != hookPath {
@@ -433,6 +1077,57 @@ func TestStageHookFilesFallsBackToLegacyClaudeHook(t *testing.T) {
 	t.Fatal("stageHookFiles() did not stage hooks/claude.json")
 }
 
+// TestRuntimeSettingsContentChangeDoesNotCascadeStaleSession is a regression
+// test for ga-zfm: a gc binary upgrade rewrites .gc/settings.json, which must
+// not produce a different CopyFiles fingerprint for previously-started sessions.
+// The fix marks .gc/settings.json as Probed:false so only the path is hashed.
+func TestRuntimeSettingsContentChangeDoesNotCascadeStaleSession(t *testing.T) {
+	cityDir := filepath.Join(t.TempDir(), "city")
+	workDir := filepath.Join(cityDir, "worker")
+	settingsPath := filepath.Join(cityDir, ".gc", "settings.json")
+	if err := os.MkdirAll(filepath.Dir(settingsPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+
+	// Write settings with "v1" content (before binary upgrade).
+	if err := os.WriteFile(settingsPath, []byte(`{"hooks":{"v1":true}}`), 0o644); err != nil {
+		t.Fatalf("WriteFile v1: %v", err)
+	}
+	before := stageHookFiles(nil, cityDir, workDir, []string{"claude"})
+
+	// Simulate binary upgrade: rewrite settings with new embedded defaults.
+	if err := os.WriteFile(settingsPath, []byte(`{"hooks":{"v2":true}}`), 0o644); err != nil {
+		t.Fatalf("WriteFile v2: %v", err)
+	}
+	after := stageHookFiles(nil, cityDir, workDir, []string{"claude"})
+
+	// Locate the settings entry in both results.
+	settingsRel := path.Join(".gc", "settings.json")
+	find := func(entries []runtime.CopyEntry) runtime.CopyEntry {
+		for _, e := range entries {
+			if e.RelDst == settingsRel {
+				return e
+			}
+		}
+		t.Fatalf("stageHookFiles: .gc/settings.json not staged")
+		return runtime.CopyEntry{}
+	}
+	eBefore := find(before)
+	eAfter := find(after)
+
+	// Content hash must be empty (not probed) and must be identical before/after
+	// so that CoreFingerprint produces the same hash regardless of file content.
+	if eBefore.Probed || eAfter.Probed {
+		t.Error(".gc/settings.json must not be marked Probed; content changes are ambient")
+	}
+	if eBefore.ContentHash != "" || eAfter.ContentHash != "" {
+		t.Error(".gc/settings.json ContentHash must be empty when not probed")
+	}
+	if eBefore.Src != eAfter.Src || eBefore.RelDst != eAfter.RelDst {
+		t.Errorf("Src/RelDst changed: before={%q %q} after={%q %q}", eBefore.Src, eBefore.RelDst, eAfter.Src, eAfter.RelDst)
+	}
+}
+
 func TestStageHookFilesDoesNotStageClaudeSkillsDir(t *testing.T) {
 	cityDir := filepath.Join(t.TempDir(), "city")
 	workDir := filepath.Join(cityDir, "worker")
@@ -445,12 +1140,194 @@ func TestStageHookFilesDoesNotStageClaudeSkillsDir(t *testing.T) {
 		t.Fatalf("WriteFile(%q): %v", skillPath, err)
 	}
 
-	got := stageHookFiles(nil, cityDir, workDir)
+	got := stageHookFiles(nil, cityDir, workDir, []string{"claude"})
 	wantRelDst := path.Join("worker", ".claude", "skills")
 	for _, entry := range got {
 		if entry.RelDst == wantRelDst {
 			t.Fatalf("stageHookFiles() staged %q at %q; want skills drift tracked via FingerprintExtra only", entry.Src, entry.RelDst)
 		}
+	}
+}
+
+func TestStageHookFilesSkipsUnrequestedWorkDirHooks(t *testing.T) {
+	cityDir := filepath.Join(t.TempDir(), "city")
+	workDir := filepath.Join(cityDir, "worker")
+	hookPath := filepath.Join(workDir, ".gemini", "settings.json")
+	if err := os.MkdirAll(filepath.Dir(hookPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll(%q): %v", hookPath, err)
+	}
+	if err := os.WriteFile(hookPath, []byte("{}"), 0o644); err != nil {
+		t.Fatalf("WriteFile(%q): %v", hookPath, err)
+	}
+
+	got := stageHookFiles(nil, cityDir, workDir, []string{"claude"})
+	for _, entry := range got {
+		if entry.RelDst == path.Join("worker", ".gemini", "settings.json") {
+			t.Fatalf("stageHookFiles() staged unrequested hook %q", entry.Src)
+		}
+	}
+}
+
+func TestStageHookFilesIncludesAntigravityHooks(t *testing.T) {
+	cityDir := filepath.Join(t.TempDir(), "city")
+	workDir := filepath.Join(cityDir, "worker")
+	hookPath := filepath.Join(workDir, ".agents", "hooks.json")
+	if err := os.MkdirAll(filepath.Dir(hookPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll(%q): %v", hookPath, err)
+	}
+	if err := os.WriteFile(hookPath, []byte("{}"), 0o644); err != nil {
+		t.Fatalf("WriteFile(%q): %v", hookPath, err)
+	}
+
+	got := stageHookFiles(nil, cityDir, workDir, []string{"antigravity"})
+	for _, entry := range got {
+		if entry.RelDst == path.Join("worker", ".agents", "hooks.json") {
+			if entry.Src != hookPath {
+				t.Fatalf("stageHookFiles() staged %q, want %q", entry.Src, hookPath)
+			}
+			if !entry.Probed {
+				t.Fatal("stageHookFiles() .agents/hooks.json not marked Probed")
+			}
+			if entry.ContentHash == "" {
+				t.Fatal("stageHookFiles() .agents/hooks.json has empty ContentHash")
+			}
+			return
+		}
+	}
+	t.Fatal("stageHookFiles() did not stage Antigravity .agents/hooks.json")
+}
+
+func TestStageHookFilesIncludesMimoCodeHooks(t *testing.T) {
+	cityDir := filepath.Join(t.TempDir(), "city")
+	workDir := filepath.Join(cityDir, "worker")
+	hookPath := filepath.Join(workDir, ".mimocode", "plugin", "gascity.js")
+	if err := os.MkdirAll(filepath.Dir(hookPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll(%q): %v", hookPath, err)
+	}
+	if err := os.WriteFile(hookPath, []byte("// plugin"), 0o644); err != nil {
+		t.Fatalf("WriteFile(%q): %v", hookPath, err)
+	}
+
+	got := stageHookFiles(nil, cityDir, workDir, []string{"mimocode"})
+	for _, entry := range got {
+		if entry.RelDst == path.Join("worker", ".mimocode", "plugin", "gascity.js") {
+			if entry.Src != hookPath {
+				t.Fatalf("stageHookFiles() staged %q, want %q", entry.Src, hookPath)
+			}
+			if !entry.Probed {
+				t.Fatal("stageHookFiles() .mimocode/plugin/gascity.js not marked Probed")
+			}
+			if entry.ContentHash == "" {
+				t.Fatal("stageHookFiles() .mimocode/plugin/gascity.js has empty ContentHash")
+			}
+			return
+		}
+	}
+	t.Fatal("stageHookFiles() did not stage MiMo Code .mimocode/plugin/gascity.js")
+}
+
+func TestStageHookFilesIncludesKimiHooks(t *testing.T) {
+	cityDir := filepath.Join(t.TempDir(), "city")
+	workDir := filepath.Join(cityDir, "worker")
+	configPath := filepath.Join(workDir, ".kimi", "config.toml")
+	scriptPath := filepath.Join(workDir, ".kimi", "hooks", "gascity-session-start.py")
+	for _, item := range []string{configPath, scriptPath} {
+		if err := os.MkdirAll(filepath.Dir(item), 0o755); err != nil {
+			t.Fatalf("MkdirAll(%q): %v", item, err)
+		}
+		if err := os.WriteFile(item, []byte("hook"), 0o644); err != nil {
+			t.Fatalf("WriteFile(%q): %v", item, err)
+		}
+	}
+
+	got := stageHookFiles(nil, cityDir, workDir, []string{"kimi"})
+	want := map[string]string{
+		path.Join("worker", ".kimi", "config.toml"):                       configPath,
+		path.Join("worker", ".kimi", "hooks", "gascity-session-start.py"): scriptPath,
+	}
+	for _, entry := range got {
+		wantSrc, ok := want[entry.RelDst]
+		if !ok {
+			continue
+		}
+		if entry.Src != wantSrc {
+			t.Fatalf("stageHookFiles() staged %q, want %q", entry.Src, wantSrc)
+		}
+		if !entry.Probed {
+			t.Fatalf("stageHookFiles() %s not marked Probed", entry.RelDst)
+		}
+		if entry.ContentHash == "" {
+			t.Fatalf("stageHookFiles() %s has empty ContentHash", entry.RelDst)
+		}
+		delete(want, entry.RelDst)
+	}
+	if len(want) > 0 {
+		t.Fatalf("stageHookFiles() missing Kimi hook entries: %v", want)
+	}
+}
+
+func TestResolveTemplateAddsKimiHookConfigArgWhenHooksInstalled(t *testing.T) {
+	tests := []struct {
+		name           string
+		session        string
+		optionDefaults map[string]string
+		wantCommand    string
+	}{
+		{
+			name:        "tmux without provider option",
+			session:     config.SessionTransportTmux,
+			wantCommand: "kimi --yolo --no-thinking --config-file .kimi/config.toml",
+		},
+		{
+			name:           "tmux with provider option",
+			session:        config.SessionTransportTmux,
+			optionDefaults: map[string]string{"model": "kimi-k2-thinking-turbo"},
+			wantCommand:    "kimi --yolo --no-thinking --config-file .kimi/config.toml --model kimi-k2-thinking-turbo",
+		},
+		{
+			name:        "acp without provider option",
+			session:     config.SessionTransportACP,
+			wantCommand: "kimi --yolo --no-thinking --config-file .kimi/config.toml acp",
+		},
+		{
+			name:           "acp with provider option",
+			session:        config.SessionTransportACP,
+			optionDefaults: map[string]string{"model": "kimi-k2-thinking-turbo"},
+			wantCommand:    "kimi --yolo --no-thinking --config-file .kimi/config.toml acp --model kimi-k2-thinking-turbo",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cityDir := t.TempDir()
+			cfgAgent := &config.Agent{
+				Name:              "worker",
+				Provider:          "kimi",
+				InstallAgentHooks: []string{"kimi"},
+				Session:           tt.session,
+				OptionDefaults:    tt.optionDefaults,
+			}
+			bp := &agentBuildParams{
+				cityName:   "city",
+				cityPath:   cityDir,
+				workspace:  &config.Workspace{Provider: "kimi"},
+				providers:  config.BuiltinProviders(),
+				lookPath:   func(name string) (string, error) { return "/bin/" + name, nil },
+				fs:         fsys.OSFS{},
+				rigs:       []config.Rig{},
+				beaconTime: time.Unix(0, 0),
+				beadNames:  make(map[string]string),
+				stderr:     io.Discard,
+			}
+
+			tp, err := resolveTemplate(bp, cfgAgent, "worker", nil)
+			if err != nil {
+				t.Fatalf("resolveTemplate: %v", err)
+			}
+
+			if tp.Command != tt.wantCommand {
+				t.Fatalf("Command = %q, want %q", tp.Command, tt.wantCommand)
+			}
+		})
 	}
 }
 
@@ -1099,5 +1976,165 @@ func TestResolveTemplateFPExtra_NotEmptyForPoolAgent(t *testing.T) {
 				t.Errorf("tp.FPExtra missing pool.min for pool agent (FPExtra=%v)", tp.FPExtra)
 			}
 		})
+	}
+}
+
+// TestDoStart_FlagValidationRunsBeforeDriftCheck pins the ordering:
+// the --file / --no-strict legacy-flag rejection must run before any
+// supervisor drift side effects. Otherwise a malformed invocation
+// (e.g. `gc start --file=foo <city>`) triggers a real supervisor
+// restart and then fails with the flag error, an avoidable footgun.
+func TestDoStart_FlagValidationRunsBeforeDriftCheck(t *testing.T) {
+	t.Setenv("GC_HOME", t.TempDir())
+	t.Setenv("GC_DOLT", "skip")
+
+	// Bootstrap a minimal city directory so requireBootstrappedCity
+	// returns successfully and execution reaches the flag check.
+	cityDir := filepath.Join(t.TempDir(), "test-city")
+	if err := os.MkdirAll(filepath.Join(cityDir, ".gc"), 0o755); err != nil {
+		t.Fatalf("mkdir city .gc: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(cityDir, "city.toml"), []byte("[workspace]\nname = \"test-city\"\n"), 0o644); err != nil {
+		t.Fatalf("write city.toml: %v", err)
+	}
+
+	// Set extraConfigFiles to a non-empty value so the legacy-flag
+	// rejection arm is selected.
+	oldExtra := extraConfigFiles
+	extraConfigFiles = []string{"some-extra.toml"}
+	t.Cleanup(func() { extraConfigFiles = oldExtra })
+
+	// Stub supervisorAliveHook to a non-zero PID so that, if drift
+	// detection runs, it would take the drift-check path. We track
+	// call count to confirm drift detection was NOT invoked.
+	oldAlive := supervisorAliveHook
+	aliveCalls := 0
+	supervisorAliveHook = func() int {
+		aliveCalls++
+		return 4242
+	}
+	t.Cleanup(func() { supervisorAliveHook = oldAlive })
+
+	var stdout, stderr bytes.Buffer
+	code := doStartWithNameOverride([]string{cityDir}, false, &stdout, &stderr, "")
+
+	if code != 1 {
+		t.Errorf("exit code = %d, want 1", code)
+	}
+	if !strings.Contains(stderr.String(), "--file and --no-strict only apply") {
+		t.Errorf("stderr missing flag-rejection message:\n%s", stderr.String())
+	}
+	if aliveCalls != 0 {
+		t.Errorf("supervisorAliveHook called %d times; drift check ran before flag validation", aliveCalls)
+	}
+	if strings.Contains(stdout.String(), "Drift detected:") || strings.Contains(stderr.String(), "Drift detected:") {
+		t.Errorf("drift report printed despite flag rejection.\nstdout:\n%s\nstderr:\n%s",
+			stdout.String(), stderr.String())
+	}
+	if strings.Contains(stdout.String(), "Restarting supervisor") {
+		t.Errorf("supervisor restart attempted despite flag rejection:\n%s", stdout.String())
+	}
+}
+
+// The map-level guards above are necessary but were never sufficient: the
+// session env is an OVERLAY, and every runtime lays it over an environment the
+// child already has. internal/runtime/subprocess and internal/runtime/acp build
+// exactly this — os.Environ() with the overlay appended — so this test spawns a
+// real child that way and asks it what it actually sees. Deleting the key
+// instead of pinning it empty passes every assertion on the map and fails here,
+// which is how the leak shipped.
+func TestPassthroughEnvWithholdsControllerTokenFromChildProcess(t *testing.T) {
+	const token = "super-secret-controller-token"
+	t.Setenv(convergence.TokenEnvVar, token)
+
+	overlay := passthroughEnv()
+	env := os.Environ()
+	for k, v := range overlay {
+		env = append(env, k+"="+v)
+	}
+
+	cmd := exec.Command("/bin/sh", "-c", `printf %s "[${`+convergence.TokenEnvVar+`-ABSENT}]"`)
+	cmd.Env = env
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("running child: %v", err)
+	}
+
+	if got := string(out); got != "[]" {
+		t.Errorf("child process saw %s = %s, want [] (present and empty); it inherited the controller's value", convergence.TokenEnvVar, got)
+	}
+	if strings.Contains(string(out), token) {
+		t.Errorf("child process received the controller token: %s", out)
+	}
+}
+
+// TestStartStandaloneBuildsSessionProviderFromResolvedCityConfig pins the
+// wiring at cmd_start.go's provider-construction site: the provider must be
+// built from the config and path gc start already resolved, not from a second,
+// independent city rediscovery.
+//
+// The regression it guards is silent. The rediscovery path
+// (newSessionProvider → loadSessionProviderContext) swallows both
+// resolveCity() and loadCityConfig() errors and returns a cfg-less context, so
+// tmuxConfigFromSession falls back through sc.Socket → cityName → "" and lands
+// on the default tmux socket. Every socket-scoped operation then targets the
+// wrong server while start still reports success.
+//
+// cwd is pointed at an empty directory so rediscovery cannot accidentally
+// resolve this city: with the fix the captured socket is the configured label,
+// and without it the capture is empty.
+func TestStartStandaloneBuildsSessionProviderFromResolvedCityConfig(t *testing.T) {
+	const (
+		socketLabel = "bright-lights"
+		cityName    = "socket-wiring-city"
+	)
+
+	cityPath := t.TempDir()
+	clearInheritedBeadsEnv(t)
+	requireNoLeakedDoltAfterForPaths(t, cityPath)
+	t.Chdir(t.TempDir())
+
+	if err := os.MkdirAll(filepath.Join(cityPath, citylayout.RuntimeRoot), 0o755); err != nil {
+		t.Fatalf("scaffold runtime root: %v", err)
+	}
+	cityTOML := "[workspace]\nname = \"" + cityName + "\"\n\n" +
+		"[beads]\nprovider = \"file\"\n\n" +
+		"[session]\nsocket = \"" + socketLabel + "\"\n"
+	if err := os.WriteFile(filepath.Join(cityPath, "city.toml"), []byte(cityTOML), 0o644); err != nil {
+		t.Fatalf("write city.toml: %v", err)
+	}
+
+	var (
+		calls       int
+		gotSocket   string
+		gotCityName string
+		gotCityPath string
+	)
+	oldBuild := buildSessionProviderByName
+	t.Cleanup(func() { buildSessionProviderByName = oldBuild })
+	buildSessionProviderByName = func(_ *config.City, _ string, sc config.SessionConfig, resolvedName, resolvedPath string) (runtime.Provider, error) {
+		calls++
+		gotSocket, gotCityName, gotCityPath = sc.Socket, resolvedName, resolvedPath
+		return runtime.NewFake(), nil
+	}
+
+	var stdout, stderr bytes.Buffer
+	if code := doStartStandalone([]string{cityPath}, false, &stdout, &stderr); code != 0 {
+		t.Fatalf("doStartStandalone exit = %d, want 0\nstdout:\n%s\nstderr:\n%s",
+			code, stdout.String(), stderr.String())
+	}
+
+	if calls == 0 {
+		t.Fatal("buildSessionProviderByName never called; the seam no longer covers gc start's provider construction")
+	}
+	if gotSocket != socketLabel {
+		t.Errorf("session socket = %q, want %q; gc start built its provider from a rediscovered city instead of the resolved config",
+			gotSocket, socketLabel)
+	}
+	if gotCityName != cityName {
+		t.Errorf("city name = %q, want %q", gotCityName, cityName)
+	}
+	if gotCityPath != cityPath {
+		t.Errorf("city path = %q, want %q", gotCityPath, cityPath)
 	}
 }
