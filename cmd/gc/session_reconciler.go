@@ -249,9 +249,14 @@ func resetPendingCommittedAtInfo(info sessionpkg.Info) (string, time.Time, bool)
 }
 
 func recordResetStallIfDue(
+	cityPath string,
+	store beads.Store,
+	sp runtime.Provider,
+	cfg *config.City,
 	info sessionpkg.Info,
 	template string,
 	name string,
+	running bool,
 	alive bool,
 	startupTimeout time.Duration,
 	now time.Time,
@@ -286,6 +291,24 @@ func recordResetStallIfDue(
 		name, elapsedSeconds, resetCommittedAt, info.ID,
 	)
 	fmt.Fprintln(stderr, msg) //nolint:errcheck
+
+	// Occupying tmux runtime is stale: continuation reset has been pending
+	// longer than the startup timeout, and the runtime the reconciler is
+	// waiting on never came back alive. When the tmux session is still
+	// running underneath (the classic wedge in #5355: the old runtime
+	// exited cleanly but its tmux session survived), waiting forever
+	// leaves the session parked in reset-pending under the old config.
+	// Evict once per dedup mark (gated by markResetStall above) so a
+	// later tick's spawn path can recreate under current config. Gated
+	// on running: if the tmux session is already gone, there is nothing
+	// to evict. Best-effort: a session that disappears between the
+	// observation above and this kill (IsSessionGone) is the expected
+	// steady state, not a failure.
+	if running && sp != nil {
+		if err := workerKillSessionTargetWithConfig(cityPath, store, sp, cfg, name); err != nil && !runtime.IsSessionGone(err) {
+			fmt.Fprintf(stderr, "session reconciler: evicting stale reset-pending runtime %s: %v\n", name, err) //nolint:errcheck
+		}
+	}
 
 	if rec != nil {
 		rec.Record(events.Event{
@@ -2211,7 +2234,7 @@ func reconcileSessionBeadsTracedWithNamedDemand(
 			shadowTick.captureRuntime(id, "observeRuntimeProviderLiveness", name, triFromBool(running), triFromBool(alive))
 		}
 		peek := cachedSessionPeek(cityPath, store, sp, cfg, id, tp.Hints.ProcessNames)
-		recordResetStallIfDue(infoByID[id], tp.TemplateName, name, alive, startupTimeout, clk.Now().UTC(), dt, rec, stderr, trace)
+		recordResetStallIfDue(cityPath, store, sp, cfg, infoByID[id], tp.TemplateName, name, running, alive, startupTimeout, clk.Now().UTC(), dt, rec, stderr, trace)
 
 		// Zombie capture: session exists but process dead — grab scrollback for forensics.
 		// markProviderTerminalError persists + folds its write onto the snapshot in one
@@ -2237,17 +2260,19 @@ func reconcileSessionBeadsTracedWithNamedDemand(
 						})
 					}
 				}
-				if !runtime.ContainsProviderRateLimitScreen(output) {
+				if rec != nil && !runtime.ContainsProviderRateLimitScreen(output) && dt.markZombieCrash(id) {
 					rec.Record(events.Event{
 						Type:    events.SessionCrashed,
 						Actor:   "gc",
 						Subject: tp.DisplayName(),
-						Message: output,
+						Message: truncateCrashPaneOutput(output, crashEventPaneOutputMaxLines),
 						Payload: api.SessionLifecyclePayloadJSON(id, tp.TemplateName, "zombie process"),
 					})
 					telemetry.RecordAgentCrash(context.Background(), tp.DisplayName(), output)
 				}
 			}
+		} else {
+			dt.clearZombieCrash(id)
 		}
 		// The snapshot is already current after the zombie-capture block:
 		// markProviderTerminalError advanced infoByID[id] in place via
@@ -2255,7 +2280,8 @@ func reconcileSessionBeadsTracedWithNamedDemand(
 		// here — a no-op when it wrote nothing). infoByID[id] is coherent here:
 		// only two path shapes arrive — the desired fast path (mutates nothing but the
 		// drain tracker via recordResetStallIfDue, which takes the coherent Info
-		// snapshot), and the ONE non-continue arm of the `if !desired` block (the
+		// snapshot and may evict a stale occupying runtime), and the ONE non-continue
+		// arm of the `if !desired` block (the
 		// post-heal `case preserveNamed:`, which sets local tp/desired + a trace only
 		// and was heal-folded just above). The alive-gated read just below never sees a
 		// markProviderTerminalError write (it runs only under `running && !alive`,
@@ -5710,6 +5736,29 @@ func truncateHashForLog(h string) string {
 		return h[:12]
 	}
 	return h
+}
+
+// truncateCrashPaneOutput caps a pane capture to at most maxLines lines,
+// keeping the first and last halves and eliding the middle. Output at or
+// under the cap is returned unchanged. Used to bound session.crashed event
+// payloads independent of the larger peek used for classifier heuristics
+// (rateLimitPeekLines) — see crashEventPaneOutputMaxLines (#5355).
+func truncateCrashPaneOutput(output string, maxLines int) string {
+	if maxLines <= 0 {
+		return output
+	}
+	lines := strings.Split(output, "\n")
+	if len(lines) <= maxLines {
+		return output
+	}
+	head := maxLines / 2
+	tail := maxLines - head
+	omitted := len(lines) - head - tail
+	var b strings.Builder
+	b.WriteString(strings.Join(lines[:head], "\n"))
+	fmt.Fprintf(&b, "\n… %d lines omitted …\n", omitted)
+	b.WriteString(strings.Join(lines[len(lines)-tail:], "\n"))
+	return b.String()
 }
 
 // rebaselineLegacyHashOutcome picks the trace outcome that matches a
