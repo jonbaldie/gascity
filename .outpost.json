@@ -1,0 +1,7 @@
+{
+  "maxWorkers": 2,
+  "maxSplicers": 1,
+  "maxRunners": 1,
+  "maxPatrolDogs": 1,
+  "thinking": "high"
+}
