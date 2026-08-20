@@ -1,8 +1,8 @@
 package api
 
 import (
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/worker"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/worker"
 )
 
 func (s *Server) workerFactory(store beads.Store) (*worker.Factory, error) {
@@ -19,8 +19,10 @@ func (s *Server) workerFactory(store beads.Store) (*worker.Factory, error) {
 		CityPath:              s.state.CityPath(),
 		SearchPaths:           s.sessionLogPaths(),
 		Recorder:              s.state.EventProvider(),
+		UsageSink:             s.state.UsageSink(),
 		ResolveTransport:      resolveTransport,
 		ResolveSessionRuntime: s.resolveWorkerSessionRuntimeWithMetadata,
+		Pricing:               cfg.PricingRegistry(),
 	})
 }
 

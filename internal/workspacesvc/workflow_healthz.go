@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 // HealthzWorkflowContract is a minimal built-in workflow service that exposes

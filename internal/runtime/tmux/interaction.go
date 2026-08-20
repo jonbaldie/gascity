@@ -2,13 +2,14 @@ package tmux
 
 import (
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
 // Compile-time checks that both Tmux and Provider implement InteractionProvider.
@@ -178,6 +179,9 @@ func (t *Tmux) Pending(name string) (*runtime.PendingInteraction, error) {
 	if err != nil {
 		// Pane might not exist (session not started yet or already stopped).
 		// Check for known "can't find" errors vs unexpected failures.
+		if errors.Is(err, ErrSessionNotFound) {
+			return nil, fmt.Errorf("capturing pane: %w: %w", runtime.ErrSessionNotFound, err)
+		}
 		if strings.Contains(err.Error(), "can't find") || strings.Contains(err.Error(), "no server") {
 			return nil, nil
 		}
@@ -227,6 +231,9 @@ func (t *Tmux) Respond(name string, response runtime.InteractionResponse) error 
 	// Verify the expected approval is still present before sending keys.
 	paneText, err := t.CapturePane(name, 40)
 	if err != nil {
+		if errors.Is(err, ErrSessionNotFound) {
+			return fmt.Errorf("pre-verify capture failed: %w: %w", runtime.ErrSessionNotFound, err)
+		}
 		return fmt.Errorf("pre-verify capture failed: %w", err)
 	}
 	current := parseApprovalPrompt(paneText)
@@ -258,8 +265,16 @@ func (t *Tmux) Respond(name string, response runtime.InteractionResponse) error 
 		return fmt.Errorf("unknown action %q", response.Action)
 	}
 
+	// Exit copy-mode first if the pane is parked (the ga-c4w wheel binding),
+	// so the approval keystroke reaches the prompt instead of being swallowed
+	// by copy-mode.
+	t.cancelCopyModeIfParked(name)
+
 	// Send the keystroke once.
 	if _, err := t.run("send-keys", "-t", name, "-l", key); err != nil {
+		if errors.Is(err, ErrSessionNotFound) {
+			return fmt.Errorf("send-keys failed: %w: %w", runtime.ErrSessionNotFound, err)
+		}
 		return fmt.Errorf("send-keys failed: %w", err)
 	}
 

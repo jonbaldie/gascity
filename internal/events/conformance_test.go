@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/events"
-	"github.com/gastownhall/gascity/internal/events/eventstest"
+	"github.com/jonbaldie/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/events/eventstest"
 )
 
 func TestFileRecorderConformance(t *testing.T) {
@@ -23,6 +23,7 @@ func TestFileRecorderConformance(t *testing.T) {
 	}
 	eventstest.RunProviderTests(t, factory)
 	eventstest.RunConcurrencyTests(t, factory)
+	eventstest.RunRotationTests(t, factory)
 }
 
 func TestFakeConformance(t *testing.T) {
@@ -32,4 +33,5 @@ func TestFakeConformance(t *testing.T) {
 	}
 	eventstest.RunProviderTests(t, factory)
 	eventstest.RunConcurrencyTests(t, factory)
+	eventstest.RunInMemoryWakeTests(t, factory)
 }

@@ -13,14 +13,14 @@ import (
 	"strings"
 	"testing"
 
-	helpers "github.com/gastownhall/gascity/test/acceptance/helpers"
+	helpers "github.com/jonbaldie/gascity/test/acceptance/helpers"
 )
 
 // --- gc doctor ---
 
 func TestDoctorCommands(t *testing.T) {
 	c := helpers.NewCity(t, testEnv)
-	c.Init("claude")
+	c.InitNoStart("claude")
 
 	t.Run("ValidCity_Passes", func(t *testing.T) {
 		out, err := c.GC("doctor")
@@ -51,7 +51,7 @@ func TestDoctorCommands(t *testing.T) {
 
 	t.Run("GastownCity_RunsPackChecks", func(t *testing.T) {
 		gc := helpers.NewCity(t, testEnv)
-		gc.InitFrom(filepath.Join(helpers.ExamplesDir(), "gastown"))
+		gc.InitFromNoStart(filepath.Join(helpers.ExamplesDir(), "gastown"))
 
 		out, _ := gc.GC("doctor")
 		// Gastown pack ships doctor scripts — verify they were discovered.
@@ -75,7 +75,7 @@ func TestDoctorCommands(t *testing.T) {
 
 func TestMailCommands(t *testing.T) {
 	c := helpers.NewCity(t, testEnv)
-	c.Init("claude")
+	c.InitNoStart("claude")
 
 	t.Run("NoSubcommand_ReturnsError", func(t *testing.T) {
 		out, err := c.GC("mail")

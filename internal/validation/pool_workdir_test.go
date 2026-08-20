@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 func TestValidatePoolWorkDirIsolation_DetectsSharedRigRoot(t *testing.T) {

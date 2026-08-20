@@ -10,26 +10,17 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/runtime"
-	"github.com/gastownhall/gascity/internal/session"
-	"github.com/gastownhall/gascity/internal/sessionlog"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/sessionlog"
 )
 
 func createTranscriptBackedSession(t *testing.T, store beads.Store, sp *runtime.Fake, workDir string) session.Info {
 	t.Helper()
-	mgr := session.NewManager(store, sp)
-	info, err := mgr.Create(
-		context.Background(),
-		"default",
-		"Transcript Backed",
-		"echo test",
-		workDir,
-		"test",
-		nil,
-		session.ProviderResume{},
-		runtime.Config{},
-	)
+	mgr := session.NewManagerWithOptions(store, sp)
+	info, err := mgr.CreateSession(
+		context.Background(), session.CreateOptions{Template: "default", Title: "Transcript Backed", Command: "echo test", WorkDir: workDir, Provider: "test", Env: nil, Resume: session.ProviderResume{}, Hints: runtime.Config{}, ExtraMeta: map[string]string{"session_origin": "manual"}})
 	if err != nil {
 		t.Fatalf("create session: %v", err)
 	}

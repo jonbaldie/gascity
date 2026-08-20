@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
 type partialSessionLister struct {
@@ -55,6 +55,19 @@ func TestExpandAgentsBoundedPool(t *testing.T) {
 	}
 	if result[2].QualifiedName != "myrig/polecat-3" {
 		t.Errorf("[2] name = %q, want myrig/polecat-3", result[2].QualifiedName)
+	}
+}
+
+func TestExpandAgentsCanonicalSingletonPoolUsesBaseName(t *testing.T) {
+	agents := []config.Agent{
+		{Name: "worker", Dir: "myrig", MinActiveSessions: intPtr(0), MaxActiveSessions: intPtr(1)},
+	}
+	result := ExpandAgents(agents, "city", "", nil)
+	if len(result) != 1 {
+		t.Fatalf("got %d agents, want 1", len(result))
+	}
+	if result[0].QualifiedName != "myrig/worker" {
+		t.Errorf("name = %q, want myrig/worker", result[0].QualifiedName)
 	}
 }
 
@@ -122,6 +135,11 @@ func TestPoolInstanceName(t *testing.T) {
 	a2 := config.Agent{Name: "polecat", MaxActiveSessions: intPtr(1)}
 	if got := PoolInstanceName("polecat", 1, a2); got != "polecat" {
 		t.Errorf("single instance: got %q, want polecat", got)
+	}
+
+	a2.MinActiveSessions = intPtr(0)
+	if got := PoolInstanceName("polecat", 1, a2); got != "polecat" {
+		t.Errorf("canonical singleton pool: got %q, want polecat", got)
 	}
 
 	a3 := config.Agent{

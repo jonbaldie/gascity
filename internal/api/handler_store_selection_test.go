@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 func TestBeadCreateUsesCityStoreWhenAvailableWithoutRig(t *testing.T) {
@@ -78,7 +78,8 @@ func TestConvoyCreateUsesCityStoreWhenAvailableWithoutRig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reload city item: %v", err)
 	}
-	if updatedItem.ParentID != convoy.ID {
-		t.Fatalf("city item parent = %q, want %q", updatedItem.ParentID, convoy.ID)
+	if updatedItem.ParentID != "" {
+		t.Fatalf("city item parent = %q, want unchanged empty parent", updatedItem.ParentID)
 	}
+	requireAPITracksDep(t, state.cityBeadStore, convoy.ID, item.ID)
 }

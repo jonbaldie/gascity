@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/mail"
-	"github.com/gastownhall/gascity/internal/mail/mailtest"
+	"github.com/jonbaldie/gascity/internal/mail"
+	"github.com/jonbaldie/gascity/internal/mail/mailtest"
 )
 
 // TestMCPMailConformanceLive runs the conformance suite against a real
@@ -105,6 +105,7 @@ func startMCPServer(t *testing.T, serverURL string) {
 	}
 
 	cmd := osexec.Command(python, "-m", "mcp_agent_mail.http")
+	cmd.Dir = t.TempDir()
 	cmd.Stdout = os.Stderr // visible with -v
 	cmd.Stderr = os.Stderr
 	if err := cmd.Start(); err != nil {

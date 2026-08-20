@@ -6,10 +6,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/clock"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/clock"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/runtime"
+	sessionpkg "github.com/jonbaldie/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/session/sessiontest"
 )
 
 type capabilityOverrideProvider struct {
@@ -304,40 +306,45 @@ func TestNamedSessionActivelyInUse(t *testing.T) {
 	name := "test-session"
 	_ = sp.Start(context.Background(), name, runtime.Config{Command: "test"})
 
-	session := beads.Bead{
-		Metadata: map[string]string{
-			"session_name": name,
-		},
+	// A degraded fixture: empty ID, no session type/label, only session_name.
+	// The front door would narrow this bead away (IsSessionBeadOrRepairable
+	// rejects it and validatedBead rejects the empty ID), so build the Info the
+	// consumer reads directly. InfoFromPersistedBead of that bead projects to
+	// exactly this literal (session_name -> SessionName/SessionNameMetadata; all
+	// else zero, since normalizeInfoState("") == "").
+	sessInfo := sessionpkg.Info{
+		SessionName:         name,
+		SessionNameMetadata: name,
 	}
 
 	// No attachment, no activity -> not active.
-	if namedSessionActivelyInUse(session, sp, name, clk) {
+	if namedSessionActivelyInUseInfo(sessInfo, sp, name, clk) {
 		t.Error("expected not active with no attachment and no activity")
 	}
 
 	// Attached -> active.
 	sp.SetAttached(name, true)
-	if !namedSessionActivelyInUse(session, sp, name, clk) {
+	if !namedSessionActivelyInUseInfo(sessInfo, sp, name, clk) {
 		t.Error("expected active when attached")
 	}
 	sp.SetAttached(name, false)
 
 	// Recent activity -> active.
 	sp.SetActivity(name, clk.Now().Add(-30*time.Second))
-	if !namedSessionActivelyInUse(session, sp, name, clk) {
+	if !namedSessionActivelyInUseInfo(sessInfo, sp, name, clk) {
 		t.Error("expected active with recent activity (30s ago)")
 	}
 
 	// Stale activity -> not active.
 	sp.SetActivity(name, clk.Now().Add(-5*time.Minute))
-	if namedSessionActivelyInUse(session, sp, name, clk) {
+	if namedSessionActivelyInUseInfo(sessInfo, sp, name, clk) {
 		t.Error("expected not active with stale activity (5m ago)")
 	}
 
 	// Unknown provider activity is conservative: an alive named session is
 	// treated as active because config-drift cannot prove it is idle.
 	unknownActivity := capabilityOverrideProvider{Provider: sp}
-	if !namedSessionActivelyInUse(session, unknownActivity, name, clk) {
+	if !namedSessionActivelyInUseInfo(sessInfo, unknownActivity, name, clk) {
 		t.Error("expected active when provider cannot report activity")
 	}
 
@@ -349,7 +356,7 @@ func TestNamedSessionActivelyInUse(t *testing.T) {
 		sleepCap: runtime.SessionSleepCapabilityFull,
 	}
 	sp.SetActivity(name, clk.Now().Add(-5*time.Minute))
-	if namedSessionActivelyInUse(session, routedActivity, name, clk) {
+	if namedSessionActivelyInUseInfo(sessInfo, routedActivity, name, clk) {
 		t.Error("expected not active when routed backend reports stale activity")
 	}
 
@@ -357,17 +364,17 @@ func TestNamedSessionActivelyInUse(t *testing.T) {
 		Provider: sp,
 		sleepCap: runtime.SessionSleepCapabilityTimedOnly,
 	}
-	if !namedSessionActivelyInUse(session, timedOnlyUnknownActivity, name, clk) {
+	if !namedSessionActivelyInUseInfo(sessInfo, timedOnlyUnknownActivity, name, clk) {
 		t.Error("expected active when timed-only backend cannot report activity")
 	}
 
 	// Nil provider -> not active.
-	if namedSessionActivelyInUse(session, nil, name, clk) {
+	if namedSessionActivelyInUseInfo(sessInfo, nil, name, clk) {
 		t.Error("expected not active with nil provider")
 	}
 
 	// Empty name -> not active.
-	if namedSessionActivelyInUse(session, sp, "", clk) {
+	if namedSessionActivelyInUseInfo(sessInfo, sp, "", clk) {
 		t.Error("expected not active with empty name")
 	}
 }
@@ -392,7 +399,7 @@ func TestShouldDeferNamedSessionConfigDriftBoundsUnknownActivity(t *testing.T) {
 		t.Fatalf("Create session bead: %v", err)
 	}
 
-	reason, deferDrift, err := shouldDeferNamedSessionConfigDrift(session, store, provider, name, clk, "drift-1")
+	reason, deferDrift, err := shouldDeferNamedSessionConfigDrift(sessiontest.SeedBead(t, session), sessionFrontDoor(store), provider, name, clk, "drift-1")
 	if err != nil {
 		t.Fatalf("shouldDeferNamedSessionConfigDrift: %v", err)
 	}
@@ -414,7 +421,7 @@ func TestShouldDeferNamedSessionConfigDriftBoundsUnknownActivity(t *testing.T) {
 	}
 
 	clk.Time = clk.Now().Add(namedSessionActivityThreshold + time.Second)
-	_, deferDrift, err = shouldDeferNamedSessionConfigDrift(session, store, provider, name, clk, "drift-1")
+	_, deferDrift, err = shouldDeferNamedSessionConfigDrift(sessiontest.SeedBead(t, session), sessionFrontDoor(store), provider, name, clk, "drift-1")
 	if err != nil {
 		t.Fatalf("shouldDeferNamedSessionConfigDrift after threshold: %v", err)
 	}
@@ -422,7 +429,7 @@ func TestShouldDeferNamedSessionConfigDriftBoundsUnknownActivity(t *testing.T) {
 		t.Fatal("expected unknown-activity config drift to stop deferring after threshold")
 	}
 
-	reason, deferDrift, err = shouldDeferNamedSessionConfigDrift(session, store, provider, name, clk, "drift-2")
+	reason, deferDrift, err = shouldDeferNamedSessionConfigDrift(sessiontest.SeedBead(t, session), sessionFrontDoor(store), provider, name, clk, "drift-2")
 	if err != nil {
 		t.Fatalf("shouldDeferNamedSessionConfigDrift new drift: %v", err)
 	}
@@ -437,8 +444,8 @@ func TestShouldDeferNamedSessionConfigDriftBoundsUnknownActivity(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get session bead after new drift: %v", err)
 	}
-	if err := clearNamedSessionConfigDriftDeferral(session, store); err != nil {
-		t.Fatalf("clearNamedSessionConfigDriftDeferral: %v", err)
+	if err := clearSessionConfigDriftDeferral(sessiontest.SeedBead(t, session), sessionFrontDoor(store)); err != nil {
+		t.Fatalf("clearSessionConfigDriftDeferral: %v", err)
 	}
 	session, err = store.Get(session.ID)
 	if err != nil {
@@ -469,7 +476,7 @@ func TestShouldDeferNamedSessionConfigDriftDoesNotDeferWhenMarkerWriteFails(t *t
 		},
 	}
 
-	_, deferDrift, err := shouldDeferNamedSessionConfigDrift(session, beads.NewMemStore(), provider, name, clk, "drift-1")
+	_, deferDrift, err := shouldDeferNamedSessionConfigDrift(sessiontest.SeedBead(t, session), sessionFrontDoor(beads.NewMemStore()), provider, name, clk, "drift-1")
 	if err == nil {
 		t.Fatal("expected marker write error")
 	}
@@ -567,6 +574,374 @@ func TestPhase0ConfigDrift_AsleepNamedSessionRepairsInPlaceWithoutWaking(t *test
 	}
 	if got.Metadata["pending_create_claim"] != "" {
 		t.Fatalf("pending_create_claim = %q, want cleared after asleep config-drift repair", got.Metadata["pending_create_claim"])
+	}
+}
+
+func TestPhase0ConfigDrift_AsleepNamedSessionAppliesTemplateOverrides(t *testing.T) {
+	env := newReconcilerTestEnv()
+	env.cfg = &config.City{
+		Workspace: config.Workspace{Name: "test-city"},
+		Agents: []config.Agent{{
+			Name:              "worker",
+			Provider:          "custom",
+			StartCommand:      "agent --effort low",
+			MaxActiveSessions: intPtr(1),
+		}},
+		NamedSessions: []config.NamedSession{{
+			Template: "worker",
+			Mode:     "on_demand",
+		}},
+	}
+
+	provider := &config.ResolvedProvider{
+		OptionsSchema: []config.ProviderOption{{
+			Key:  "effort",
+			Type: "select",
+			Choices: []config.OptionChoice{
+				{Value: "low", FlagArgs: []string{"--effort", "low"}},
+				{Value: "high", FlagArgs: []string{"--effort", "high"}},
+			},
+		}},
+		EffectiveDefaults: map[string]string{"effort": "low"},
+	}
+	sessionName := config.NamedSessionRuntimeName(env.cfg.Workspace.Name, env.cfg.Workspace, "worker")
+	env.desiredState[sessionName] = TemplateParams{
+		TemplateName:            "worker",
+		InstanceName:            "worker",
+		Alias:                   "worker",
+		Command:                 "agent --effort low",
+		ConfiguredNamedIdentity: "worker",
+		ConfiguredNamedMode:     "on_demand",
+		ResolvedProvider:        provider,
+	}
+
+	acceptedRuntime := runtime.Config{Command: "agent --effort high"}
+	session := env.createSessionBead(sessionName, "worker")
+	env.setSessionMetadata(&session, map[string]string{
+		namedSessionMetadataKey:      "true",
+		namedSessionIdentityMetadata: "worker",
+		namedSessionModeMetadata:     "on_demand",
+		"started_config_hash":        runtime.CoreFingerprint(acceptedRuntime),
+		"started_live_hash":          runtime.LiveFingerprint(acceptedRuntime),
+		"template_overrides":         `{"effort":"high"}`,
+	})
+
+	env.reconcile([]beads.Bead{session})
+
+	got, err := env.store.Get(session.ID)
+	if err != nil {
+		t.Fatalf("Get(%s): %v", session.ID, err)
+	}
+	if got.Metadata["started_config_hash"] != runtime.CoreFingerprint(acceptedRuntime) {
+		t.Fatalf("started_config_hash = %q, want preserved override-aware hash", got.Metadata["started_config_hash"])
+	}
+	if got.Metadata["continuation_reset_pending"] == "true" {
+		t.Fatal("asleep named session was repaired for drift even though template_overrides made the hash match")
+	}
+}
+
+func TestConfigDrift_AttachedSessionPersistsAcrossCycles(t *testing.T) {
+	// Config-drift deferral for attached sessions must persist across
+	// reconciler cycles — the session must never be killed while attached.
+	env := newReconcilerTestEnv()
+	env.cfg = &config.City{
+		Workspace: config.Workspace{Name: "test-city"},
+		Agents: []config.Agent{{
+			Name:              "worker",
+			StartCommand:      "new-cmd",
+			MaxActiveSessions: intPtr(1),
+		}},
+		NamedSessions: []config.NamedSession{{
+			Template: "worker",
+			Mode:     "always",
+		}},
+	}
+
+	sessionName := config.NamedSessionRuntimeName(env.cfg.Workspace.Name, env.cfg.Workspace, "worker")
+	env.desiredState[sessionName] = TemplateParams{
+		TemplateName:            "worker",
+		InstanceName:            "worker",
+		Alias:                   "worker",
+		Command:                 "new-cmd",
+		ConfiguredNamedIdentity: "worker",
+		ConfiguredNamedMode:     "always",
+	}
+
+	oldRuntime := runtime.Config{Command: "old-cmd"}
+	if err := env.sp.Start(context.Background(), sessionName, oldRuntime); err != nil {
+		t.Fatalf("Start(old runtime): %v", err)
+	}
+	env.sp.SetAttached(sessionName, true)
+
+	session := env.createSessionBead(sessionName, "worker")
+	env.markSessionActive(&session)
+	env.setSessionMetadata(&session, map[string]string{
+		namedSessionMetadataKey:      "true",
+		namedSessionIdentityMetadata: "worker",
+		namedSessionModeMetadata:     "always",
+		"session_key":                "old-provider-conversation",
+		"started_config_hash":        runtime.CoreFingerprint(oldRuntime),
+		"started_live_hash":          runtime.LiveFingerprint(oldRuntime),
+	})
+
+	// Run multiple reconcile cycles — session must survive all of them.
+	for i := 0; i < 5; i++ {
+		env.clk.Time = env.clk.Now().Add(10 * time.Second)
+		got, err := env.store.Get(session.ID)
+		if err != nil {
+			t.Fatalf("cycle %d: Get(%s): %v", i, session.ID, err)
+		}
+		env.reconcile([]beads.Bead{got})
+
+		if !env.sp.IsRunning(sessionName) {
+			t.Fatalf("cycle %d: attached session was stopped during config-drift", i)
+		}
+		got, err = env.store.Get(session.ID)
+		if err != nil {
+			t.Fatalf("cycle %d: Get after reconcile: %v", i, err)
+		}
+		if got.Metadata["state"] == "creating" {
+			t.Fatalf("cycle %d: state = creating; want deferred", i)
+		}
+		if got.Metadata["started_config_hash"] == "" {
+			t.Fatalf("cycle %d: started_config_hash cleared; want preserved", i)
+		}
+	}
+}
+
+func TestConfigDrift_AttachedSessionSurvivesTransientFalseNegative(t *testing.T) {
+	env := newReconcilerTestEnv()
+	env.cfg = &config.City{
+		Workspace: config.Workspace{Name: "test-city"},
+		Agents: []config.Agent{{
+			Name:              "worker",
+			StartCommand:      "new-cmd",
+			MaxActiveSessions: intPtr(1),
+		}},
+		NamedSessions: []config.NamedSession{{
+			Template: "worker",
+			Mode:     "always",
+		}},
+	}
+
+	sessionName := config.NamedSessionRuntimeName(env.cfg.Workspace.Name, env.cfg.Workspace, "worker")
+	env.desiredState[sessionName] = TemplateParams{
+		TemplateName:            "worker",
+		InstanceName:            "worker",
+		Alias:                   "worker",
+		Command:                 "new-cmd",
+		ConfiguredNamedIdentity: "worker",
+		ConfiguredNamedMode:     "always",
+	}
+
+	oldRuntime := runtime.Config{Command: "old-cmd"}
+	oldStartedHash := runtime.CoreFingerprint(oldRuntime)
+	if err := env.sp.Start(context.Background(), sessionName, oldRuntime); err != nil {
+		t.Fatalf("Start(old runtime): %v", err)
+	}
+	env.sp.SetAttached(sessionName, true)
+
+	session := env.createSessionBead(sessionName, "worker")
+	env.markSessionActive(&session)
+	env.setSessionMetadata(&session, map[string]string{
+		namedSessionMetadataKey:      "true",
+		namedSessionIdentityMetadata: "worker",
+		namedSessionModeMetadata:     "always",
+		"session_key":                "old-provider-conversation",
+		"started_config_hash":        oldStartedHash,
+		"started_live_hash":          runtime.LiveFingerprint(oldRuntime),
+	})
+
+	env.reconcile([]beads.Bead{session})
+
+	got, err := env.store.Get(session.ID)
+	if err != nil {
+		t.Fatalf("Get after attached deferral: %v", err)
+	}
+	if got.Metadata["started_config_hash"] == "" {
+		t.Fatal("started_config_hash cleared during attached deferral")
+	}
+	if got.Metadata[sessionAttachedConfigDriftDeferredAtMetadata] == "" {
+		t.Fatal("attached config-drift deferral timestamp was not recorded")
+	}
+
+	env.clk.Time = env.clk.Now().Add(10 * time.Second)
+	falseAttached := make([]bool, 100)
+	env.sp.SetAttachedSequence(sessionName, falseAttached...)
+	env.reconcile([]beads.Bead{got})
+
+	got, err = env.store.Get(session.ID)
+	if err != nil {
+		t.Fatalf("Get after false-negative cycle: %v", err)
+	}
+	if !env.sp.IsRunning(sessionName) {
+		t.Fatal("attached session was stopped after one false-negative attachment cycle")
+	}
+	if got.Metadata["state"] == "creating" {
+		t.Fatalf("state = creating after false-negative cycle; want deferred")
+	}
+	if got.Metadata["started_config_hash"] != oldStartedHash {
+		t.Fatalf("started_config_hash = %q after false-negative cycle; want preserved old hash %q", got.Metadata["started_config_hash"], oldStartedHash)
+	}
+	if got.Metadata["session_key"] != "old-provider-conversation" {
+		t.Fatalf("session_key = %q after false-negative cycle; want old provider conversation preserved", got.Metadata["session_key"])
+	}
+}
+
+func TestConfigDrift_DetachAllowsDriftToResume(t *testing.T) {
+	// After an attached session detaches, config-drift should proceed
+	// with restart-in-place for named sessions.
+	env := newReconcilerTestEnv()
+	env.cfg = &config.City{
+		Workspace: config.Workspace{Name: "test-city"},
+		Agents: []config.Agent{{
+			Name:              "worker",
+			StartCommand:      "new-cmd",
+			MaxActiveSessions: intPtr(1),
+		}},
+		NamedSessions: []config.NamedSession{{
+			Template: "worker",
+			Mode:     "always",
+		}},
+	}
+
+	sessionName := config.NamedSessionRuntimeName(env.cfg.Workspace.Name, env.cfg.Workspace, "worker")
+	env.desiredState[sessionName] = TemplateParams{
+		TemplateName:            "worker",
+		InstanceName:            "worker",
+		Alias:                   "worker",
+		Command:                 "new-cmd",
+		ConfiguredNamedIdentity: "worker",
+		ConfiguredNamedMode:     "always",
+	}
+
+	oldRuntime := runtime.Config{Command: "old-cmd"}
+	if err := env.sp.Start(context.Background(), sessionName, oldRuntime); err != nil {
+		t.Fatalf("Start(old runtime): %v", err)
+	}
+	env.sp.SetAttached(sessionName, true)
+
+	session := env.createSessionBead(sessionName, "worker")
+	env.markSessionActive(&session)
+	env.setSessionMetadata(&session, map[string]string{
+		namedSessionMetadataKey:      "true",
+		namedSessionIdentityMetadata: "worker",
+		namedSessionModeMetadata:     "always",
+		"session_key":                "old-provider-conversation",
+		"started_config_hash":        runtime.CoreFingerprint(oldRuntime),
+		"started_live_hash":          runtime.LiveFingerprint(oldRuntime),
+	})
+
+	// Cycle 1: Attached → deferred.
+	env.reconcile([]beads.Bead{session})
+	if !env.sp.IsRunning(sessionName) {
+		t.Fatal("cycle 1: attached session was stopped; want deferred")
+	}
+
+	// Detach and ensure no recent activity.
+	env.sp.SetAttached(sessionName, false)
+	env.sp.SetActivity(sessionName, env.clk.Now().Add(-5*time.Minute))
+	env.clk.Time = env.clk.Now().Add(sessionAttachedConfigDriftFalseNegativeLimit + time.Second)
+
+	got, err := env.store.Get(session.ID)
+	if err != nil {
+		t.Fatalf("Get after detach: %v", err)
+	}
+
+	// Cycle 2: Detached + stale activity means drift proceeds. Current
+	// reconciler behavior restarts the named session in place and wakes it
+	// in the same tick.
+	env.reconcile([]beads.Bead{got})
+
+	got, err = env.store.Get(session.ID)
+	if err != nil {
+		t.Fatalf("Get after drift: %v", err)
+	}
+	if got.Metadata["state"] != "active" {
+		t.Fatalf("state = %q after detach; want active after drift restart", got.Metadata["state"])
+	}
+	if got.Metadata["started_config_hash"] == runtime.CoreFingerprint(oldRuntime) {
+		t.Fatalf("started_config_hash still points at old runtime after drift restart")
+	}
+}
+
+func TestConfigDrift_AttachedPoolSessionDefersAcrossCycles(t *testing.T) {
+	// Non-named (pool) sessions that are attached should also defer
+	// config-drift across multiple reconciler cycles.
+	env := newReconcilerTestEnv()
+	env.cfg = &config.City{
+		Agents: []config.Agent{{Name: "worker", StartCommand: "new-cmd"}},
+	}
+	env.addRunningWorkerDesiredWithNewConfig()
+
+	session := env.createSessionBead("worker", "worker")
+	env.markSessionActive(&session)
+	startedHash := runtime.CoreFingerprint(runtime.Config{Command: "test-cmd"})
+	env.setSessionMetadata(&session, map[string]string{
+		"started_config_hash": startedHash,
+	})
+	env.sp.SetAttached("worker", true)
+
+	for i := 0; i < 3; i++ {
+		env.clk.Time = env.clk.Now().Add(10 * time.Second)
+		got, err := env.store.Get(session.ID)
+		if err != nil {
+			t.Fatalf("cycle %d: Get(%s): %v", i, session.ID, err)
+		}
+		env.reconcile([]beads.Bead{got})
+
+		ds := env.dt.get(session.ID)
+		if ds != nil {
+			t.Fatalf("cycle %d: attached pool session should not be drained, got: %+v", i, ds)
+		}
+	}
+}
+
+func TestConfigDrift_AttachedPoolSessionSurvivesTransientFalseNegative(t *testing.T) {
+	env := newReconcilerTestEnv()
+	env.cfg = &config.City{
+		Agents: []config.Agent{{Name: "worker", StartCommand: "new-cmd"}},
+	}
+	env.addRunningWorkerDesiredWithNewConfig()
+
+	session := env.createSessionBead("worker", "worker")
+	env.markSessionActive(&session)
+	oldHash := runtime.CoreFingerprint(runtime.Config{Command: "test-cmd"})
+	env.setSessionMetadata(&session, map[string]string{
+		"session_key":         "old-provider-conversation",
+		"started_config_hash": oldHash,
+	})
+	env.sp.SetAttached("worker", true)
+
+	env.reconcile([]beads.Bead{session})
+	got, err := env.store.Get(session.ID)
+	if err != nil {
+		t.Fatalf("Get after attached deferral: %v", err)
+	}
+	if got.Metadata[sessionAttachedConfigDriftDeferredAtMetadata] == "" {
+		t.Fatal("attached config-drift deferral timestamp was not recorded")
+	}
+
+	env.clk.Time = env.clk.Now().Add(10 * time.Second)
+	falseAttached := make([]bool, 100)
+	env.sp.SetAttachedSequence("worker", falseAttached...)
+	env.reconcile([]beads.Bead{got})
+
+	got, err = env.store.Get(session.ID)
+	if err != nil {
+		t.Fatalf("Get after false-negative cycle: %v", err)
+	}
+	if !env.sp.IsRunning("worker") {
+		t.Fatal("attached pool session was stopped after one false-negative attachment cycle")
+	}
+	if ds := env.dt.get(session.ID); ds != nil {
+		t.Fatalf("attached pool session should not be drained after false-negative cycle, got %+v", ds)
+	}
+	if got.Metadata["started_config_hash"] != oldHash {
+		t.Fatalf("started_config_hash = %q after false-negative cycle; want %q", got.Metadata["started_config_hash"], oldHash)
+	}
+	if got.Metadata["session_key"] != "old-provider-conversation" {
+		t.Fatalf("session_key = %q after false-negative cycle; want old provider conversation preserved", got.Metadata["session_key"])
 	}
 }
 
@@ -677,8 +1052,8 @@ func TestPhase0CanonicalRepair_DuplicateOpenNamedBeadsRetiresLosersNonTerminally
 func TestPhase0StatusText_DegradesAlwaysNamedIdentityBlockedByCitySuspend(t *testing.T) {
 	cfg := &config.City{
 		Workspace: config.Workspace{
-			Name:      "test-city",
-			Suspended: true,
+			Name:             "test-city",
+			SuspendedOnStart: true,
 		},
 		Agents: []config.Agent{{
 			Name:         "worker",
@@ -720,9 +1095,9 @@ func TestPhase0StatusText_DegradesAlwaysNamedIdentityBlockedByRigSuspend(t *test
 	cfg := &config.City{
 		Workspace: config.Workspace{Name: "test-city"},
 		Rigs: []config.Rig{{
-			Name:      "demo",
-			Path:      t.TempDir(),
-			Suspended: true,
+			Name:             "demo",
+			Path:             t.TempDir(),
+			SuspendedOnStart: true,
 		}},
 		Agents: []config.Agent{{
 			Name:         "worker",

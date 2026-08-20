@@ -1,10 +1,15 @@
-# Notify gasworks-internal to rebuild the gc-runtime image when Go source changes.
+# Notify gasworks-control-plane to rebuild the gc-runtime image when Go source
+# changes.
 #
 # gascity provides the gc binary embedded in runtime images.
 # When source code changes, images need rebuilding.
 #
-# Required secret: GASCITY_HOSTED_TOKEN — PAT with repo scope for
-# gascity/gasworks-internal (needed for repository_dispatch).
+# Secret: GASCITY_HOSTED_TOKEN — a token with contents:write on
+# gascity/gasworks-control-plane (needed for repository_dispatch). A
+# fine-grained PAT scoped to that repo, or a classic PAT with repo scope.
+# If the secret is unset, or this repository cannot write the target repo,
+# the job no-ops. Do not substitute github.token; that token cannot dispatch
+# to a different org.
 
 name: Notify Image Rebuilds
 
@@ -25,13 +30,28 @@ permissions: {}
 
 jobs:
   notify:
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     steps:
       - name: Trigger runtime image rebuild
         env:
           GH_TOKEN: ${{ secrets.GASCITY_HOSTED_TOKEN }}
         run: |
+          set -euo pipefail
+          TARGET_REPO="gascity/gasworks-control-plane"
+          EVENT_TYPE="runtime-dep-updated"
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "hosted notify token unset; skipping image rebuild notify for ${TARGET_REPO}"
+            exit 0
+          fi
+          if ! push="$(gh api "repos/${TARGET_REPO}" --jq '.permissions.push // false')"; then
+            echo "target repo ${TARGET_REPO} unavailable; skipping image rebuild notify"
+            exit 0
+          fi
+          if [ "$push" != "true" ]; then
+            echo "no write access to ${TARGET_REPO}; skipping image rebuild notify"
+            exit 0
+          fi
           gh api \
             --method POST \
-            repos/gascity/gasworks-internal/dispatches \
-            -f event_type=runtime-dep-updated
+            "repos/${TARGET_REPO}/dispatches" \
+            -f "event_type=${EVENT_TYPE}"

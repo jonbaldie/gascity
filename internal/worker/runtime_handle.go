@@ -7,9 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/events"
-	"github.com/gastownhall/gascity/internal/runtime"
-	sessionpkg "github.com/gastownhall/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/promptsafe"
+	"github.com/jonbaldie/gascity/internal/runtime"
+	sessionpkg "github.com/jonbaldie/gascity/internal/session"
 )
 
 // ErrOperationUnsupported reports that a worker handle cannot support the
@@ -153,6 +154,15 @@ func (h *RuntimeHandle) Close(ctx context.Context) (err error) {
 	return err
 }
 
+// CloseDetailed asks the provider to close the live runtime session and
+// returns no bead cleanup artifacts for runtime-only handles.
+func (h *RuntimeHandle) CloseDetailed(ctx context.Context) (sessionpkg.CloseResult, error) {
+	if err := h.Close(ctx); err != nil {
+		return sessionpkg.CloseResult{}, err
+	}
+	return sessionpkg.CloseResult{}, nil
+}
+
 // Rename reports unsupported because runtime-only handles have no persisted name update.
 func (h *RuntimeHandle) Rename(ctx context.Context, _ string) (err error) {
 	event := h.beginOperationEvent(ctx, workerOperationRename)
@@ -194,6 +204,9 @@ func (h *RuntimeHandle) State(context.Context) (State, error) {
 }
 
 // Message submits a runtime nudge as a synchronous worker message.
+// Runtime-only sessions are permanently excluded from invocation
+// telemetry (gc.agent.tokens.*, gc.agent.invocation.cost_usd); see
+// SessionHandle.recordInvocationTelemetry. Do not add a telemetry hook here.
 func (h *RuntimeHandle) Message(ctx context.Context, req MessageRequest) (result MessageResult, err error) {
 	event := h.beginOperationEvent(ctx, workerOperationMessage)
 	defer func() {
@@ -226,6 +239,8 @@ func (h *RuntimeHandle) Interrupt(ctx context.Context, _ InterruptRequest) (err 
 }
 
 // Nudge submits a best-effort reminder to the live runtime session.
+// Like Message, it is permanently excluded from invocation telemetry;
+// see SessionHandle.recordInvocationTelemetry.
 func (h *RuntimeHandle) Nudge(ctx context.Context, req NudgeRequest) (result NudgeResult, err error) {
 	event := h.beginOperationEvent(ctx, workerOperationNudge)
 	defer func() {
@@ -331,9 +346,10 @@ func (h *RuntimeHandle) PendingStatus(ctx context.Context) (*PendingInteraction,
 // LiveObservation reports runtime presence metadata for a legacy runtime-only
 // worker target.
 func (h *RuntimeHandle) LiveObservation(_ context.Context) (LiveObservation, error) {
+	liveness := runtime.ObserveLiveness(h.provider, h.sessionName, h.processNames)
 	obs := LiveObservation{
-		Running:     h.provider.IsRunning(h.sessionName),
-		Alive:       false,
+		Running:     liveness.Running,
+		Alive:       liveness.Alive,
 		SessionName: h.sessionName,
 	}
 	if suspended, err := h.provider.GetMeta(h.sessionName, "suspended"); err == nil && strings.TrimSpace(suspended) == "true" {
@@ -343,7 +359,6 @@ func (h *RuntimeHandle) LiveObservation(_ context.Context) (LiveObservation, err
 		obs.RuntimeSessionID = strings.TrimSpace(sessionID)
 	}
 	if obs.Running {
-		obs.Alive = h.provider.ProcessAlive(h.sessionName, h.processNames)
 		obs.Attached = h.provider.IsAttached(h.sessionName)
 		if last, err := h.provider.GetLastActivity(h.sessionName); err == nil && !last.IsZero() {
 			lastCopy := last
@@ -387,12 +402,17 @@ func (h *RuntimeHandle) nudgeWaitIdle(ctx context.Context, req NudgeRequest) (Nu
 		}
 		return NudgeResult{Delivered: true}, nil
 	}
+	// Not a silent false: a caller that downgrades to the queue has to be able
+	// to say WHY, and "this provider cannot take live delivery" is a permanent
+	// property of the runtime rather than a transient miss. Reporting it as a
+	// bare Delivered:false is how `gc session nudge` came to print an
+	// unqualified success line for a delivery path that is a no-op end to end.
 	if h.providerName != "claude" {
-		return NudgeResult{Delivered: false}, nil
+		return NudgeResult{Delivered: false, Undelivered: NudgeUndeliveredProviderUnsupported}, nil
 	}
 	waiter, ok := h.provider.(runtime.IdleWaitProvider)
 	if !ok {
-		return NudgeResult{Delivered: false}, nil
+		return NudgeResult{Delivered: false, Undelivered: NudgeUndeliveredProviderUnsupported}, nil
 	}
 	if err := waiter.WaitForIdle(ctx, h.sessionName, runtimeHandleWaitIdleTimeout); err != nil {
 		if errors.Is(err, context.Canceled) {
@@ -402,9 +422,9 @@ func (h *RuntimeHandle) nudgeWaitIdle(ctx context.Context, req NudgeRequest) (Nu
 			if ctxErr := ctx.Err(); ctxErr != nil {
 				return NudgeResult{Delivered: false}, ctxErr
 			}
-			return NudgeResult{Delivered: false}, nil
+			return NudgeResult{Delivered: false, Undelivered: NudgeUndeliveredNoIdleBoundary}, nil
 		}
-		return NudgeResult{Delivered: false}, nil
+		return NudgeResult{Delivered: false, Undelivered: NudgeUndeliveredNoIdleBoundary}, nil
 	}
 	if err := h.nudgeNow(formatRuntimeWaitIdleReminder(req.Source, req.Text)); err != nil {
 		return NudgeResult{}, err
@@ -417,6 +437,13 @@ func formatRuntimeWaitIdleReminder(source, message string) string {
 	if source == "" {
 		source = "session"
 	}
+	// Sanitize attacker-controllable fields before interpolating into the
+	// <system-reminder> block. The deferred-nudge body is sender-supplied, so
+	// without this a sender can embed </system-reminder> sequences to break out
+	// of the reminder and inject a forged operator/system directive.
+	// See gastownhall/gascity#2195 and the ga-vs7 notification-injection incident.
+	source = promptsafe.SanitizeForSystemReminder(source)
+	message = promptsafe.SanitizeForSystemReminder(message)
 	var sb strings.Builder
 	sb.WriteString("<system-reminder>\n")
 	sb.WriteString("You have a deferred reminder that was queued until a safe boundary:\n\n")

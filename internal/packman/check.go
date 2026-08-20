@@ -1,14 +1,18 @@
 package packman
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/builtinpacks"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/fsys"
+	gitutil "github.com/jonbaldie/gascity/internal/git"
 )
 
 // CheckSeverity classifies an import state validation issue.
@@ -83,21 +87,22 @@ func CheckInstalled(cityRoot string, imports map[string]config.Import) (*CheckRe
 
 	if countRemoteImports(imports) > 0 || len(lock.Packs) > 0 {
 		if err := withRepoCacheReadLock(func() error {
-			checkLockedImports(report, lock, imports)
+			checkLockedImports(report, lock, imports, cityRoot)
 			return nil
 		}); err != nil {
 			return nil, err
 		}
 	} else {
-		checkLockedImports(report, lock, imports)
+		checkLockedImports(report, lock, imports, cityRoot)
 	}
 	return report, nil
 }
 
-func checkLockedImports(report *CheckReport, lock *Lockfile, imports map[string]config.Import) {
+func checkLockedImports(report *CheckReport, lock *Lockfile, imports map[string]config.Import, cityRoot string) {
 	state := &importCheckState{
 		lock:              lock,
 		report:            report,
+		cityRoot:          cityRoot,
 		constraints:       make(map[string]string),
 		reachable:         make(map[string]struct{}),
 		seen:              make(map[string]bool),
@@ -106,7 +111,7 @@ func checkLockedImports(report *CheckReport, lock *Lockfile, imports map[string]
 
 	names := sortedImportNames(imports)
 	for _, name := range names {
-		state.walkImport(name, imports[name])
+		state.walkImport(name, imports[name], cityRoot)
 	}
 
 	state.reportStaleLockEntries()
@@ -115,6 +120,7 @@ func checkLockedImports(report *CheckReport, lock *Lockfile, imports map[string]
 type importCheckState struct {
 	lock              *Lockfile
 	report            *CheckReport
+	cityRoot          string
 	constraints       map[string]string
 	reachable         map[string]struct{}
 	seen              map[string]bool
@@ -122,8 +128,12 @@ type importCheckState struct {
 	closureIncomplete bool
 }
 
-func (s *importCheckState) walkImport(name string, imp config.Import) {
+// walkImport walks one import. declDir is the directory a relative local-path
+// source is resolved against: the city root for top-level imports, and the
+// declaring pack's own directory for nested imports.
+func (s *importCheckState) walkImport(name string, imp config.Import, declDir string) {
 	if !isRemoteSource(imp.Source) {
+		s.walkLocalImport(name, imp, declDir)
 		return
 	}
 
@@ -206,8 +216,51 @@ func (s *importCheckState) walkImport(name string, imp config.Import) {
 		return
 	}
 	s.seen[imp.Source] = true
+	// A remote pack's nested relative local import (if any) resolves under
+	// the cached checkout, not the city root.
 	for _, nestedName := range sortedImportNames(nested) {
-		s.walkImport(name+"/"+nestedName, nested[nestedName])
+		s.walkImport(name+"/"+nestedName, nested[nestedName], packDir)
+	}
+}
+
+// walkLocalImport handles a local path-source import. Unlike a remote
+// import, it is never locked or cached, so it can't produce a
+// missing-lock-entry issue for itself — but its own declared imports still
+// need walking so a missing transitive remote import is caught here rather
+// than surfacing later as a load-time "not installed" error. A relative
+// source resolves against declDir, not the process working directory.
+func (s *importCheckState) walkLocalImport(name string, imp config.Import, declDir string) {
+	if !imp.ImportIsTransitive() {
+		return
+	}
+	srcDir := imp.Source
+	if !filepath.IsAbs(srcDir) {
+		srcDir = filepath.Join(declDir, srcDir)
+	}
+	if s.seen[srcDir] {
+		return
+	}
+	s.seen[srcDir] = true
+	nested, err := readPackImports(srcDir)
+	if err != nil {
+		// A local path source that isn't materialized on disk yet has no
+		// transitive imports to discover -- not a hard error. Only a
+		// pack.toml that exists but fails to parse is a genuine problem.
+		if errors.Is(err, fs.ErrNotExist) {
+			return
+		}
+		s.closureIncomplete = true
+		s.addIssue(CheckIssue{
+			Code:       "invalid-local-pack",
+			ImportName: name,
+			Source:     imp.Source,
+			Path:       filepath.Join(srcDir, "pack.toml"),
+			Message:    err.Error(),
+		})
+		return
+	}
+	for _, nestedName := range sortedImportNames(nested) {
+		s.walkImport(name+"/"+nestedName, nested[nestedName], srcDir)
 	}
 }
 
@@ -226,98 +279,41 @@ func (s *importCheckState) validateCachedPack(name, source, commit string) (stri
 		return "", false
 	}
 
-	gitPath := filepath.Join(cachePath, ".git")
-	if st, err := os.Stat(gitPath); err != nil {
-		if os.IsNotExist(err) {
-			s.closureIncomplete = true
-			s.addIssue(CheckIssue{
-				Code:       "missing-cache",
-				ImportName: name,
-				Source:     source,
-				Commit:     commit,
-				Path:       cachePath,
-				Message:    "locked import is missing from the local repo cache",
-				RepairHint: `run "gc import install"`,
-			})
-			return "", false
+	if repository, known := builtinpacks.RepositoryForSource(source); known && config.IsBundledSourceAtCanonicalPin(source, commit) {
+		if err := builtinpacks.ValidateSyntheticRepo(cachePath, repository, commit); err != nil {
+			gitInfo, gitErr := os.Stat(filepath.Join(cachePath, ".git"))
+			if gitErr == nil && !gitutil.MissingCheckoutMarker(gitInfo, gitErr) {
+				if !s.validateCachedGitCheckout(name, source, commit, cachePath) {
+					return "", false
+				}
+			} else {
+				if gitErr != nil && !gitutil.MissingCheckoutMarker(gitInfo, gitErr) {
+					s.closureIncomplete = true
+					s.addIssue(CheckIssue{
+						Code:       "unreadable-cache",
+						ImportName: name,
+						Source:     source,
+						Commit:     commit,
+						Path:       filepath.Join(cachePath, ".git"),
+						Message:    fmt.Sprintf("cannot inspect cached repository: %v; synthetic cache is invalid: %v", gitErr, err),
+						RepairHint: `run "gc import install"`,
+					})
+					return "", false
+				}
+				s.closureIncomplete = true
+				s.addIssue(CheckIssue{
+					Code:       "invalid-synthetic-cache",
+					ImportName: name,
+					Source:     source,
+					Commit:     commit,
+					Path:       cachePath,
+					Message:    fmt.Sprintf("synthetic cache is invalid: %v", err),
+					RepairHint: `run "gc import install"`,
+				})
+				return "", false
+			}
 		}
-		s.closureIncomplete = true
-		s.addIssue(CheckIssue{
-			Code:       "unreadable-cache",
-			ImportName: name,
-			Source:     source,
-			Commit:     commit,
-			Path:       gitPath,
-			Message:    fmt.Sprintf("cannot inspect cached repository: %v", err),
-			RepairHint: `run "gc import install"`,
-		})
-		return "", false
-	} else if st.IsDir() || st.Mode().IsRegular() {
-		head, err := runGit(cachePath, "rev-parse", "HEAD")
-		if err != nil {
-			s.closureIncomplete = true
-			s.addIssue(CheckIssue{
-				Code:       "unreadable-cache-git",
-				ImportName: name,
-				Source:     source,
-				Commit:     commit,
-				Path:       cachePath,
-				Message:    fmt.Sprintf("cannot read cached repository HEAD: %v", err),
-				RepairHint: `run "gc import install"`,
-			})
-			return "", false
-		}
-		if !sameCommit(head, commit) {
-			s.closureIncomplete = true
-			s.addIssue(CheckIssue{
-				Code:       "cache-checkout-mismatch",
-				ImportName: name,
-				Source:     source,
-				Commit:     commit,
-				Path:       cachePath,
-				Message:    fmt.Sprintf("cached repository is checked out at %s, expected %s", strings.TrimSpace(head), commit),
-				RepairHint: `run "gc import install"`,
-			})
-			return "", false
-		}
-		dirty, err := cachedRepoDirty(cachePath)
-		if err != nil {
-			s.closureIncomplete = true
-			s.addIssue(CheckIssue{
-				Code:       "unreadable-cache-git",
-				ImportName: name,
-				Source:     source,
-				Commit:     commit,
-				Path:       cachePath,
-				Message:    fmt.Sprintf("cannot read cached repository status: %v", err),
-				RepairHint: `run "gc import install"`,
-			})
-			return "", false
-		}
-		if dirty {
-			s.closureIncomplete = true
-			s.addIssue(CheckIssue{
-				Code:       "cache-worktree-dirty",
-				ImportName: name,
-				Source:     source,
-				Commit:     commit,
-				Path:       cachePath,
-				Message:    "cached repository has local worktree changes",
-				RepairHint: `run "gc import install"`,
-			})
-			return "", false
-		}
-	} else {
-		s.closureIncomplete = true
-		s.addIssue(CheckIssue{
-			Code:       "invalid-cache",
-			ImportName: name,
-			Source:     source,
-			Commit:     commit,
-			Path:       gitPath,
-			Message:    "cached repository .git entry is not a file or directory",
-			RepairHint: `run "gc import install"`,
-		})
+	} else if !s.validateCachedGitCheckout(name, source, commit, cachePath) {
 		return "", false
 	}
 
@@ -362,6 +358,93 @@ func (s *importCheckState) validateCachedPack(name, source, commit string) (stri
 	}
 
 	return packDir, true
+}
+
+func (s *importCheckState) validateCachedGitCheckout(name, source, commit, cachePath string) bool {
+	gitPath := filepath.Join(cachePath, ".git")
+	st, err := os.Stat(gitPath)
+	if gitutil.MissingCheckoutMarker(st, err) {
+		s.closureIncomplete = true
+		s.addIssue(CheckIssue{
+			Code:       "missing-cache",
+			ImportName: name,
+			Source:     source,
+			Commit:     commit,
+			Path:       cachePath,
+			Message:    "locked import is missing from the local repo cache",
+			RepairHint: `run "gc import install"`,
+		})
+		return false
+	}
+	if err != nil {
+		s.closureIncomplete = true
+		s.addIssue(CheckIssue{
+			Code:       "unreadable-cache",
+			ImportName: name,
+			Source:     source,
+			Commit:     commit,
+			Path:       gitPath,
+			Message:    fmt.Sprintf("cannot inspect cached repository: %v", err),
+			RepairHint: `run "gc import install"`,
+		})
+		return false
+	}
+
+	head, err := runGit(cachePath, "rev-parse", "HEAD")
+	if err != nil {
+		s.closureIncomplete = true
+		s.addIssue(CheckIssue{
+			Code:       "unreadable-cache-git",
+			ImportName: name,
+			Source:     source,
+			Commit:     commit,
+			Path:       cachePath,
+			Message:    fmt.Sprintf("cannot read cached repository HEAD: %v", err),
+			RepairHint: `run "gc import install"`,
+		})
+		return false
+	}
+	if !gitutil.SameCommit(head, commit) {
+		s.closureIncomplete = true
+		s.addIssue(CheckIssue{
+			Code:       "cache-checkout-mismatch",
+			ImportName: name,
+			Source:     source,
+			Commit:     commit,
+			Path:       cachePath,
+			Message:    fmt.Sprintf("cached repository is checked out at %s, expected %s", strings.TrimSpace(head), commit),
+			RepairHint: `run "gc import install"`,
+		})
+		return false
+	}
+	dirty, err := cachedRepoDirty(cachePath)
+	if err != nil {
+		s.closureIncomplete = true
+		s.addIssue(CheckIssue{
+			Code:       "unreadable-cache-git",
+			ImportName: name,
+			Source:     source,
+			Commit:     commit,
+			Path:       cachePath,
+			Message:    fmt.Sprintf("cannot read cached repository status: %v", err),
+			RepairHint: `run "gc import install"`,
+		})
+		return false
+	}
+	if dirty {
+		s.closureIncomplete = true
+		s.addIssue(CheckIssue{
+			Code:       "cache-worktree-dirty",
+			ImportName: name,
+			Source:     source,
+			Commit:     commit,
+			Path:       cachePath,
+			Message:    "cached repository has local worktree changes",
+			RepairHint: `run "gc import install"`,
+		})
+		return false
+	}
+	return true
 }
 
 func (s *importCheckState) reportStaleLockEntries() {
@@ -438,16 +521,4 @@ func cachedPackDir(source, cachePath string) string {
 		return filepath.Join(cachePath, subpath)
 	}
 	return cachePath
-}
-
-func sameCommit(actual, expected string) bool {
-	actual = strings.TrimSpace(actual)
-	expected = strings.TrimSpace(expected)
-	if actual == "" || expected == "" {
-		return false
-	}
-	if strings.EqualFold(actual, expected) {
-		return true
-	}
-	return len(expected) < len(actual) && strings.HasPrefix(strings.ToLower(actual), strings.ToLower(expected))
 }

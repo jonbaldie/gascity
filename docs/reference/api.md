@@ -7,13 +7,16 @@ The `gc` supervisor exposes a single, typed HTTP control plane
 described by an OpenAPI 3.1 document. Everything the CLI does, any
 third-party client can do too — there is no hidden surface.
 
-## Download the spec
+See also: [The six primitives](/getting-started/how-gas-city-works) — the canonical model this
+API projects over.
 
-- **<a href="/schema/openapi.txt" download="openapi.json">Download openapi.json</a>** —
+## Get the spec
+
+- **<a href="https://raw.githubusercontent.com/jonbaldie/gascity/main/docs/reference/schema/openapi.json" target="_blank" rel="noopener">openapi.json</a>** —
   the authoritative contract. Drop it into Stoplight, Postman,
   Swagger UI, or any OpenAPI-aware tool to browse operations
   interactively.
-- **<a href="/schema/events.txt" download="events.json">Download events.json</a>** —
+- **<a href="https://raw.githubusercontent.com/jonbaldie/gascity/main/docs/reference/schema/events.json" target="_blank" rel="noopener">events.json</a>** —
   the `gc events` JSONL line schema. It references DTO components in
   `openapi.json`, so the API remains the source of truth.
 
@@ -33,10 +36,18 @@ The spec is the full reference. A brief summary of the surfaces:
   query + hook operations, dependencies, labels.
 - **Sessions.** CRUD under `/v0/city/{cityName}/sessions`, submit,
   prompt, resume, interaction response, transcript, SSE stream.
-- **Mail, convoys, orders, formulas, molecules, participants,
+- **Connected-client external messaging.** `POST /v0/extmsg/clients`
+  registers an external LLM client and returns a bearer token.
+  `POST /v0/extmsg/inbound` (with `provider: "llm-client"`) delivers an
+  inbound turn from the registered client to a city session.
+  `GET /v0/extmsg/{provider}/{account_id}/{conversation_id}/subscribe`
+  opens a long-lived SSE reply stream for that conversation.
+  See [Connect an external LLM client](/guides/connected-clients) for
+  the full integration guide including the SSE error catalog.
+- **Mail, convoys, orders, formulas, participants,
   transcripts, adapters.** External messaging and orchestration
   surfaces; see the spec for per-operation shapes.
-- **Event bus.** `GET /v0/events` + `GET /v0/events/stream` at
+- **Events.** `GET /v0/events` + `GET /v0/events/stream` at
   supervisor scope, and `GET /v0/city/{cityName}/events` +
   `GET /v0/city/{cityName}/events/stream` at city scope.
 - **Config & packs.** Per-city config and pack metadata under
@@ -82,15 +93,37 @@ Each header's schema is documented in the operation's
 ## Errors
 
 Every error response is an RFC 9457 Problem Details body
-(`application/problem+json`). Error types are documented in the spec
-under `components.schemas.ErrorModel`. The `detail` field carries a
-short `code: ` prefix (e.g. `pending_interaction: ...`,
-`conflict: ...`, `not_found: ...`, `read_only: ...`) so clients can
-pattern-match on the semantic code without needing a typed error
-enum. Body-field validation errors (e.g. a required string posted
-empty) come back as `422 Unprocessable Entity` or `400 Bad Request`
-depending on the operation; the `errors` array of the Problem Details
-body pinpoints which fields failed.
+(`application/problem+json`), described by `components.schemas.ErrorModel`.
+
+**Branch on the machine-readable identity, not on prose.** An error carries a
+stable `type` URN of the form `urn:gascity:error:<code>` and a convenience
+`code` member (the URN's final segment) — for example
+`type: "urn:gascity:error:bead-not-found"`, `code: "bead-not-found"`. This is
+the canonical identifier to switch on; it never changes between occurrences and
+is independent of the human-readable `title`/`detail`. The full catalog of
+codes the API can return is published in the spec as the
+`x-gascity-problem-types` extension on the `ErrorModel.type` schema.
+
+The `detail` field remains a human-readable, occurrence-specific explanation.
+Some legacy paths still encode a semantic hint as a `code: ` prefix on `detail`
+(e.g. `not_found: ...`, `conflict: ...`, `read_only: ...`, `in_flight: ...`);
+prefer the `type`/`code` members and treat detail-prefix parsing as
+deprecated. An error whose body omits `code` is an as-yet-unconverted legacy
+path — match it by `status` and `detail` until it gains a code.
+
+The framework's built-in request validation (e.g. a required string posted
+empty, or `limit=-1`) carries `type: "urn:gascity:error:validation-failed"`,
+usually as `422 Unprocessable Entity` — but as `400 Bad Request` for a body it
+cannot parse and `415 Unsupported Media Type` for an unsupported content type;
+the `code`/`type` is the constant across those statuses, and the `errors` array
+pinpoints the fields that failed. A few endpoints perform their own additional
+validation and return a code-less `400`/`422` until converted, so treat a
+missing `code` as a legacy path (match on `status`/`detail`). Operations that
+enumerate their error responses (currently the bead and sling endpoints) list
+each status explicitly in the spec; others declare a single catch-all `default`
+error response. An enumerated list covers the operation's own errors plus the
+always-applied middleware errors (e.g. `403` on mutations); framework-level
+transport statuses may still occur, as with any HTTP API.
 
 ## Streaming
 
@@ -100,6 +133,11 @@ the per-operation `responses.200.content.text/event-stream` entry.
 Clients should follow the standard SSE reconnection protocol
 (`Last-Event-ID` header) where the server supports it; the event bus
 stream (`/v0/events/stream`) replays from the last received index.
+When no cursor is supplied, event streams start at the current event
+head and deliver future events only. Async `202 Accepted` responses
+include an `event_cursor` captured before the operation starts; pass
+that value as `after_cursor` or `after_seq` to wait for the operation's
+request-result event without replaying unrelated historical backlog.
 
 Fatal setup errors are returned as normal Problem Details responses
 *before* the stream's 200 headers commit, never as a 200 stream that
@@ -121,46 +159,39 @@ is nothing to poll.
 
 ```json
 {
-  "ok": true,
-  "name": "my-city",
-  "path": "/abs/path/to/my-city"
+  "request_id": "req-...",
+  "event_cursor": "__supervisor__:42,my-city:17"
 }
 ```
 
-The `name` field is the city's resolved runtime identity
-(`workspace.name` from `city.toml`, or the directory basename).
-Use it to filter the event stream for completion.
+Use `request_id` to correlate the completion event. Use `event_cursor`
+as the `after_cursor` value on the supervisor event stream.
 
 ### Completion events
 
-On the same `/v0/events/stream` the client will see (in order):
+On the same `/v0/events/stream` the client will see:
 
-- `city.created` (`CityCreatedPayload`) — emitted by the scaffold
+- `city.created` (`CityLifecyclePayload`) — emitted by the scaffold
   step before `POST` returns. `subject` and payload `name` equal
-  the response's `name`.
-- `city.ready` (`CityReadyPayload`) — the reconciler finished
-  `prepareCityForSupervisor` successfully. Matching event:
-  `subject == name` and `type == "city.ready"`.
-- `city.init_failed` (`CityInitFailedPayload`) — the reconciler
-  gave up. The payload's `error` field describes why, including
-  deferred dependency or provider-readiness blockers that the async
-  API does not fail synchronously.
+  the resolved city name.
+- `request.result.city.create` (`CityCreateSucceededPayload`) — the
+  reconciler finished `prepareCityForSupervisor` successfully.
+- `request.failed` (`RequestFailedPayload`) — the reconciler failed
+  the async operation. Match `payload.request_id` to the 202 response.
 
-Exactly one of `city.ready` or `city.init_failed` lands per
-successful `POST`. Clients wait for either; no polling of
-`GET /v0/cities` or `GET /v0/city/{cityName}/readiness` is
-required.
+Exactly one terminal event (`request.result.city.create` or
+`request.failed`) lands per successful `POST`. Clients wait for the
+returned `request_id`; no polling of `GET /v0/cities` or
+`GET /v0/city/{cityName}/readiness` is required.
 
 ### Subscribe before or after POST
 
 Either order works. The recommended flow is:
 
-1. `POST /v0/city` and wait for `202`.
-2. `GET /v0/events/stream?after_cursor=0` — request replay from
-   the start so `city.created` (and possibly `city.ready`) are
-   delivered even if they fired before subscribe.
-3. Read frames until `subject == response.name` and
-   `type ∈ {"city.ready", "city.init_failed"}`.
+1. `POST /v0/city` and wait for `202 {request_id, event_cursor}`.
+2. `GET /v0/events/stream?after_cursor=<event_cursor>`.
+3. Read frames until `payload.request_id == response.request_id` and
+   `type ∈ {"request.result.city.create", "request.failed"}`.
 
 **Empty supervisor is fine.** The event stream works even when
 no cities existed before the `POST`. `POST` writes the city to
@@ -186,10 +217,10 @@ event multiplexer finds the new city on the very next
 
 `POST /v0/city/{cityName}/unregister` removes a city from the
 supervisor's registry and signals the supervisor to stop the city's
-controller. Like `POST /v0/city`, it is asynchronous: the response
+orchestrator. Like `POST /v0/city`, it is asynchronous: the response
 is `202 Accepted` returned as soon as the registry entry is gone
 and the supervisor is notified. The supervisor reconciler stops the
-controller on its next tick and emits the completion event.
+orchestrator on its next tick and emits the completion event.
 
 The city directory on disk is **not** touched. This operation only
 detaches the city from the supervisor; reattaching it later is a
@@ -199,28 +230,30 @@ simple `gc register`.
 
 ```json
 {
-  "ok": true,
-  "name": "my-city",
-  "path": "/abs/path/to/my-city"
+  "request_id": "req-...",
+  "event_cursor": "__supervisor__:43,my-city:21"
 }
 ```
+
+Pass `event_cursor` as `after_cursor` on `/v0/events/stream` and wait
+for the terminal event whose payload contains the returned `request_id`.
 
 ### Completion events
 
 On `/v0/events/stream` the client will see (in order):
 
 - `city.unregister_requested`
-  (`CityUnregisterRequestedPayload`) — emitted by the handler
+  (`CityLifecyclePayload`) — emitted by the handler
   before the registry write so subscribers see the teardown start.
-- `city.unregistered` (`CityUnregisteredPayload`) — emitted by the
-  reconciler once the city's controller has stopped. Matching
-  event: `subject == name` and `type == "city.unregistered"`.
-- `city.unregister_failed` (`CityUnregisterFailedPayload`) — emitted
-  by the reconciler if the controller did not stop cleanly. The
-  payload's `error` field describes the failure.
+- `request.result.city.unregister`
+  (`CityUnregisterSucceededPayload`) — emitted by the reconciler once
+  the city's orchestrator has stopped.
+- `request.failed` (`RequestFailedPayload`) — emitted by the
+  reconciler if the orchestrator did not stop cleanly. Match
+  `payload.request_id`.
 
-Exactly one of `city.unregistered` or `city.unregister_failed`
-lands per successful unregister. Clients wait for either.
+Exactly one terminal event lands per successful unregister. Clients
+wait for the returned `request_id`.
 
 ### Errors
 
@@ -241,15 +274,32 @@ behavior, heartbeat suppression, and the `--seq` plain-text cursor format, see
 
 ### City Scope
 
+Per-city routes are available only after the supervisor marks the city
+`running=true` in `GET /v0/cities`. During startup reconciliation, a city can
+appear in the city list with `running=false` and `status=starting_agents`; in
+that window typed `/v0/city/{cityName}/...` routes return `404` with
+`not_found: city not found or not running: <cityName>`. The raw
+`/v0/city/{cityName}/svc/*` workspace-service proxy is outside the Huma-typed
+API surface and returns the static readiness detail
+`not_found: city not found or not running`. Clients should use the supervisor
+city list or lifecycle events as the readiness boundary before issuing per-city
+requests.
+
 - `GET /v0/city/{cityName}/events`
   returns `ListBodyWireEvent` and includes `X-GC-Index`.
 - `GET /v0/city/{cityName}/events/stream`
   emits:
   - `event: event` with `EventStreamEnvelope`
   - `event: heartbeat` with `HeartbeatEvent`
+- Async session mutations in that city (`session.create`,
+  `session.message`, `session.submit`) complete on this stream. Match
+  terminal `request.result.session.*` or `request.failed` events by
+  `payload.request_id`.
 - Resume:
-  - `Last-Event-ID` or `after_seq`
-- `gc events` in city scope outputs one `WireEvent` JSON object per line.
+  - `Last-Event-ID` or `after_seq`; omit both to start from the
+    current city event head.
+- `gc events` in city scope outputs one `TypedEventStreamEnvelope` JSON
+  object per line.
 - `gc events --watch` and `gc events --follow` in city scope output one
   `EventStreamEnvelope` JSON object per line.
 - `gc events --seq` in city scope prints the API's `X-GC-Index` value.
@@ -262,10 +312,14 @@ behavior, heartbeat suppression, and the `--seq` plain-text cursor format, see
   emits:
   - `event: tagged_event` with `TaggedEventStreamEnvelope`
   - `event: heartbeat` with `HeartbeatEvent`
+- Async supervisor mutations (`city.create`, `city.unregister`) complete
+  on this stream. Match terminal `request.result.city.*` or
+  `request.failed` events by `payload.request_id`.
 - Resume:
-  - `Last-Event-ID` or `after_cursor`
-- `gc events` in supervisor scope outputs one `WireTaggedEvent` JSON object
-  per line.
+  - `Last-Event-ID` or `after_cursor`; omit both to start from the
+    current supervisor event head.
+- `gc events` in supervisor scope outputs one `TypedTaggedEventStreamEnvelope`
+  JSON object per line.
 - `gc events --watch` and `gc events --follow` in supervisor scope
   output one `TaggedEventStreamEnvelope` JSON object per line.
 - `gc events --seq` in supervisor scope prints the current composite

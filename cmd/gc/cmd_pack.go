@@ -5,8 +5,8 @@ import (
 	"io"
 	"path/filepath"
 
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/fsys"
 	"github.com/spf13/cobra"
 )
 
@@ -24,6 +24,8 @@ can be pinned to specific git refs.`,
 			return cmd.Help()
 		},
 	}
+	cmd.AddCommand(newPackRegistryCmd(stdout, stderr))
+	cmd.AddCommand(newPackReleaseCmd(stdout, stderr))
 	cmd.AddCommand(newPackFetchCmd(stdout, stderr))
 	cmd.AddCommand(newPackListCmd(stdout, stderr))
 	return cmd

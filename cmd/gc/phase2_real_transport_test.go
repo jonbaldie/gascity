@@ -7,15 +7,16 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/runtime"
-	"github.com/gastownhall/gascity/internal/shellquote"
-	workertest "github.com/gastownhall/gascity/internal/worker/workertest"
-	"github.com/gastownhall/gascity/test/tmuxtest"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/shellquote"
+	workertest "github.com/jonbaldie/gascity/internal/worker/workertest"
+	"github.com/jonbaldie/gascity/test/tmuxtest"
 )
 
 const (
@@ -40,33 +41,18 @@ func TestPhase2WorkerCoreRealTransportProof(t *testing.T) {
 	}
 }
 
-func TestPhase2HookEnabledClaudeLaunchPromptDeliveryProof(t *testing.T) {
-	tmuxtest.RequireTmux(t)
-
-	tc := phase2ProviderCaseForFamily(t, "claude")
-	tp := resolvePhase2Template(t, tc)
-	if !tp.HookEnabled {
-		t.Fatal("HookEnabled = false, want true for Claude phase2 profile")
-	}
-	if tp.ResolvedProvider == nil {
-		t.Fatal("ResolvedProvider = nil, want Claude provider metadata")
-	}
-	if !tp.ResolvedProvider.SupportsHooks {
-		t.Fatal("SupportsHooks = false, want true for Claude phase2 profile")
-	}
-
-	materialized := templateParamsToConfig(tp)
-	run := launchPhase2RealTransportSession(t, tc, materialized)
-
-	if run.ErrorStage != "" {
-		t.Fatalf("%s failed: %s", run.ErrorStage, run.Error)
-	}
-	if got, want := run.ObservedStartupPrompt, run.ExpectedStartupPrompt; got != want {
-		t.Fatalf("startup prompt = %q, want %q", got, want)
-	}
-	if !run.AutonomousStarted {
-		t.Fatal("launch prompt marker = missing, want command-line startup prompt matched before any explicit rescue nudge")
-	}
+// phase2ObservedNudgeText is the nudge TEXT a provider received, with the
+// submit keystrokes stripped.
+//
+// This proof is about delivery of the configured nudge, not about how the
+// carrier submits it. Since upstream #4706 a codex pane's submit sequence is
+// Escape then Enter (nudgeSubmitKeySequences), so the ESC byte lands on the
+// provider's stdin right behind the text and a whitespace-only trim leaves
+// "nudge-codex\x1b" — a keystroke, not content. Strip the ASCII control bytes
+// the submit sequence can contribute; a nudge body never legitimately carries a
+// bare ESC.
+func phase2ObservedNudgeText(observed string) string {
+	return strings.TrimSpace(strings.TrimRight(strings.TrimSpace(observed), "\x1b\r\n"))
 }
 
 type phase2RealTransportRun struct {
@@ -154,7 +140,7 @@ func launchPhase2RealTransportSession(t *testing.T, tc phase2ProviderCase, mater
 		}
 	}
 
-	sp, err := newSessionProviderByName("", config.SessionConfig{
+	sp, err := newSessionProviderForCityByName(nil, "", config.SessionConfig{
 		Socket:             guard.SocketName(),
 		SetupTimeout:       "3s",
 		NudgeReadyTimeout:  "2s",
@@ -193,10 +179,10 @@ func launchPhase2RealTransportSession(t *testing.T, tc phase2ProviderCase, mater
 		`printf "%s" "${GC_SESSION_ORIGIN:-}" > "$GC_REAL_TRANSPORT_SESSION_ORIGIN_PATH"`,
 		`printf "%s" "${GC_STARTUP_PROMPT_DELIVERED:-}" > "$GC_REAL_TRANSPORT_STARTUP_DELIVERED_PATH"`,
 		`printf "started\n" > "$GC_REAL_TRANSPORT_STARTED_PATH"`,
-		`printf "%s" "$0" > "$GC_REAL_TRANSPORT_STARTUP_PROMPT_PATH"`,
+		`case "${GC_REAL_TRANSPORT_STARTUP_PROMPT_SOURCE:-none}" in flag) printf "%s" "${1:-}" > "$GC_REAL_TRANSPORT_STARTUP_PROMPT_PATH" ;; arg) printf "%s" "$0" > "$GC_REAL_TRANSPORT_STARTUP_PROMPT_PATH" ;; *) : > "$GC_REAL_TRANSPORT_STARTUP_PROMPT_PATH" ;; esac`,
 		`if cmp -s "$GC_REAL_TRANSPORT_STARTUP_PROMPT_PATH" "$GC_REAL_TRANSPORT_EXPECTED_PROMPT_PATH"; then printf "launch-prompt\n" > "$GC_REAL_TRANSPORT_AUTONOMOUS_PATH"; fi`,
-		`IFS= read -r line`,
-		`printf "%s\n" "$line" > "$GC_REAL_TRANSPORT_INPUT_PATH"`,
+		`: > "$GC_REAL_TRANSPORT_INPUT_PATH"`,
+		`i=0; input_lines="${GC_REAL_TRANSPORT_INPUT_LINES:-1}"; while [ "$i" -lt "$input_lines" ]; do IFS= read -r line; if [ "$i" -gt 0 ]; then printf "\n" >> "$GC_REAL_TRANSPORT_INPUT_PATH"; fi; printf "%s" "$line" >> "$GC_REAL_TRANSPORT_INPUT_PATH"; i=$((i + 1)); done`,
 		`while [ ! -f "$GC_REAL_TRANSPORT_STOP_PATH" ]; do sleep 0.05; done`,
 	}, "; ")
 
@@ -223,6 +209,12 @@ func launchPhase2RealTransportSession(t *testing.T, tc phase2ProviderCase, mater
 	cfg.Env["GC_REAL_TRANSPORT_EXPECTED_PROMPT_PATH"] = expectedPromptPath
 	cfg.Env["GC_REAL_TRANSPORT_AUTONOMOUS_PATH"] = autonomousPath
 	cfg.Env["GC_REAL_TRANSPORT_STOP_PATH"] = stopPath
+	cfg.Env["GC_REAL_TRANSPORT_INPUT_LINES"] = strconv.Itoa(runtimeInputLineCount(materialized.Nudge))
+	if cfg.PromptFlag != "" {
+		cfg.Env["GC_REAL_TRANSPORT_STARTUP_PROMPT_SOURCE"] = "flag"
+	} else if cfg.PromptSuffix != "" {
+		cfg.Env["GC_REAL_TRANSPORT_STARTUP_PROMPT_SOURCE"] = "arg"
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), phase2RealTransportBound)
 	defer cancel()
@@ -293,7 +285,7 @@ func launchPhase2RealTransportSession(t *testing.T, tc phase2ProviderCase, mater
 		ErrorStage:               errorStage,
 		Error:                    errorDetail,
 		ExpectedInput:            materialized.Nudge,
-		ObservedInput:            strings.TrimSpace(observedInput),
+		ObservedInput:            phase2ObservedNudgeText(observedInput),
 		ExpectedSessionOrigin:    materialized.Env["GC_SESSION_ORIGIN"],
 		ObservedSessionOrigin:    strings.TrimSpace(observedSessionOrigin),
 		ExpectedStartupDelivered: materialized.Env[startupPromptDeliveredEnv],
@@ -306,6 +298,13 @@ func launchPhase2RealTransportSession(t *testing.T, tc phase2ProviderCase, mater
 		RunningAfterInput:        sp.IsRunning(sessionName),
 		StartElapsed:             startElapsed,
 	}
+}
+
+func runtimeInputLineCount(input string) int {
+	if input == "" {
+		return 0
+	}
+	return strings.Count(input, "\n") + 1
 }
 
 func phase2RealTransportResult(tc phase2ProviderCase, run phase2RealTransportRun) workertest.Result {

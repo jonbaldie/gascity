@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // hasLabel checks if a bead has a specific label.
@@ -132,7 +132,7 @@ func encodeMetadataFields(meta map[string]string, fields map[string]string) map[
 
 func decodePrefixedMetadata(meta map[string]string) map[string]string {
 	if len(meta) == 0 {
-		return nil
+		return map[string]string{}
 	}
 	out := make(map[string]string)
 	for k, v := range meta {
@@ -141,7 +141,7 @@ func decodePrefixedMetadata(meta map[string]string) map[string]string {
 		}
 	}
 	if len(out) == 0 {
-		return nil
+		return map[string]string{}
 	}
 	return out
 }

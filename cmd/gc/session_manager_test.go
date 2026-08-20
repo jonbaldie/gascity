@@ -3,18 +3,18 @@ package main
 import (
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/runtime"
-	"github.com/gastownhall/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/session"
 )
 
 func newSessionManagerWithConfig(cityPath string, store beads.Store, sp runtime.Provider, cfg *config.City) *session.Manager {
 	if cfg == nil {
-		return session.NewManagerWithCityPath(store, sp, cityPath)
+		return session.NewManagerWithOptions(store, sp, session.WithCityPath(cityPath))
 	}
 	rigContext := currentRigContext(cfg)
-	return session.NewManagerWithTransportPolicyResolverAndCityPath(store, sp, cityPath, func(template, provider string) (string, bool) {
+	return session.NewManagerWithOptions(store, sp, session.WithCityPath(cityPath), session.WithTransportPolicyResolver(func(template, provider string) (string, bool) {
 		agentCfg, ok := resolveAgentIdentity(cfg, template, rigContext)
 		if ok {
 			resolved, err := config.ResolveProvider(
@@ -45,5 +45,5 @@ func newSessionManagerWithConfig(cityPath string, store beads.Store, sp runtime.
 			return "", false
 		}
 		return strings.TrimSpace(resolved.ProviderSessionCreateTransport()), false
-	})
+	}))
 }

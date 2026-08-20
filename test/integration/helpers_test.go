@@ -14,7 +14,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/test/tmuxtest"
+	"github.com/jonbaldie/gascity/internal/builtinpacks"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/test/tmuxtest"
 )
 
 // agentConfig describes a single agent for setupCity.
@@ -29,18 +31,22 @@ func usingSubprocess() bool {
 }
 
 // uniqueCityName generates a random city name for test isolation.
+//
+// Names like "gctest-{hex}" all derive to Dolt DB prefix "gc" via
+// DeriveBeadsPrefix, causing dirty-table schema migration failures when
+// tests share a Dolt server and a prior run crashes. Instead, generate
+// a 6-letter random name: DeriveBeadsPrefix returns the first 2 chars,
+// giving 26² = 676 distinct prefixes across the test suite.
 func uniqueCityName() string {
-	b := make([]byte, 4)
+	b := make([]byte, 6)
 	if _, err := rand.Read(b); err != nil {
 		panic("generating random city name: " + err.Error())
 	}
-	hex := fmt.Sprintf("%x", b)
-	parts := make([]string, 0, len(hex)+1)
-	parts = append(parts, "gctest")
-	for _, r := range hex {
-		parts = append(parts, string(r))
+	name := make([]byte, 6)
+	for i, c := range b {
+		name[i] = 'a' + c%26
 	}
-	return strings.Join(parts, "-")
+	return string(name)
 }
 
 // setupCity creates a city directory, initializes it, writes a city.toml
@@ -119,6 +125,9 @@ func initCityWithManagedDoltRecovery(t *testing.T, env []string, configPath, cit
 	for attempt := 1; attempt <= 2; attempt++ {
 		out, err = runGCDoltWithEnv(env, "", "init", "--skip-provider-readiness", "--file", configPath, cityDir)
 		if err == nil {
+			if readyOut, readyErr := waitForManagedDoltCityReady(env, cityDir, 20*time.Second); readyErr != nil {
+				t.Fatalf("gc init succeeded but managed Dolt city never became ready: %v\nlast bd output: %s", readyErr, readyOut)
+			}
 			return
 		}
 
@@ -277,6 +286,20 @@ func writeCityToml(t *testing.T, cityDir, cityName, startCommand string) {
 // quote returns a TOML-safe quoted string.
 func quote(s string) string {
 	return strconv.Quote(s)
+}
+
+func packTomlWithCoreImport(t testing.TB, packName string) string {
+	t.Helper()
+
+	source, ok := builtinpacks.Source("core")
+	if !ok {
+		t.Fatal("builtin core pack source is not registered")
+	}
+	return fmt.Sprintf("[pack]\nname = %s\nschema = 2\n\n[imports.core]\nsource = %s\nversion = %s\n",
+		quote(packName),
+		quote(source),
+		quote(config.BundledSourcePinnedVersion(source)),
+	)
 }
 
 func repoRoot(t *testing.T) string {

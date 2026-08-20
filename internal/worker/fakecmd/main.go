@@ -10,7 +10,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/gastownhall/gascity/internal/worker/fake"
+	"github.com/jonbaldie/gascity/internal/worker/fake"
 )
 
 func main() {

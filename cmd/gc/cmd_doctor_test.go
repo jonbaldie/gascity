@@ -2,17 +2,75 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/beads/contract"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/doctor"
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads/contract"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/doctor"
+	"github.com/jonbaldie/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/suspensionstate"
 )
+
+func prependDoctorJSONStubBinaries(t *testing.T, names ...string) {
+	t.Helper()
+	dir := t.TempDir()
+	for _, name := range names {
+		path := filepath.Join(dir, name)
+		if err := os.WriteFile(path, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+			t.Fatalf("write stub %s: %v", name, err)
+		}
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+}
+
+func TestDoctorJSONSuccessIsParseableJSONOnly(t *testing.T) {
+	cityDir := t.TempDir()
+	writeMinimalCityToml(t, cityDir)
+	if err := os.MkdirAll(filepath.Join(cityDir, ".gc"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cityDir, "city.toml"), []byte("[workspace]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeBuiltinImportsFixture(t, cityDir, "core")
+	if err := os.WriteFile(filepath.Join(cityDir, ".gc", "site.toml"), []byte("workspace_name = \"demo\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GC_BEADS", "file")
+	prependDoctorJSONStubBinaries(t, "tmux", "git", "jq", "pgrep", "lsof")
+
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"--city", cityDir, "doctor", "--json"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("gc doctor --json = %d; stderr=%s stdout=%s", code, stderr.String(), stdout.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	if strings.Contains(stdout.String(), "✓") || strings.Contains(stdout.String(), "warnings") {
+		t.Fatalf("stdout contains human doctor output: %q", stdout.String())
+	}
+
+	var payload struct {
+		Passed  int `json:"passed"`
+		Failed  int `json:"failed"`
+		Results []struct {
+			Name   string `json:"name"`
+			Status string `json:"status"`
+		} `json:"results"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatalf("stdout is not JSON: %v\n%s", err, stdout.String())
+	}
+	if payload.Passed == 0 || payload.Failed != 0 || len(payload.Results) == 0 {
+		t.Fatalf("payload summary/results = %+v", payload)
+	}
+}
 
 func TestDoctorSkipsDoltChecksTreatsExecGcBeadsBdAsBdContract(t *testing.T) {
 	cityDir := t.TempDir()
@@ -172,13 +230,187 @@ prefix = "fe"
 	})
 
 	var stdout, stderr bytes.Buffer
-	_ = doDoctor(false, false, &stdout, &stderr)
+	_ = doDoctor(false, false, false, 0, &stdout, &stderr)
 
 	if citySkip == nil || *citySkip {
 		t.Fatalf("city dolt check skip = %v, want false when a bd-backed rig inherits the city endpoint", citySkip)
 	}
 	if rigSkip == nil || *rigSkip {
 		t.Fatalf("rig dolt check skip = %v, want false for bd-backed rig", rigSkip)
+	}
+}
+
+func TestBuildDoctorChecksRegistersDoltChecksOnlyForActiveManagedRigs(t *testing.T) {
+	clearInheritedBeadsEnv(t)
+
+	cityDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(cityDir, "city.toml"), []byte(`[workspace]
+name = "demo"
+
+[beads]
+provider = "file"
+
+[[rigs]]
+name = "managed"
+path = "managed"
+prefix = "ma"
+
+[[rigs]]
+name = "filebacked"
+path = "filebacked"
+prefix = "fi"
+
+[[rigs]]
+name = "sleeping"
+path = "sleeping"
+prefix = "sl"
+suspended = true
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"managed", "filebacked", "sleeping"} {
+		if err := os.MkdirAll(filepath.Join(cityDir, name), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, name := range []string{"managed", "sleeping"} {
+		rigDir := filepath.Join(cityDir, name)
+		if err := os.MkdirAll(filepath.Join(rigDir, ".beads"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := contract.EnsureCanonicalMetadata(fsys.OSFS{}, filepath.Join(rigDir, ".beads", "metadata.json"), contract.MetadataState{
+			Database:     "dolt",
+			Backend:      "dolt",
+			DoltMode:     "server",
+			DoltDatabase: name,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	doltDataDir := filepath.Join(cityDir, "runtime-dolt")
+	t.Setenv("GC_DOLT_DATA_DIR", doltDataDir)
+
+	oldBackupCheck := newDoctorDoltBackupCheck
+	oldLocalOnlyCheck := newDoctorDoltLocalOnlyCheck
+	registeredBackup := map[string]string{}
+	registeredLocalOnly := map[string]string{}
+	newDoctorDoltBackupCheck = func(cityPath string, rig config.Rig, dataDir string) *doctor.DoltBackupCheck {
+		registeredBackup[rig.Name] = dataDir
+		return doctor.NewDoltBackupCheck(cityPath, rig, dataDir)
+	}
+	newDoctorDoltLocalOnlyCheck = func(cityPath string, rig config.Rig, dataDir string) *doctor.DoltLocalOnlyRemoteCheck {
+		registeredLocalOnly[rig.Name] = dataDir
+		return doctor.NewDoltLocalOnlyRemoteCheck(cityPath, rig, dataDir)
+	}
+	t.Cleanup(func() {
+		newDoctorDoltBackupCheck = oldBackupCheck
+		newDoctorDoltLocalOnlyCheck = oldLocalOnlyCheck
+	})
+
+	cfg := &config.City{
+		Workspace: config.Workspace{Name: "demo"},
+		Rigs: []config.Rig{
+			{Name: "managed", Path: "managed", Prefix: "ma"},
+			{Name: "filebacked", Path: "filebacked", Prefix: "fi"},
+			{Name: "sleeping", Path: "sleeping", Prefix: "sl", Suspended: true},
+		},
+	}
+	buildDoctorChecks(cityDir, cfg, nil, buildDoctorChecksOpts{
+		ControllerRunning:    true,
+		SkipCityDoltCheck:    true,
+		SkipManagedDoltCheck: true,
+	})
+
+	if len(registeredBackup) != 1 {
+		t.Fatalf("registered dolt-backup checks = %#v, want only active managed rig", registeredBackup)
+	}
+	if got := registeredBackup["managed"]; got != doltDataDir {
+		t.Fatalf("managed rig data dir = %q, want runtime layout data dir %q", got, doltDataDir)
+	}
+	if _, ok := registeredBackup["filebacked"]; ok {
+		t.Fatalf("file-backed rig should not register dolt-backup check: %#v", registeredBackup)
+	}
+	if _, ok := registeredBackup["sleeping"]; ok {
+		t.Fatalf("suspended rig should not register dolt-backup check: %#v", registeredBackup)
+	}
+	if len(registeredLocalOnly) != 1 {
+		t.Fatalf("registered dolt-local-only checks = %#v, want only active managed rig", registeredLocalOnly)
+	}
+	if got := registeredLocalOnly["managed"]; got != doltDataDir {
+		t.Fatalf("managed rig local-only data dir = %q, want runtime layout data dir %q", got, doltDataDir)
+	}
+	if _, ok := registeredLocalOnly["filebacked"]; ok {
+		t.Fatalf("file-backed rig should not register dolt-local-only check: %#v", registeredLocalOnly)
+	}
+	if _, ok := registeredLocalOnly["sleeping"]; ok {
+		t.Fatalf("suspended rig should not register dolt-local-only check: %#v", registeredLocalOnly)
+	}
+}
+
+func TestBuildDoctorChecksSkipsRigDoltChecks(t *testing.T) {
+	clearInheritedBeadsEnv(t)
+
+	cityDir := t.TempDir()
+	rigDir := filepath.Join(cityDir, "managed")
+	if err := os.MkdirAll(rigDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(rigDir, ".beads"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cityDir, "city.toml"), []byte(`[workspace]
+name = "demo"
+
+[beads]
+provider = "file"
+
+[[rigs]]
+name = "managed"
+path = "managed"
+prefix = "ma"
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := contract.EnsureCanonicalMetadata(fsys.OSFS{}, filepath.Join(rigDir, ".beads", "metadata.json"), contract.MetadataState{
+		Database:     "dolt",
+		Backend:      "dolt",
+		DoltMode:     "server",
+		DoltDatabase: "managed",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	oldRigCheck := newDoctorRigDoltServerCheck
+	var rigSkip *bool
+	newDoctorRigDoltServerCheck = func(cityPath string, rig config.Rig, skip bool) *doctor.RigDoltServerCheck {
+		rigSkip = &skip
+		return doctor.NewRigDoltServerCheck(cityPath, rig, skip)
+	}
+	t.Cleanup(func() {
+		newDoctorRigDoltServerCheck = oldRigCheck
+	})
+
+	cfg := &config.City{
+		Workspace: config.Workspace{Name: "demo"},
+		Rigs:      []config.Rig{{Name: "managed", Path: "managed", Prefix: "ma"}},
+	}
+	checks := buildDoctorChecks(cityDir, cfg, nil, buildDoctorChecksOpts{
+		ControllerRunning:    true,
+		SkipCityDoltCheck:    true,
+		SkipManagedDoltCheck: true,
+		SkipRigDoltChecks:    true,
+	})
+
+	if rigSkip == nil {
+		t.Error("rig dolt-server check was not registered")
+	} else if !*rigSkip {
+		t.Error("rig dolt-server check skip = false, want true")
+	}
+	names := doctorCheckNames(checks)
+	for _, name := range []string{"rig:managed:dolt-backup", "rig:managed:dolt-local-only-remote"} {
+		if doctorCheckIndex(names, name) >= 0 {
+			t.Errorf("check %q registered with SkipRigDoltChecks=true; names=%v", name, names)
+		}
 	}
 }
 
@@ -235,11 +467,229 @@ dolt_port = "3308"
 	})
 
 	var stdout, stderr bytes.Buffer
-	_ = doDoctor(false, false, &stdout, &stderr)
+	_ = doDoctor(false, false, false, 0, &stdout, &stderr)
 
 	if !strings.Contains(stdout.String(), "canonical/compat Dolt drift") {
 		t.Fatalf("doctor output missing Dolt topology drift:\nstdout:\n%s\nstderr:\n%s", stdout.String(), stderr.String())
 	}
+}
+
+func TestDoDoctorRegistersStaleLocalPackDirCheck(t *testing.T) {
+	skipSlowCmdGCTest(t, "starts real Dolt lifecycle")
+	cityDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(cityDir, ".gc"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(cityDir, "packs", "actual"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cityDir, "city.toml"), []byte(`[workspace]
+name = "demo"
+
+[beads]
+provider = "file"
+
+[packs.actual]
+source = "https://github.com/gastownhall/gc-actual-packs"
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GC_CITY_PATH", cityDir)
+	t.Setenv("GC_DOLT", "skip")
+	cleanupManagedDoltTestCity(t, cityDir)
+
+	var stdout, stderr bytes.Buffer
+	_ = doDoctor(false, true, false, 0, &stdout, &stderr)
+	out := stdout.String() + stderr.String()
+	if !strings.Contains(out, "stale-local-pack-dirs") {
+		t.Fatalf("doctor output missing stale-local-pack-dirs check:\n%s", out)
+	}
+	if !strings.Contains(out, "delete `packs/actual/` (it's stale); edits go via PR on gc-actual-packs") {
+		t.Fatalf("doctor output missing stale pack action:\n%s", out)
+	}
+}
+
+func TestDoDoctorRegistersStaleLocalPackDirCheckForRemoteImport(t *testing.T) {
+	cityDir := t.TempDir()
+	homeDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
+	t.Setenv("GC_HOME", filepath.Join(homeDir, ".gc"))
+	source := "https://github.com/gastownhall/gc-actual-packs"
+	commit := writeDoctorRemotePackFixture(t, homeDir, source)
+
+	if err := os.MkdirAll(filepath.Join(cityDir, ".gc"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(cityDir, "packs", "actual"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cityDir, "city.toml"), []byte(`[workspace]
+name = "demo"
+
+[beads]
+provider = "file"
+
+[session]
+provider = "fake"
+
+[imports.actual]
+source = "https://github.com/gastownhall/gc-actual-packs"
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeDoctorPackLock(t, cityDir, source, commit)
+
+	out := runDoctorForStaleLocalPackDirTest(t, cityDir)
+	if !strings.Contains(out, "stale-local-pack-dirs") {
+		t.Fatalf("doctor output missing stale-local-pack-dirs check:\n%s", out)
+	}
+	if !strings.Contains(out, "packs/actual exists while [imports.actual] points at https://github.com/gastownhall/gc-actual-packs") {
+		t.Fatalf("doctor output missing remote import stale pack detail:\n%s", out)
+	}
+}
+
+func TestDoDoctorRegistersStaleLocalPackDirCheckForRigRemoteImport(t *testing.T) {
+	cityDir := t.TempDir()
+	homeDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
+	t.Setenv("GC_HOME", filepath.Join(homeDir, ".gc"))
+	source := "https://github.com/gastownhall/gc-actual-packs"
+	commit := writeDoctorRemotePackFixture(t, homeDir, source)
+
+	if err := os.MkdirAll(filepath.Join(cityDir, ".gc"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(cityDir, "rig"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(cityDir, "packs", "actual"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cityDir, "city.toml"), []byte(`[workspace]
+name = "demo"
+
+[beads]
+provider = "file"
+
+[session]
+provider = "fake"
+
+[[rigs]]
+name = "demo-rig"
+path = "rig"
+
+[rigs.imports.actual]
+source = "https://github.com/gastownhall/gc-actual-packs"
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeDoctorPackLock(t, cityDir, source, commit)
+
+	out := runDoctorForStaleLocalPackDirTest(t, cityDir)
+	if !strings.Contains(out, "stale-local-pack-dirs") {
+		t.Fatalf("doctor output missing stale-local-pack-dirs check:\n%s", out)
+	}
+	if !strings.Contains(out, "packs/actual exists while [rigs.demo-rig.imports.actual] points at https://github.com/gastownhall/gc-actual-packs") {
+		t.Fatalf("doctor output missing rig remote import stale pack detail:\n%s", out)
+	}
+}
+
+func TestDoDoctorRegistersStaleLocalPackDirCheckForDefaultRigRemoteImport(t *testing.T) {
+	skipSlowCmdGCTest(t, "starts real Dolt lifecycle")
+	cityDir := t.TempDir()
+	homeDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
+	source := "https://github.com/gastownhall/gc-actual-packs"
+	commit := writeDoctorRemotePackFixture(t, homeDir, source)
+
+	if err := os.MkdirAll(filepath.Join(cityDir, ".gc"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(cityDir, "packs", "actual"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cityDir, "city.toml"), []byte(`[workspace]
+name = "demo"
+
+[beads]
+provider = "file"
+
+[session]
+provider = "fake"
+
+[defaults.rig.imports.actual]
+source = "https://github.com/gastownhall/gc-actual-packs"
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cityDir, "pack.toml"), []byte(`[pack]
+name = "demo"
+schema = 2
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeDoctorPackLock(t, cityDir, source, commit)
+
+	out := runDoctorForStaleLocalPackDirTest(t, cityDir)
+	if !strings.Contains(out, "stale-local-pack-dirs") {
+		t.Fatalf("doctor output missing stale-local-pack-dirs check:\n%s", out)
+	}
+	if !strings.Contains(out, "packs/actual exists while [defaults.rig.imports.actual] points at https://github.com/gastownhall/gc-actual-packs") {
+		t.Fatalf("doctor output missing default rig remote import stale pack detail:\n%s", out)
+	}
+}
+
+func writeDoctorRemotePackFixture(t *testing.T, homeDir, source string) string {
+	t.Helper()
+
+	repoDir := filepath.Join(t.TempDir(), "remote-pack")
+	if err := os.MkdirAll(repoDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repoDir, "pack.toml"), []byte(`[pack]
+name = "actual"
+schema = 1
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	mustGitImport(t, repoDir, "init")
+	mustGitImport(t, repoDir, "add", ".")
+	mustGitImport(t, repoDir, "commit", "-m", "initial")
+	commit := gitOutputImport(t, repoDir, "rev-parse", "HEAD")
+	cacheDir := filepath.Join(homeDir, ".gc", "cache", "repos", config.RepoCacheKey(source, commit))
+	if err := os.MkdirAll(filepath.Dir(cacheDir), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(repoDir, cacheDir); err != nil {
+		t.Fatal(err)
+	}
+	return commit
+}
+
+func writeDoctorPackLock(t *testing.T, cityDir, source, commit string) {
+	t.Helper()
+
+	if err := os.WriteFile(filepath.Join(cityDir, "packs.lock"), []byte(`schema = 1
+
+[packs."`+source+`"]
+version = "1.0.0"
+commit = "`+commit+`"
+fetched = "2026-05-20T00:00:00Z"
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func runDoctorForStaleLocalPackDirTest(t *testing.T, cityDir string) string {
+	t.Helper()
+
+	t.Setenv("GC_CITY_PATH", cityDir)
+	t.Setenv("GC_DOLT", "skip")
+	cleanupManagedDoltTestCity(t, cityDir)
+
+	var stdout, stderr bytes.Buffer
+	_ = doDoctor(false, true, false, 0, &stdout, &stderr)
+	return stdout.String() + stderr.String()
 }
 
 func TestDoDoctorReportsLegacyBDSplitStore(t *testing.T) {
@@ -266,7 +716,7 @@ func TestDoDoctorReportsLegacyBDSplitStore(t *testing.T) {
 	t.Cleanup(func() { cityFlag = origCityFlag })
 
 	var stdout, stderr bytes.Buffer
-	_ = doDoctor(false, false, &stdout, &stderr)
+	_ = doDoctor(false, false, false, 0, &stdout, &stderr)
 	out := stdout.String() + stderr.String()
 	if !strings.Contains(out, "bd-split-store") {
 		t.Fatalf("doctor output missing bd-split-store check:\n%s", out)
@@ -426,13 +876,13 @@ func TestDoctorSkipsSuspendedRigChecks(t *testing.T) {
 
 	rigs := []config.Rig{
 		{Name: "active-rig", Path: activeDir},
-		{Name: "suspended-rig", Path: suspendedDir, Suspended: true},
+		{Name: "suspended-rig", Path: suspendedDir, SuspendedOnStart: true},
 	}
 
 	// Mirror the per-rig registration logic from doDoctor.
 	d := &doctor.Doctor{}
 	for _, rig := range rigs {
-		if rig.Suspended {
+		if suspensionstate.EffectiveRigSuspended(suspensionstate.State{}, rig.Name, rig.SuspendedOnStart) {
 			continue
 		}
 		d.Register(doctor.NewRigPathCheck(rig))
@@ -581,5 +1031,41 @@ dolt_port = "3307"
 	res := newDoltTopologyCheck(cityDir, cfg).Run(&doctor.CheckContext{CityPath: cityDir})
 	if res.Status != doctor.StatusOK {
 		t.Fatalf("status = %v, want ok; message = %q", res.Status, res.Message)
+	}
+}
+
+// TestWriteDoctorJSONProjectsTimedOut pins the machine-readable timeout
+// signal: a timed-out check projects timed_out=true so automation can tell an
+// abandoned check (outcome unknown) from an ordinary advisory failure, while
+// omitempty keeps output byte-identical for every non-timed-out result.
+func TestWriteDoctorJSONProjectsTimedOut(t *testing.T) {
+	report := &doctor.Report{
+		Failed: 2,
+		Results: []*doctor.CheckResult{
+			{Name: "wedged", Status: doctor.StatusError, Severity: doctor.SeverityAdvisory, Message: "timed out", TimedOut: true},
+			{Name: "advisory", Status: doctor.StatusError, Severity: doctor.SeverityAdvisory, Message: "ran and found an advisory issue"},
+		},
+	}
+	var buf bytes.Buffer
+	if err := writeDoctorJSON(&buf, report); err != nil {
+		t.Fatalf("writeDoctorJSON: %v", err)
+	}
+	var decoded doctorJSONReport
+	if err := json.Unmarshal(buf.Bytes(), &decoded); err != nil {
+		t.Fatalf("decode doctor JSON: %v; out=%q", err, buf.String())
+	}
+	if len(decoded.Results) != 2 {
+		t.Fatalf("Results = %d, want 2", len(decoded.Results))
+	}
+	if !decoded.Results[0].TimedOut {
+		t.Fatalf("timed-out check projected TimedOut=false, want true")
+	}
+	if decoded.Results[1].TimedOut {
+		t.Fatalf("ordinary advisory check projected TimedOut=true, want false")
+	}
+	// omitempty: only the abandoned check carries the key, so existing --json
+	// consumers of non-timed-out results see unchanged output.
+	if n := strings.Count(buf.String(), "timed_out"); n != 1 {
+		t.Fatalf("timed_out appears %d times, want exactly 1 (only the abandoned check); out=%s", n, buf.String())
 	}
 }

@@ -9,12 +9,12 @@ package acceptance_test
 import (
 	"testing"
 
-	helpers "github.com/gastownhall/gascity/test/acceptance/helpers"
+	helpers "github.com/jonbaldie/gascity/test/acceptance/helpers"
 )
 
 func TestBeadsHealthCommands(t *testing.T) {
 	c := helpers.NewCity(t, testEnv)
-	c.Init("claude")
+	c.InitNoStart("claude")
 
 	t.Run("HealthSucceeds", func(t *testing.T) {
 		out, err := c.GC("beads", "health")

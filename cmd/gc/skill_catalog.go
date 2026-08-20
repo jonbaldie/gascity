@@ -3,8 +3,8 @@ package main
 import (
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/materialize"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/materialize"
 )
 
 func sharedSkillCatalogInputs(cfg *config.City, rigName string) []config.DiscoveredSkillCatalog {

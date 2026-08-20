@@ -8,8 +8,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
 
 // pruneLegacyConfiguredScripts removes symlink-only top-level scripts/

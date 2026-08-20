@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
 
 var agentPromptConventionFilenames = []string{
@@ -51,6 +51,8 @@ func DiscoverPackAgents(fs fsys.FS, packDir, _ string, skipNames map[string]bool
 			agent.Name = agentName
 		}
 		applyAgentConventionDefaults(fs, packDir, &agent)
+		agent.source = sourcePack
+		agent.layout = layoutV2Convention
 
 		discovered = append(discovered, agent)
 	}

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -10,11 +11,62 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/events"
-	"github.com/gastownhall/gascity/internal/runtime"
-	"github.com/gastownhall/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/mail"
+	"github.com/jonbaldie/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/session"
 )
+
+func listOpenMessagesBothTiers(t *testing.T, store beads.Store) []beads.Bead {
+	t.Helper()
+	all, err := store.List(beads.ListQuery{
+		Type:      "message",
+		Status:    "open",
+		TierMode:  beads.TierBoth,
+		AllowScan: true,
+	})
+	if err != nil {
+		t.Fatalf("List messages: %v", err)
+	}
+	return all
+}
+
+func listOpenMessagesInTier(t *testing.T, store beads.Store, tier beads.TierMode) []beads.Bead {
+	t.Helper()
+	all, err := store.List(beads.ListQuery{
+		Type:      "message",
+		Status:    "open",
+		TierMode:  tier,
+		AllowScan: true,
+	})
+	if err != nil {
+		t.Fatalf("List messages in tier %v: %v", tier, err)
+	}
+	return all
+}
+
+func hasString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
+}
+
+func listOpenBeadsBothTiers(t *testing.T, store beads.Store) []beads.Bead {
+	t.Helper()
+	all, err := store.List(beads.ListQuery{
+		Status:    "open",
+		TierMode:  beads.TierBoth,
+		AllowScan: true,
+	})
+	if err != nil {
+		t.Fatalf("List open beads: %v", err)
+	}
+	return all
+}
 
 func TestHandoffSuccess(t *testing.T) {
 	store := beads.NewMemStore()
@@ -22,14 +74,14 @@ func TestHandoffSuccess(t *testing.T) {
 	dops := newFakeDrainOps()
 	var stdout, stderr bytes.Buffer
 
-	code := doHandoff(store, rec, dops, nil, "mayor", "mayor",
+	code := doHandoff(store, store, rec, dops, nil, "mayor", "mayor",
 		[]string{"HANDOFF: context full"}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("code = %d, want 0; stderr: %s", code, stderr.String())
 	}
 
 	// Verify mail bead created.
-	all, _ := store.ListOpen()
+	all := listOpenMessagesBothTiers(t, store)
 	if len(all) != 1 {
 		t.Fatalf("got %d beads, want 1", len(all))
 	}
@@ -48,6 +100,12 @@ func TestHandoffSuccess(t *testing.T) {
 	}
 	if b.Description != "" {
 		t.Errorf("Description = %q, want empty", b.Description)
+	}
+	if !b.Ephemeral {
+		t.Errorf("Ephemeral = false, want true")
+	}
+	if issueMessages := listOpenMessagesInTier(t, store, beads.TierIssues); len(issueMessages) != 0 {
+		t.Fatalf("issue-tier messages = %#v, want none", issueMessages)
 	}
 
 	// Verify restart-requested flag set.
@@ -75,22 +133,303 @@ func TestHandoffSuccess(t *testing.T) {
 	}
 }
 
+func TestWaitForControllerRestartHandoffFlagCleared(t *testing.T) {
+	dops := &drainOpsWithCountdown{fakeDrainOps: newFakeDrainOps(), remaining: 2}
+	if err := dops.setRestartRequested("worker"); err != nil {
+		t.Fatalf("setRestartRequested: %v", err)
+	}
+
+	var stderr bytes.Buffer
+	code := waitForControllerRestart(context.Background(), dops, runtime.NewFake(), "worker", "gc handoff",
+		10*time.Millisecond, 5*time.Second, &stderr)
+	if code != 0 {
+		t.Fatalf("code = %d, want 0 when flag cleared; stderr: %s", code, stderr.String())
+	}
+	if stderr.Len() > 0 {
+		t.Errorf("unexpected stderr: %q", stderr.String())
+	}
+	if dops.restartRequested["worker"] {
+		t.Error("restart flag should be cleared by the simulated reconciler")
+	}
+}
+
+// TestWaitForControllerRestartHandoffFlagClearedButSessionStillRunning covers
+// Fix 2: the reconciler's pinned-session collateral-skip clears
+// GC_RESTART_REQUESTED without stopping the session (see
+// pinnedConfiguredNamedSessionKillProtected in session_reconciler.go), so a
+// cleared flag alone must not be reported as success while the session is
+// still running.
+func TestWaitForControllerRestartHandoffFlagClearedButSessionStillRunning(t *testing.T) {
+	dops := &drainOpsWithCountdown{fakeDrainOps: newFakeDrainOps(), remaining: 2}
+	if err := dops.setRestartRequested("worker"); err != nil {
+		t.Fatalf("setRestartRequested: %v", err)
+	}
+	sp := runtime.NewFake()
+	if err := sp.Start(context.Background(), "worker", runtime.Config{Command: "true"}); err != nil {
+		t.Fatalf("start session: %v", err)
+	}
+
+	var stderr bytes.Buffer
+	code := waitForControllerRestart(context.Background(), dops, sp, "worker", "gc handoff",
+		10*time.Millisecond, 50*time.Millisecond, &stderr)
+	if code != 1 {
+		t.Fatalf("code = %d, want 1 (flag cleared but session still running is not success); stderr: %s", code, stderr.String())
+	}
+	if got := stderr.String(); !strings.Contains(got, "gc handoff: controller did not act within") {
+		t.Errorf("stderr = %q, want handoff timeout diagnostic", got)
+	}
+}
+
+func TestWaitForControllerRestartHandoffTimeout(t *testing.T) {
+	dops := newFakeDrainOps()
+	if err := dops.setRestartRequested("worker"); err != nil {
+		t.Fatalf("setRestartRequested: %v", err)
+	}
+
+	var stderr bytes.Buffer
+	code := waitForControllerRestart(context.Background(), dops, runtime.NewFake(), "worker", "gc handoff",
+		10*time.Millisecond, 25*time.Millisecond, &stderr)
+	if code != 1 {
+		t.Fatalf("code = %d, want 1 on timeout", code)
+	}
+	if got := stderr.String(); !strings.Contains(got, "gc handoff: controller did not act within") {
+		t.Errorf("stderr = %q, want handoff timeout diagnostic", got)
+	}
+	if !strings.Contains(stderr.String(), "gc dashboard") {
+		t.Errorf("stderr = %q, want gc dashboard hint", stderr.String())
+	}
+}
+
+func TestWaitForControllerRestartHandoffTimeoutReportsLastPollError(t *testing.T) {
+	dops := newFakeDrainOps()
+	if err := dops.setRestartRequested("worker"); err != nil {
+		t.Fatalf("setRestartRequested: %v", err)
+	}
+	dops.restartReadErr = errors.New("metadata read failed")
+
+	var stderr bytes.Buffer
+	code := waitForControllerRestart(context.Background(), dops, runtime.NewFake(), "worker", "gc handoff",
+		10*time.Millisecond, 25*time.Millisecond, &stderr)
+	if code != 1 {
+		t.Fatalf("code = %d, want 1 on timeout", code)
+	}
+	if got := stderr.String(); !strings.Contains(got, "last poll error: metadata read failed") {
+		t.Errorf("stderr = %q, want last poll error", got)
+	}
+}
+
+func TestWaitForControllerRestartHandoffContextCancel(t *testing.T) {
+	dops := newFakeDrainOps()
+	if err := dops.setRestartRequested("worker"); err != nil {
+		t.Fatalf("setRestartRequested: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	var stderr bytes.Buffer
+
+	done := make(chan int, 1)
+	go func() {
+		done <- waitForControllerRestart(ctx, dops, runtime.NewFake(), "worker", "gc handoff",
+			10*time.Millisecond, 30*time.Second, &stderr)
+	}()
+
+	time.Sleep(30 * time.Millisecond)
+	cancel()
+
+	select {
+	case code := <-done:
+		if code != 0 {
+			t.Fatalf("code = %d, want 0 on context cancel", code)
+		}
+		if !dops.restartRequested["worker"] {
+			t.Error("restart flag should remain set after context cancel")
+		}
+		if got := stderr.String(); !strings.Contains(got, "gc handoff: signal received; restart request remains set") {
+			t.Errorf("stderr = %q, want pending restart warning", got)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("waitForControllerRestart did not exit on context cancel")
+	}
+}
+
+func TestCmdHandoffAutoSendsMailWithoutBlocking(t *testing.T) {
+	cityDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(cityDir, "city.toml"), []byte("[workspace]\nname = \"demo\"\n"), 0o644); err != nil {
+		t.Fatalf("write city.toml: %v", err)
+	}
+	t.Setenv("GC_BEADS", "file")
+	t.Setenv("GC_BEADS_SCOPE_ROOT", "")
+	t.Setenv("GC_CITY", cityDir)
+	t.Setenv("GC_CITY_PATH", cityDir)
+	t.Setenv("GC_ALIAS", "mayor")
+	t.Setenv("GC_SESSION_NAME", "mayor")
+
+	var stdout, stderr bytes.Buffer
+	cmd := newHandoffCmd(&stdout, &stderr)
+	cmd.SilenceErrors = true
+	cmd.SilenceUsage = true
+	cmd.SetArgs([]string{"--auto", "context cycle"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("gc handoff --auto failed: %v; stderr=%s", err, stderr.String())
+	}
+
+	store, err := openCityStoreAt(cityDir)
+	if err != nil {
+		t.Fatalf("openCityStoreAt: %v", err)
+	}
+	all := listOpenMessagesBothTiers(t, store)
+	if len(all) != 1 {
+		t.Fatalf("got %d open beads, want 1", len(all))
+	}
+	if got := all[0].Title; got != "context cycle" {
+		t.Fatalf("mail title = %q, want context cycle", got)
+	}
+	if got := all[0].Type; got != "message" {
+		t.Fatalf("mail type = %q, want message", got)
+	}
+	for _, want := range []string{mail.AutoHandoffLabel, mail.ArchiveAfterInjectLabel} {
+		if !hasString(all[0].Labels, want) {
+			t.Fatalf("auto handoff mail labels = %#v, want %q", all[0].Labels, want)
+		}
+	}
+	if strings.Contains(stdout.String(), "requesting restart") {
+		t.Fatalf("stdout = %q, --auto must not request restart", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "auto") {
+		t.Fatalf("stdout = %q, want auto handoff confirmation", stdout.String())
+	}
+}
+
+func TestCmdHandoffAutoHookFormatCodex(t *testing.T) {
+	cityDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(cityDir, "city.toml"), []byte("[workspace]\nname = \"demo\"\n"), 0o644); err != nil {
+		t.Fatalf("write city.toml: %v", err)
+	}
+	t.Setenv("GC_BEADS", "file")
+	t.Setenv("GC_BEADS_SCOPE_ROOT", "")
+	t.Setenv("GC_CITY", cityDir)
+	t.Setenv("GC_CITY_PATH", cityDir)
+	t.Setenv("GC_ALIAS", "mayor")
+	t.Setenv("GC_SESSION_NAME", "mayor")
+
+	var stdout, stderr bytes.Buffer
+	cmd := newHandoffCmd(&stdout, &stderr)
+	cmd.SilenceErrors = true
+	cmd.SilenceUsage = true
+	cmd.SetArgs([]string{"--auto", "--hook-format", "codex", "context cycle"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("gc handoff --auto --hook-format codex failed: %v; stderr=%s", err, stderr.String())
+	}
+
+	var payload struct {
+		HookSpecificOutput struct {
+			HookEventName     string `json:"hookEventName"`
+			AdditionalContext string `json:"additionalContext"`
+		} `json:"hookSpecificOutput"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatalf("stdout is not Codex hook JSON: %v\n%s", err, stdout.String())
+	}
+	if got, want := payload.HookSpecificOutput.HookEventName, "PreCompact"; got != want {
+		t.Fatalf("hookEventName = %q, want %q", got, want)
+	}
+	if !strings.Contains(payload.HookSpecificOutput.AdditionalContext, "Handoff: sent auto mail") {
+		t.Fatalf("additionalContext = %q, want handoff confirmation", payload.HookSpecificOutput.AdditionalContext)
+	}
+	store, err := openCityStoreAt(cityDir)
+	if err != nil {
+		t.Fatalf("openCityStoreAt: %v", err)
+	}
+	all := listOpenMessagesBothTiers(t, store)
+	if len(all) != 1 {
+		t.Fatalf("open beads = %d, want handoff mail", len(all))
+	}
+	if !strings.Contains(payload.HookSpecificOutput.AdditionalContext, all[0].ID) {
+		t.Fatalf("additionalContext = %q, want handoff mail id %s", payload.HookSpecificOutput.AdditionalContext, all[0].ID)
+	}
+}
+
+func TestDoHandoffAutoReportsHookOutputWriteError(t *testing.T) {
+	store := beads.NewMemStore()
+	rec := events.NewFake()
+	var stderr bytes.Buffer
+
+	code := doHandoffAuto(store, store, rec, "mayor", []string{"context cycle"}, "codex", errWriter{}, &stderr)
+	if code != 1 {
+		t.Fatalf("code = %d, want 1", code)
+	}
+	if !strings.Contains(stderr.String(), "writing hook output") {
+		t.Fatalf("stderr = %q, want hook output write error", stderr.String())
+	}
+	all := listOpenMessagesBothTiers(t, store)
+	if len(all) != 1 {
+		t.Fatalf("open beads = %d, want handoff mail still created", len(all))
+	}
+}
+
+func TestCmdHandoffAutoUsesDefaultSubject(t *testing.T) {
+	cityDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(cityDir, "city.toml"), []byte("[workspace]\nname = \"demo\"\n"), 0o644); err != nil {
+		t.Fatalf("write city.toml: %v", err)
+	}
+	t.Setenv("GC_BEADS", "file")
+	t.Setenv("GC_BEADS_SCOPE_ROOT", "")
+	t.Setenv("GC_CITY", cityDir)
+	t.Setenv("GC_CITY_PATH", cityDir)
+	t.Setenv("GC_ALIAS", "mayor")
+	t.Setenv("GC_SESSION_NAME", "mayor")
+
+	var stdout, stderr bytes.Buffer
+	cmd := newHandoffCmd(&stdout, &stderr)
+	cmd.SilenceErrors = true
+	cmd.SilenceUsage = true
+	cmd.SetArgs([]string{"--auto"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("gc handoff --auto failed: %v; stderr=%s", err, stderr.String())
+	}
+
+	store, err := openCityStoreAt(cityDir)
+	if err != nil {
+		t.Fatalf("openCityStoreAt: %v", err)
+	}
+	all := listOpenMessagesBothTiers(t, store)
+	if len(all) != 1 {
+		t.Fatalf("got %d open beads, want 1", len(all))
+	}
+	if got := all[0].Title; got != "context cycle" {
+		t.Fatalf("mail title = %q, want context cycle", got)
+	}
+}
+
+type errWriter struct{}
+
+func (errWriter) Write([]byte) (int, error) {
+	return 0, errors.New("write failed")
+}
+
+func TestCmdHandoffAutoRejectsTarget(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	if code := cmdHandoff([]string{"context cycle"}, "mayor", true, "", &stdout, &stderr); code == 0 {
+		t.Fatal("cmdHandoff returned 0 for --auto with --target")
+	}
+	if !strings.Contains(stderr.String(), "--auto cannot be used with --target") {
+		t.Fatalf("stderr = %q, want --auto/--target conflict", stderr.String())
+	}
+}
+
 // Regression for gastownhall/gascity#744:
 // gc handoff on a named (human-attended) session used to call
 // setRestartRequested unconditionally. The controller cannot respawn a
-// user-started session, so the PreCompact hook crashed the mayor to the
-// user's shell on every context compaction. doHandoff must recognize the
-// named-session case, still send the handoff mail, and skip both the
-// tmux and bead restart flags.
+// user-started session, so the PreCompact hook crashed the user to their shell
+// on every context compaction. doHandoff must recognize the named-session
+// case, still send the handoff mail, and skip both the tmux and bead restart
+// flags.
 func TestDoHandoff_Regression744_NamedSessionSkipsRestart(t *testing.T) {
 	store := beads.NewMemStore()
 	rec := events.NewFake()
 	dops := newFakeDrainOps()
 	var stdout, stderr bytes.Buffer
 
-	// Seed a session bead marked as a configured named session (i.e. the
-	// mayor). IsNamedSessionBead returns true for beads whose metadata
-	// contains configured_named_session="true".
 	b, err := store.Create(beads.Bead{
 		Type:   sessionBeadType,
 		Labels: []string{"gc:session"},
@@ -116,11 +455,10 @@ func TestDoHandoff_Regression744_NamedSessionSkipsRestart(t *testing.T) {
 	dops.restartRequested["mayor"] = true
 
 	persistCalled := false
-	outcome := doHandoffWithOutcome(store, rec, dops, func() error {
+	outcome := doHandoffWithOutcome(store, store, rec, dops, func() error {
 		persistCalled = true
 		return nil
-	}, "mayor", "mayor",
-		[]string{"HANDOFF: context full"}, &stdout, &stderr)
+	}, "mayor", "mayor", []string{"HANDOFF: context full"}, &stdout, &stderr)
 	if outcome.code != 0 {
 		t.Fatalf("code = %d, want 0; stderr: %s", outcome.code, stderr.String())
 	}
@@ -128,9 +466,8 @@ func TestDoHandoff_Regression744_NamedSessionSkipsRestart(t *testing.T) {
 		t.Fatal("restartRequested = true, want false for on-demand named session")
 	}
 
-	// Mail must still be sent — context preservation is the whole point.
 	mailFound := false
-	all, _ := store.ListOpen()
+	all := listOpenMessagesBothTiers(t, store)
 	for _, got := range all {
 		if got.Title == "HANDOFF: context full" && got.Type == "message" {
 			mailFound = true
@@ -140,18 +477,12 @@ func TestDoHandoff_Regression744_NamedSessionSkipsRestart(t *testing.T) {
 	if !mailFound {
 		t.Fatalf("handoff mail not created; beads=%v", all)
 	}
-
-	// Restart must NOT be requested — the controller can't respawn a
-	// user-started named session.
 	if dops.restartRequested["mayor"] {
-		t.Errorf("restart-requested flag is still set — named sessions must skip restart (gascity#744)")
+		t.Errorf("restart-requested flag is still set; named sessions must skip restart")
 	}
 	if persistCalled {
-		t.Error("persistRestart was called — named sessions must skip persisted restart requests")
+		t.Error("persistRestart was called; named sessions must skip persisted restart requests")
 	}
-
-	// Bead-level restart flags must also be absent, including stale flags
-	// left behind by older handoff implementations.
 	refreshed, err := store.Get(b.ID)
 	if err != nil {
 		t.Fatalf("fetching seeded bead: %v", err)
@@ -162,8 +493,6 @@ func TestDoHandoff_Regression744_NamedSessionSkipsRestart(t *testing.T) {
 	if refreshed.Metadata["continuation_reset_pending"] != "" {
 		t.Errorf("continuation_reset_pending = %q, want cleared for named session", refreshed.Metadata["continuation_reset_pending"])
 	}
-
-	// Stdout should not promise a restart the controller can't deliver.
 	if strings.Contains(stdout.String(), "requesting restart") {
 		t.Errorf("stdout = %q, must not promise a restart for named sessions", stdout.String())
 	}
@@ -199,7 +528,7 @@ func TestDoHandoff_NamedSessionClearRestartFailureReturnsError(t *testing.T) {
 		t.Fatalf("set configured_named_mode: %v", err)
 	}
 
-	outcome := doHandoffWithOutcome(store, rec, dops, nil, "mayor", "mayor",
+	outcome := doHandoffWithOutcome(store, store, rec, dops, nil, "mayor", "mayor",
 		[]string{"HANDOFF: context full"}, &stdout, &stderr)
 	if outcome.code != 1 {
 		t.Fatalf("code = %d, want 1", outcome.code)
@@ -239,7 +568,7 @@ func TestDoHandoff_NamedAlwaysSessionRequestsRestart(t *testing.T) {
 	}
 
 	persistCalled := false
-	outcome := doHandoffWithOutcome(store, rec, dops, func() error {
+	outcome := doHandoffWithOutcome(store, store, rec, dops, func() error {
 		persistCalled = true
 		return nil
 	}, "mayor", "mayor", []string{"HANDOFF: context full"}, &stdout, &stderr)
@@ -263,12 +592,97 @@ func TestDoHandoff_NamedAlwaysSessionRequestsRestart(t *testing.T) {
 	}
 }
 
+// TestDoHandoff_PinnedAlwaysSessionRequiresPersistRestart covers Fix 1: a
+// pinned named session (pin_awake == "true") is kill-protected by the
+// reconciler unless an explicit controller reset is persisted, so
+// persistRestart is mandatory rather than best-effort for pinned sessions.
+// When it is unavailable or fails, doHandoffWithOutcome must report failure
+// and must not promise a restart it cannot guarantee.
+func TestDoHandoff_PinnedAlwaysSessionRequiresPersistRestart(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		persistRestart func() error
+	}{
+		{name: "nil persistRestart"},
+		{name: "persistRestart error", persistRestart: func() error { return errors.New("worker boundary unavailable") }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			store := beads.NewMemStore()
+			rec := events.NewFake()
+			dops := newFakeDrainOps()
+			var stdout, stderr bytes.Buffer
+
+			b, err := store.Create(beads.Bead{
+				Type:   sessionBeadType,
+				Labels: []string{"gc:session"},
+			})
+			if err != nil {
+				t.Fatalf("seeding session bead: %v", err)
+			}
+			if err := store.SetMetadata(b.ID, "session_name", "mayor"); err != nil {
+				t.Fatalf("set session_name: %v", err)
+			}
+			if err := store.SetMetadata(b.ID, "configured_named_session", "true"); err != nil {
+				t.Fatalf("set configured_named_session: %v", err)
+			}
+			if err := store.SetMetadata(b.ID, "configured_named_mode", "always"); err != nil {
+				t.Fatalf("set configured_named_mode: %v", err)
+			}
+			if err := store.SetMetadata(b.ID, "pin_awake", "true"); err != nil {
+				t.Fatalf("set pin_awake: %v", err)
+			}
+
+			outcome := doHandoffWithOutcome(store, store, rec, dops, tc.persistRestart, "mayor", "mayor",
+				[]string{"HANDOFF: context full"}, &stdout, &stderr)
+			if outcome.code != 1 {
+				t.Fatalf("code = %d, want 1; stderr: %s", outcome.code, stderr.String())
+			}
+			if outcome.restartRequested {
+				t.Fatal("restartRequested = true, want false when persistRestart is unavailable for a pinned session")
+			}
+			if strings.Contains(stdout.String(), "requesting restart") {
+				t.Errorf("stdout = %q, must not promise a restart when persistRestart is unavailable for a pinned session", stdout.String())
+			}
+			if len(rec.Events) != 1 {
+				t.Fatalf("got %d events, want 1 (mail only, no SessionDraining); events=%v", len(rec.Events), rec.Events)
+			}
+			if rec.Events[0].Type != events.MailSent {
+				t.Fatalf("event[0].Type = %q, want %q", rec.Events[0].Type, events.MailSent)
+			}
+		})
+	}
+}
+
+func TestHandoffWithMessage(t *testing.T) {
+	store := beads.NewMemStore()
+	rec := events.NewFake()
+	dops := newFakeDrainOps()
+	var stdout, stderr bytes.Buffer
+
+	code := doHandoff(store, store, rec, dops, nil, "polecat-1", "gc-city-polecat-1",
+		[]string{"HANDOFF: PR review needed", "PR #42 is open, tests passing, needs review from refinery"},
+		&stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("code = %d, want 0; stderr: %s", code, stderr.String())
+	}
+
+	all := listOpenMessagesBothTiers(t, store)
+	if len(all) != 1 {
+		t.Fatalf("got %d beads, want 1", len(all))
+	}
+	b := all[0]
+	if b.Description != "PR #42 is open, tests passing, needs review from refinery" {
+		t.Errorf("Description = %q, want body text", b.Description)
+	}
+}
+
 func TestCmdHandoff_Regression744_NamedSessionReturnsWithoutBlocking(t *testing.T) {
 	cityDir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(cityDir, "city.toml"), []byte("[workspace]\nname = \"demo\"\n"), 0o644); err != nil {
 		t.Fatalf("write city.toml: %v", err)
 	}
 	t.Setenv("GC_BEADS", "file")
+	t.Setenv("GC_BEADS_SCOPE_ROOT", "")
 	t.Setenv("GC_CITY", cityDir)
 	t.Setenv("GC_CITY_PATH", cityDir)
 	t.Setenv("GC_ALIAS", "mayor")
@@ -298,7 +712,7 @@ func TestCmdHandoff_Regression744_NamedSessionReturnsWithoutBlocking(t *testing.
 	var stdout, stderr bytes.Buffer
 	done := make(chan int, 1)
 	go func() {
-		done <- cmdHandoff([]string{"HANDOFF: context full"}, "", &stdout, &stderr)
+		done <- cmdHandoff([]string{"HANDOFF: context full"}, "", false, "", &stdout, &stderr)
 	}()
 
 	select {
@@ -311,29 +725,6 @@ func TestCmdHandoff_Regression744_NamedSessionReturnsWithoutBlocking(t *testing.
 	}
 	if !strings.Contains(stdout.String(), "restart skipped") {
 		t.Fatalf("stdout = %q, want restart skipped confirmation", stdout.String())
-	}
-}
-
-func TestHandoffWithMessage(t *testing.T) {
-	store := beads.NewMemStore()
-	rec := events.NewFake()
-	dops := newFakeDrainOps()
-	var stdout, stderr bytes.Buffer
-
-	code := doHandoff(store, rec, dops, nil, "polecat-1", "gc-city-polecat-1",
-		[]string{"HANDOFF: PR review needed", "PR #42 is open, tests passing, needs review from refinery"},
-		&stdout, &stderr)
-	if code != 0 {
-		t.Fatalf("code = %d, want 0; stderr: %s", code, stderr.String())
-	}
-
-	all, _ := store.ListOpen()
-	if len(all) != 1 {
-		t.Fatalf("got %d beads, want 1", len(all))
-	}
-	b := all[0]
-	if b.Description != "PR #42 is open, tests passing, needs review from refinery" {
-		t.Errorf("Description = %q, want body text", b.Description)
 	}
 }
 
@@ -355,7 +746,7 @@ func TestHandoffMissingSubject(t *testing.T) {
 	}
 
 	// Verify no side effects.
-	all, _ := store.ListOpen()
+	all := listOpenBeadsBothTiers(t, store)
 	if len(all) != 0 {
 		t.Errorf("got %d beads, want 0", len(all))
 	}
@@ -394,14 +785,14 @@ func TestHandoffRemoteRunning(t *testing.T) {
 		t.Fatal(err)
 	}
 	var stdout, stderr bytes.Buffer
-	code := doHandoffRemote(store, rec, sp, "deacon", "deacon", "mayor",
+	code := doHandoffRemote(store, store, rec, sp, "deacon", "deacon", "mayor",
 		[]string{"Context refresh", "Check beads for current state"}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("code = %d, want 0; stderr: %s", code, stderr.String())
 	}
 
 	// Verify mail sent to target.
-	all, _ := store.ListOpen()
+	all := listOpenMessagesBothTiers(t, store)
 	if len(all) != 1 {
 		t.Fatalf("got %d beads, want 1", len(all))
 	}
@@ -472,7 +863,7 @@ func TestHandoffRemoteNamedOnDemandSkipsKill(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	code := doHandoffRemote(store, rec, sp, "mayor", "mayor", "deacon",
+	code := doHandoffRemote(store, store, rec, sp, "mayor", "mayor", "deacon",
 		[]string{"Context refresh", "Please pick this up manually"}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("code = %d, want 0; stderr: %s", code, stderr.String())
@@ -512,14 +903,14 @@ func TestHandoffRemoteNotRunning(t *testing.T) {
 	rec := events.NewFake()
 	sp := runtime.NewFake()
 	var stdout, stderr bytes.Buffer
-	code := doHandoffRemote(store, rec, sp, "deacon", "deacon", "human",
+	code := doHandoffRemote(store, store, rec, sp, "deacon", "deacon", "human",
 		[]string{"Please check on PR #42"}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("code = %d, want 0; stderr: %s", code, stderr.String())
 	}
 
 	// Mail still sent even if session not running.
-	all, _ := store.ListOpen()
+	all := listOpenMessagesBothTiers(t, store)
 	if len(all) != 1 {
 		t.Fatalf("got %d beads, want 1", len(all))
 	}
@@ -537,6 +928,7 @@ func TestHandoffRemoteNotRunning(t *testing.T) {
 
 func TestCmdHandoffRemoteDefaultSenderFallsBackToGCAliasWhenSessionIDMissing(t *testing.T) {
 	t.Setenv("GC_BEADS", "file")
+	t.Setenv("GC_BEADS_SCOPE_ROOT", "")
 	t.Setenv("GC_MAIL", "")
 
 	cityPath := t.TempDir()
@@ -585,10 +977,7 @@ func TestCmdHandoffRemoteDefaultSenderFallsBackToGCAliasWhenSessionIDMissing(t *
 	if err != nil {
 		t.Fatalf("openCityStoreAt after handoff: %v", err)
 	}
-	all, err := storeAfter.ListOpen()
-	if err != nil {
-		t.Fatalf("ListOpen: %v", err)
-	}
+	all := listOpenMessagesBothTiers(t, storeAfter)
 	var msg beads.Bead
 	found := false
 	for _, b := range all {

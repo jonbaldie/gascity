@@ -14,15 +14,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
-// updateNotification builds a session/update notification carrying one text
-// content block (this fork's SessionUpdateParams shape).
+// updateNotification builds a session/update notification carrying one agent
+// message chunk.
 func updateNotification(t *testing.T, text string) JSONRPCMessage {
 	t.Helper()
+	content, err := json.Marshal(ContentBlock{Type: "text", Text: text})
+	if err != nil {
+		t.Fatalf("marshal content block: %v", err)
+	}
 	params, err := json.Marshal(SessionUpdateParams{
-		Content: []ContentBlock{{Type: "text", Text: text}},
+		Update: SessionUpdateContent{Type: "agent_message_chunk", Content: content},
 	})
 	if err != nil {
 		t.Fatalf("marshal update params: %v", err)

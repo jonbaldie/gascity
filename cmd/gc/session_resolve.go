@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/session"
 )
 
 // resolveSessionID delegates to session.ResolveSessionID.
@@ -57,24 +57,24 @@ func resolveConfiguredNamedSessionID(
 	if !ok {
 		return "", false, fmt.Errorf("%w: %q", session.ErrSessionNotFound, identifier)
 	}
-	candidates, err := session.NamedSessionResolutionCandidates(store, spec)
+	lookup, err := session.LookupConfiguredNamedSession(store, spec)
 	if err != nil {
-		return "", true, err
+		return "", true, fmt.Errorf("looking up configured named session: %w", err)
 	}
-	if bead, ok := session.FindCanonicalNamedSessionBead(candidates, spec); ok {
-		return bead.ID, true, nil
+	if lookup.HasCanonical {
+		return lookup.Canonical.ID, true, nil
 	}
 	// When materializing, check for a closed bead with this identity and
 	// reopen it (preserves bead ID for reference continuity).
 	if opts.materialize {
-		if bead, ok := reopenClosedConfiguredNamedSessionBead(
+		if bead, _, ok := reopenClosedConfiguredNamedSessionBead(
 			cityPath, store, cfg, cityName, spec.Identity, spec.SessionName, "stopped", time.Now().UTC(), opts.materializeMetadata, io.Discard,
 		); ok {
 			return bead.ID, true, nil
 		}
 	}
-	if bead, conflict := session.FindNamedSessionConflict(candidates, spec); conflict {
-		return "", true, fmt.Errorf("%w: %q conflicts with configured named session %q via live bead %s", errNamedSessionConflict, identifier, spec.Identity, bead.ID)
+	if lookup.HasConflict {
+		return "", true, fmt.Errorf("%w: %q conflicts with configured named session %q via live bead %s", errNamedSessionConflict, identifier, spec.Identity, lookup.Conflict.ID)
 	}
 	if !opts.materialize {
 		return "", false, fmt.Errorf("%w: %q", session.ErrSessionNotFound, identifier)
@@ -144,10 +144,12 @@ func resolveSessionIDWithOptions(
 	}
 	if id, err := session.ResolveSessionID(store, identifier); err == nil {
 		if cfg != nil {
-			if bead, getErr := store.Get(id); getErr == nil && isNamedSessionBead(bead) {
-				identity := namedSessionIdentity(bead)
-				if identity != "" && config.FindNamedSession(cfg, identity) == nil {
-					return "", fmt.Errorf("%w: %q", session.ErrSessionNotFound, identifier)
+			if info, getErr := sessionFrontDoor(store).Get(id); getErr == nil {
+				if isNamedSessionInfo(info) {
+					identity := namedSessionIdentityInfo(info)
+					if identity != "" && config.FindNamedSession(cfg, identity) == nil {
+						return "", fmt.Errorf("%w: %q", session.ErrSessionNotFound, identifier)
+					}
 				}
 			}
 		}
@@ -183,21 +185,26 @@ func resolveOpenQualifiedAliasBasename(store beads.Store, identifier string) (st
 	if store == nil || identifier == "" || strings.Contains(identifier, "/") {
 		return "", fmt.Errorf("%w: %q", session.ErrSessionNotFound, identifier)
 	}
-	all, err := store.List(beads.ListQuery{Label: session.LabelSession})
+	sessFront := sessionFrontDoor(store)
+	all, err := sessFront.ListAll(session.ListAllOptions{})
 	if err != nil {
 		return "", fmt.Errorf("listing sessions: %w", err)
 	}
-	matches := make([]beads.Bead, 0, 1)
-	for _, b := range all {
-		if !session.IsSessionBeadOrRepairable(b) || b.Status == "closed" {
+	matches := make([]session.Info, 0, 1)
+	for _, info := range all {
+		// ListAll already filters via IsSessionBeadOrRepairable and excludes
+		// closed beads; the info.Closed guard is kept defensively.
+		if info.Closed {
 			continue
 		}
-		session.RepairEmptyType(store, &b)
-		alias := strings.TrimSpace(b.Metadata["alias"])
+		if info.Type == "" {
+			sessFront.RepairTypeBestEffort(info.ID)
+		}
+		alias := strings.TrimSpace(info.Alias)
 		if alias == "" || !strings.Contains(alias, "/") || session.TargetBasename(alias) != identifier {
 			continue
 		}
-		matches = append(matches, b)
+		matches = append(matches, info)
 	}
 	switch len(matches) {
 	case 0:
@@ -207,7 +214,7 @@ func resolveOpenQualifiedAliasBasename(store beads.Store, identifier string) (st
 	default:
 		labels := make([]string, 0, len(matches))
 		for _, match := range matches {
-			labels = append(labels, fmt.Sprintf("%s (%s)", match.ID, strings.TrimSpace(match.Metadata["alias"])))
+			labels = append(labels, fmt.Sprintf("%s (%s)", match.ID, strings.TrimSpace(match.Alias)))
 		}
 		return "", fmt.Errorf("%w: %q matches %d sessions: %s", session.ErrAmbiguous, identifier, len(matches), strings.Join(labels, ", "))
 	}

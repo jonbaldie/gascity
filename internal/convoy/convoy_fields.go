@@ -4,7 +4,7 @@
 package convoy
 
 import (
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // ConvoyFields holds structured metadata for convoy beads. These map to

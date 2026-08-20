@@ -3,8 +3,8 @@ package workspacesvc
 import (
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/supervisor"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/supervisor"
 )
 
 type publicationRefs struct {

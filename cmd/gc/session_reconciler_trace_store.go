@@ -16,8 +16,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/citylayout"
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/citylayout"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
 
 const (
@@ -627,7 +627,7 @@ func ReadTraceRecords(rootDir string, filter TraceFilter) ([]SessionReconcilerTr
 		}
 		paths = filtered
 	}
-	var records []SessionReconcilerTraceRecord
+	records := make([]SessionReconcilerTraceRecord, 0)
 	for _, path := range paths {
 		fileRecords, _, err := readTraceRecordsFile(path, filter, true)
 		if err != nil {

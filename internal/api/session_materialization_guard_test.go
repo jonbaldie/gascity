@@ -4,9 +4,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/session"
 )
 
 func TestResolveSessionIDMaterializingNamed_DoesNotMaterializeMissingMultiSessionTemplate(t *testing.T) {
@@ -69,6 +69,9 @@ func TestResolveSessionIDWithConfig_RejectsOrphanedNamedSessionBead(t *testing.T
 	_, err = srv.resolveSessionIDWithConfig(fs.cityBeadStore, "myrig/worker")
 	if !errors.Is(err, session.ErrSessionNotFound) {
 		t.Fatalf("resolveSessionIDWithConfig(myrig/worker) = %v, want ErrSessionNotFound", err)
+	}
+	if !errors.Is(err, errSessionTargetRejectedByConfig) {
+		t.Fatalf("resolveSessionIDWithConfig(myrig/worker) = %v, want config rejection marker at the resolver surface", err)
 	}
 	handle, err := srv.workerHandleForSessionTarget(fs.cityBeadStore, "myrig/worker")
 	if !errors.Is(err, session.ErrSessionNotFound) {

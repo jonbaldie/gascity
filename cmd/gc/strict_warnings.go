@@ -1,6 +1,6 @@
 package main
 
-import "github.com/gastownhall/gascity/internal/config"
+import "github.com/jonbaldie/gascity/internal/config"
 
 // splitStrictConfigWarnings separates warnings that should remain fatal in
 // strict mode from compatibility/migration guidance that should stay warnings.
@@ -16,5 +16,10 @@ func splitStrictConfigWarnings(warnings []string) (fatal []string, nonFatal []st
 }
 
 func strictWarningIsNonFatal(warning string) bool {
-	return config.IsNonFatalSiteBindingWarning(warning)
+	return config.IsNonFatalSiteBindingWarning(warning) ||
+		config.IsLegacyV1SurfaceWarning(warning) ||
+		config.IsLegacyWorkspaceFieldWarning(warning) ||
+		config.IsIdleSleepMaskedByIdleTimeoutWarning(warning) ||
+		config.IsAlwaysFreshWakeModeWarning(warning) ||
+		config.IsRetiredKeyWarning(warning)
 }

@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	sessions "github.com/gastownhall/gascity/internal/session"
+	sessions "github.com/jonbaldie/gascity/internal/session"
 )
 
 func TestWakeReason_Constants(t *testing.T) {

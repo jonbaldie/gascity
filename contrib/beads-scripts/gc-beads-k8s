@@ -27,7 +27,9 @@
 #   GC_K8S_CUSTOM_TYPES      - custom bead types CSV (optional, e.g. "session,molecule")
 #
 # Label conventions:
-#   parent:<id>  — tracks parent-child relationships
+#   parent:<id>  — legacy parent-child encoding, read-only. The parent is
+#                  written natively via bd --parent; this label is only still
+#                  read as a fallback for beads created before that.
 #   needs:<id>   — tracks step dependencies
 #
 # Metadata is stored natively via bd --metadata (JSON). Legacy meta:<k>=<v>
@@ -127,16 +129,21 @@ run_bd() {
 #   - native .metadata field (bd >= 0.62 stores metadata natively)
 #   - meta:<key>=<value> labels (legacy storage, backward compatible)
 # Native metadata takes precedence over label-derived metadata for the same key.
+# The parent is read the same way: native .parent first, parent:<id> label only
+# as a fallback for beads written before the native flag was used.
 bd_to_gc() {
   jq '{
     id: .id,
     title: .title,
     status: (if .status == "blocked" or .status == "review" or .status == "testing" then "open" else .status end),
     type: (.issue_type // .type // "task"),
+    priority: .priority,
     created_at: .created_at,
     assignee: (.assignee // ""),
     parent_id: (
-      [.labels // [] | .[] | select(startswith("parent:")) | ltrimstr("parent:")] | first // ""
+      if (.parent // "") != "" then .parent
+      else ([.labels // [] | .[] | select(startswith("parent:")) | ltrimstr("parent:")] | first // "")
+      end
     ),
     ref: (.ref // ""),
     needs: [.labels // [] | .[] | select(startswith("needs:")) | ltrimstr("needs:")],
@@ -145,7 +152,8 @@ bd_to_gc() {
     metadata: ((
       ([.labels // [] | .[] | select(startswith("meta:")) | ltrimstr("meta:") | split("=") | {(.[0]): (.[1:] | join("="))}] | add // {})
       + (.metadata // {})
-    ) | map_values(tostring))
+    ) | map_values(tostring)),
+    ephemeral: (.ephemeral // false)
   }'
 }
 
@@ -156,10 +164,13 @@ bd_list_to_gc() {
     title: .title,
     status: (if .status == "blocked" or .status == "review" or .status == "testing" then "open" else .status end),
     type: (.issue_type // .type // "task"),
+    priority: .priority,
     created_at: .created_at,
     assignee: (.assignee // ""),
     parent_id: (
-      [.labels // [] | .[] | select(startswith("parent:")) | ltrimstr("parent:")] | first // ""
+      if (.parent // "") != "" then .parent
+      else ([.labels // [] | .[] | select(startswith("parent:")) | ltrimstr("parent:")] | first // "")
+      end
     ),
     ref: (.ref // ""),
     needs: [.labels // [] | .[] | select(startswith("needs:")) | ltrimstr("needs:")],
@@ -168,8 +179,17 @@ bd_list_to_gc() {
     metadata: ((
       ([.labels // [] | .[] | select(startswith("meta:")) | ltrimstr("meta:") | split("=") | {(.[0]): (.[1:] | join("="))}] | add // {})
       + (.metadata // {})
-    ) | map_values(tostring))
+    ) | map_values(tostring)),
+    ephemeral: (.ephemeral // false)
   }]'
+}
+
+# bd_list_all_tiers returns raw bd JSON for permanent issues plus ephemeral
+# wisps. The Go exec store applies final filters and tier selection.
+bd_list_all_tiers() {
+  jq -s 'map(select(type == "array")) | add // [] | unique_by(.id)' \
+    <(run_bd list --json --limit 0 --all) \
+    <(run_bd query --json "ephemeral=true" --all --limit 0)
 }
 
 # join_labels joins an array of labels with commas for bd --labels flag.
@@ -195,7 +215,7 @@ case "$op" in
         run_bd config set types.custom "$CUSTOM_TYPES" >/dev/null 2>&1 || true
       else
         # Must match the init-branch default below and doctor.RequiredCustomTypes.
-        custom_types="${GC_BEADS_CUSTOM_TYPES:-molecule,convoy,message,event,gate,merge-request,agent,role,rig,session,spec,convergence}"
+        custom_types="${GC_BEADS_CUSTOM_TYPES:-molecule,convoy,message,event,gate,merge-request,agent,role,rig,session,spec,convergence,step}"
         run_bd config set types.custom "$custom_types" >/dev/null 2>&1 || true
       fi
       exit 0
@@ -229,9 +249,9 @@ case "$op" in
           restartPolicy: "Never",
           securityContext: {
             runAsNonRoot: true,
-            runAsUser: 1000,
-            runAsGroup: 1000,
-            fsGroup: 1000,
+            runAsUser: 1001,
+            runAsGroup: 1001,
+            fsGroup: 1001,
             seccompProfile: {type: "RuntimeDefault"}
           },
           containers: [{
@@ -285,7 +305,7 @@ case "$op" in
     # and doctor.RequiredCustomTypes). Without this, bd rejects creates for
     # types like "session" that aren't in the default set. "convergence" is
     # required because gc's convergence handler creates beads with that type.
-    custom_types="${GC_BEADS_CUSTOM_TYPES:-molecule,convoy,message,event,gate,merge-request,agent,role,rig,session,spec,convergence}"
+    custom_types="${GC_BEADS_CUSTOM_TYPES:-molecule,convoy,message,event,gate,merge-request,agent,role,rig,session,spec,convergence,step}"
     GC_STORE_ROOT="$scope_root" run_bd config set types.custom "$custom_types" >/dev/null 2>&1 || true
     ;;
 
@@ -326,6 +346,9 @@ case "$op" in
     # Build create command.
     cmd_args=(create --json --type="$bead_type")
     [ -n "$description" ] && cmd_args+=(--description "$description")
+    if [ "$(echo "$input" | jq -r '.ephemeral // false')" = "true" ]; then
+      cmd_args+=(--ephemeral)
+    fi
     if [ ${#all_labels[@]} -gt 0 ]; then
       cmd_args+=(--labels "$(join_labels "${all_labels[@]}")")
     fi
@@ -346,17 +369,33 @@ case "$op" in
     input=$(cat)
     cmd_args=(update --json "$id")
 
-    description=$(echo "$input" | jq -r '.description // empty')
-    [ -n "$description" ] && cmd_args+=(--description "$description")
+    # Forward every scalar field the update request may carry (see
+    # docs/reference/exec-beads-provider.md). Dropping any of them makes the
+    # write silently succeed while the change is lost -- dropping .type, for
+    # example, leaves a graph.v2 step at type=gate forever (ready-excluded, so
+    # never dispatched) even though activation reported success.
+    for field in title status type description assignee; do
+      value=$(echo "$input" | jq -r --arg f "$field" '.[$f] // empty')
+      [ -n "$value" ] && cmd_args+=("--$field" "$value")
+    done
+
+    priority=$(echo "$input" | jq -r '.priority // empty')
+    [ -n "$priority" ] && cmd_args+=(--priority "$priority")
 
     # Append labels via --add-label (one per flag).
     while IFS= read -r label; do
       [ -n "$label" ] && cmd_args+=(--add-label "$label")
     done < <(echo "$input" | jq -r '.labels // [] | .[]')
 
-    # Handle parent_id change.
+    # Remove labels via --remove-label (one per flag).
+    while IFS= read -r label; do
+      [ -n "$label" ] && cmd_args+=(--remove-label "$label")
+    done < <(echo "$input" | jq -r '.remove_labels // [] | .[]')
+
+    # Handle parent_id change. bd models the parent natively, so pass --parent
+    # rather than encoding it as a label the way label-only backends must.
     parent_id=$(echo "$input" | jq -r '.parent_id // empty')
-    [ -n "$parent_id" ] && cmd_args+=(--add-label "parent:$parent_id")
+    [ -n "$parent_id" ] && cmd_args+=(--parent "$parent_id")
 
     # Handle metadata via --metadata (avoids CSV quoting issues with --add-label).
     # bd --metadata uses merge semantics: new keys are added, existing keys are
@@ -370,31 +409,51 @@ case "$op" in
 
   close)
     id="${1:?close: missing id}"
-    run_bd close --json "$id" > /dev/null
+    # --force: this generic exec Store.Close delegate runs under the pod/controller
+    # actor (BEADS_ACTOR is stripped from the child) while closing agent-owned
+    # beads, so it must bypass bd's cross-actor close guard (gastownhall/beads#3734),
+    # matching the SDK BdStore which always force-closes.
+    run_bd close --force --json "$id" > /dev/null
     ;;
 
   list)
-    run_bd list --json --limit 0 --all | bd_list_to_gc
+    bd_list_all_tiers | bd_list_to_gc
     ;;
 
   ready)
-    run_bd ready --json --limit 0 | bd_list_to_gc
+    ready_args=(ready)
+    while [ "$#" -gt 0 ]; do
+      case "$1" in
+        --include-ephemeral)
+          ready_args+=(--include-ephemeral)
+          ;;
+        *)
+          echo "ready: unsupported argument: $1" >&2
+          exit 1
+          ;;
+      esac
+      shift
+    done
+    ready_args+=(--json --limit 0)
+    run_bd "${ready_args[@]}" | bd_list_to_gc
     ;;
 
   children)
     parent_id="${1:?children: missing parent_id}"
     # Sort by created_at to match the "in creation order" contract.
-    run_bd list --json --all --label "parent:$parent_id" | bd_list_to_gc | jq 'sort_by(.created_at)'
+    bd_list_all_tiers | bd_list_to_gc | jq --arg pid "$parent_id" '[.[] | select(.parent_id == $pid)] | sort_by(.created_at)'
     ;;
 
   list-by-label)
     label="${1:?list-by-label: missing label}"
     limit="${2:-0}"
-    if [ "$limit" -gt 0 ] 2>/dev/null; then
-      run_bd list --json --all --label "$label" --limit "$limit" | bd_list_to_gc
-    else
-      run_bd list --json --all --label "$label" | bd_list_to_gc
+    if ! [[ "$limit" =~ ^[0-9]+$ ]]; then
+      limit=0
     fi
+    bd_list_all_tiers | bd_list_to_gc | jq --arg label "$label" --argjson lim "$limit" '
+      [.[] | select(.labels | index($label))]
+      | if $lim > 0 then .[:$lim] else . end
+    '
     ;;
 
   set-metadata)

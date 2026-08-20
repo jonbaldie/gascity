@@ -5,10 +5,11 @@
 | Channel | Mechanism | Automatic? |
 |---------|-----------|------------|
 | **GitHub Release** | GoReleaser via `release.yml` on tag push | Yes |
+| **GitHub draft prerelease** | GoReleaser via `rc-release.yml` on RC tag push or manual dispatch | Yes |
 | **Homebrew tap** (`gastownhall/gascity`) | `release.yml` writes an asset-based formula after archives upload | Yes |
 | **Homebrew core** (`Homebrew/homebrew-core`) | BrewTestBot autobump, once listed | Yes (~3h delay) |
 
-The homebrew-core submission is [in progress](https://github.com/Homebrew/homebrew-core). Until it lands and is added to the autobump list, users install via `brew install gastownhall/gascity/gascity`.
+This fork's documented install path is `go install github.com/jonbaldie/gascity/cmd/gc@latest`. Do not send users to the upstream Homebrew tap or release tarballs.
 
 ## How to Release
 
@@ -19,6 +20,35 @@ The homebrew-core submission is [in progress](https://github.com/Homebrew/homebr
 ```
 
 This rewrites the `[Unreleased]` section of `CHANGELOG.md` into `[X.Y.Z] - YYYY-MM-DD`, commits, tags `vX.Y.Z`, and pushes. GitHub Actions takes it from there.
+
+### Release candidates
+
+Use the **RC Release** workflow to produce downloadable release-candidate
+archives for manual verification without updating Homebrew or publishing the
+stable release.
+
+Recommended path:
+
+1. Run the RC gate on the intended release branch or commit.
+2. Open **Actions → RC Release → Run workflow**.
+3. Set `tag_name` to an RC tag such as `v1.2.0-rc1`.
+4. Set `target_ref` to the exact RC-gate-passing commit SHA.
+
+The workflow creates the annotated RC tag if needed, builds GoReleaser
+archives for linux/darwin × amd64/arm64, and creates a GitHub **draft
+prerelease** with generated GoReleaser notes and downloadable assets. It does
+not update the Homebrew tap, create attestations, or mark the release latest.
+
+You can also push an existing RC tag manually:
+
+```bash
+git tag -a vX.Y.Z-rcN <commit> -m "Release vX.Y.Z-rcN"
+git push origin vX.Y.Z-rcN
+```
+
+Pushing an RC tag triggers `rc-release.yml`. The stable `release.yml` jobs
+skip tags containing a prerelease suffix, so RC tags do not run the Homebrew
+or stable publishing path.
 
 ### Manual
 
@@ -41,15 +71,16 @@ Version numbers live **only** in the git tag — there is no `Version` constant 
 
 ## What Happens After Tag Push
 
-`.github/workflows/release.yml` fires on any `v*` tag and runs, in order:
+`.github/workflows/release.yml` fires on stable `vMAJOR.MINOR.PATCH` tags and
+runs, in order:
 
 1. **Reject `replace` directives in `go.mod`** — they break `go install ...@latest` and bottle builds in homebrew-core.
-2. **`make check-version-tag`** — asserts the tag is a clean `vMAJOR.MINOR.PATCH` with no pre-release suffix. RC/beta tags will fail the release. Pre-release tags should be cut on a dedicated branch or not trigger this workflow.
+2. **`make check-version-tag`** — asserts the tag is a clean `vMAJOR.MINOR.PATCH` with no pre-release suffix. RC/beta tags are handled by `rc-release.yml` instead.
 3. **GoReleaser** — builds binaries for linux/darwin × amd64/arm64 and creates the GitHub Release with grouped changelog (`feat:` → Features, `fix:` → Bug Fixes, others → Others).
 4. **Release attestations** — downloads the published checksum manifest, uploads an SPDX SBOM asset, and creates GitHub artifact attestations for the release archives.
 5. **Homebrew tap update** — downloads the published checksums and writes an asset-based formula to `gastownhall/homebrew-gascity`.
 
-Forks skip publish/announce steps automatically via the `--skip=publish --skip=announce` flag (the workflow checks `github.repository != 'gastownhall/gascity'`).
+Forks skip publish/announce steps automatically via the `--skip=publish --skip=announce` flag (the workflow checks `github.repository != 'jonbaldie/gascity'`).
 
 ### Running checks locally before pushing the tag
 
@@ -61,21 +92,14 @@ goreleaser check          # also enforced by CI
 
 ## Homebrew tap (`gastownhall/gascity`)
 
-The release workflow automatically overwrites `Formula/gascity.rb` in the `gastownhall/homebrew-gascity` repo on every tag push. Publishing is GitHub App only: `HOMEBREW_TAP_APP_ID` and `HOMEBREW_TAP_APP_PRIVATE_KEY` must be configured in repository secrets for an app installed on `gastownhall/homebrew-gascity` with contents write.
+This fork's user-facing install path is
+`go install github.com/jonbaldie/gascity/cmd/gc@latest`. The tap below is
+upstream release machinery still in the tree; it is not how to install this
+project.
 
-The tap formula installs prebuilt release assets, so users do not need Go or a source build:
-
-```bash
-brew install gastownhall/gascity/gascity
-```
-
-The intended long-term user-facing Homebrew path is homebrew-core:
-
-```bash
-brew install gascity
-```
-
-Until the core formula lands, the tap is the public install path. After core lands, keep the tap available for emergency updates while normal releases flow through homebrew-core.
+The release workflow can overwrite `Formula/gascity.rb` in the
+`gastownhall/homebrew-gascity` repo on tag push. That tap is not published
+for this fork.
 
 ## Homebrew core (planned)
 
@@ -100,9 +124,11 @@ Manual `brew bump-formula-pr` is refused for autobump formulae. If the bot stall
 
 ## Troubleshooting
 
-### `make check-version-tag` fails with "pre-release suffix"
+### Stable release workflow skipped an RC tag
 
-The tag has a suffix (`-rc1`, `-beta`, `-alpha.1`). The release workflow only publishes stable releases. Either retag without the suffix, or don't trigger `release.yml` for this tag.
+This is expected. Tags with suffixes such as `-rc1`, `-beta`, or `-alpha.1`
+are intentionally excluded from the stable `release.yml` publishing jobs. Use
+the **RC Release** workflow for release candidates.
 
 ### GoReleaser fails with "replace directives"
 

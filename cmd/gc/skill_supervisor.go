@@ -5,10 +5,10 @@ import (
 	"io"
 	"path/filepath"
 
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/doctor"
-	"github.com/gastownhall/gascity/internal/materialize"
-	"github.com/gastownhall/gascity/internal/validation"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/doctor"
+	"github.com/jonbaldie/gascity/internal/materialize"
+	"github.com/jonbaldie/gascity/internal/validation"
 )
 
 // runStage1SkillMaterialization performs stage-1 skill materialization
@@ -107,10 +107,11 @@ func runStage1SkillMaterialization(cityPath string, cfg *config.City, stderr io.
 		}
 
 		res, merr := materialize.Run(materialize.Request{
-			SinkDir:     sinkDir,
-			Desired:     desired,
-			OwnedRoots:  owned,
-			LegacyNames: materialize.LegacyStubNames(),
+			SinkDir:          sinkDir,
+			Desired:          desired,
+			OwnedRoots:       owned,
+			LegacyNames:      materialize.LegacyStubNames(),
+			LegacyOwnedRoots: materialize.LegacyOwnedRootsFor(cityPath),
 		})
 		if merr != nil {
 			fmt.Fprintf(stderr, "gc: stage-1 materialize-skills for agent %q at %s: %v\n", //nolint:errcheck // best-effort stderr

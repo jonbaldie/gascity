@@ -12,12 +12,12 @@ import (
 	"strings"
 	"testing"
 
-	helpers "github.com/gastownhall/gascity/test/acceptance/helpers"
+	helpers "github.com/jonbaldie/gascity/test/acceptance/helpers"
 )
 
 func TestConfigShowCommands(t *testing.T) {
 	c := helpers.NewCity(t, testEnv)
-	c.InitFrom(filepath.Join(helpers.ExamplesDir(), "gastown"))
+	c.InitFromNoStart(filepath.Join(helpers.ExamplesDir(), "gastown"))
 
 	t.Run("Show_OutputsTOML", func(t *testing.T) {
 		out, err := c.GC("config", "show")
@@ -87,7 +87,7 @@ func TestConfigShowNonCity(t *testing.T) {
 
 func TestPackListCommands(t *testing.T) {
 	c := helpers.NewCity(t, testEnv)
-	c.InitFrom(filepath.Join(helpers.ExamplesDir(), "gastown"))
+	c.InitFromNoStart(filepath.Join(helpers.ExamplesDir(), "gastown"))
 
 	t.Run("ListSucceeds", func(t *testing.T) {
 		out, err := c.GC("pack", "list")

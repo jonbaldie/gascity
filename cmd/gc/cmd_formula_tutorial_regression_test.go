@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -58,6 +59,7 @@ needs = ["cook"]
 `)
 
 	t.Chdir(cityDir)
+	t.Setenv("GC_CITY_PATH", cityDir)
 
 	var stdout bytes.Buffer
 	cmd := newFormulaShowCmd(&stdout, &bytes.Buffer{})
@@ -90,6 +92,7 @@ condition = "{{env}} == staging"
 `)
 
 	t.Chdir(cityDir)
+	t.Setenv("GC_CITY_PATH", cityDir)
 
 	var stdout bytes.Buffer
 	cmd := newFormulaShowCmd(&stdout, &bytes.Buffer{})
@@ -123,6 +126,7 @@ title = "[{{epic}}] Implement: {{feature}}"
 `)
 
 	t.Chdir(cityDir)
+	t.Setenv("GC_CITY_PATH", cityDir)
 
 	var stdout bytes.Buffer
 	cmd := newFormulaShowCmd(&stdout, &bytes.Buffer{})
@@ -160,6 +164,7 @@ title = "[{{epic}}] Implement: {{feature}}"
 `)
 
 	t.Chdir(cityDir)
+	t.Setenv("GC_CITY_PATH", cityDir)
 
 	var stdout bytes.Buffer
 	cmd := newFormulaShowCmd(&stdout, &bytes.Buffer{})
@@ -202,6 +207,7 @@ title = "[{{epic}}] Implement: {{feature}}"
 `)
 
 	t.Chdir(cityDir)
+	t.Setenv("GC_CITY_PATH", cityDir)
 
 	var stdout bytes.Buffer
 	cmd := newFormulaShowCmd(&stdout, &bytes.Buffer{})
@@ -238,18 +244,20 @@ title = "[{{epic}}] Deploy {{env}}"
 `)
 
 	t.Chdir(cityDir)
+	t.Setenv("GC_CITY_PATH", cityDir)
 
-	cmd := newFormulaShowCmd(&bytes.Buffer{}, &bytes.Buffer{})
+	stderr := &bytes.Buffer{}
+	cmd := newFormulaShowCmd(&bytes.Buffer{}, stderr)
 	cmd.SetArgs([]string{"enum-vars", "--var", "env=staging"})
 	err := cmd.Execute()
-	if err == nil {
-		t.Fatal("formula show should reject invalid provided vars")
+	if !errors.Is(err, errExit) {
+		t.Fatalf("error = %v, want errExit", err)
 	}
-	if !strings.Contains(err.Error(), `variable "env": value "staging" not in allowed values`) {
-		t.Fatalf("error = %v, want invalid env", err)
+	if !strings.Contains(stderr.String(), `variable "env": value "staging" not in allowed values`) {
+		t.Fatalf("stderr = %q, want invalid env", stderr.String())
 	}
-	if strings.Contains(err.Error(), `variable "epic" is required`) {
-		t.Fatalf("formula show should not require missing runtime vars while validating provided vars: %v", err)
+	if strings.Contains(stderr.String(), `variable "epic" is required`) {
+		t.Fatalf("formula show should not require missing runtime vars while validating provided vars: %s", stderr.String())
 	}
 }
 
@@ -274,7 +282,7 @@ func writeTutorialFormulaCity(t *testing.T, formulaName, formulaBody string) str
 		}
 	}
 
-	writeFile("city.toml", "[workspace]\nname = \"my-city\"\nprovider = \"claude\"\n")
-	writeFile("formulas/"+formulaName+".formula.toml", formulaBody)
+	writeFile("city.toml", withBuiltinProviderAliasesTOMLForTest("[workspace]\nname = \"my-city\"\nprovider = \"claude\"\n", "claude"))
+	writeFile("formulas/"+formulaName+".toml", formulaBody)
 	return cityDir
 }

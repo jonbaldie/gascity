@@ -4,8 +4,8 @@ import (
 	"reflect"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/gastownhall/gascity/internal/extmsg"
-	"github.com/gastownhall/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/extmsg"
+	"github.com/jonbaldie/gascity/internal/session"
 )
 
 // This file names the string-enum schemas used by the supervisor API so

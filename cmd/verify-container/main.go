@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/verification"
+	"github.com/jonbaldie/gascity/internal/verification"
 )
 
 const replayRunner = "go run ./cmd/verify-container"

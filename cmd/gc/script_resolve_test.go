@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 func writeLegacyScriptLink(t *testing.T, dir, relPath, target string) {
@@ -310,8 +310,10 @@ func TestPruneLegacyConfiguredScripts_FallbackPreservesTopLevelScriptsTargets(t 
 }
 
 func TestPrepareCityForSupervisorPrunesLegacyScripts(t *testing.T) {
+	skipSlowCmdGCTest(t, "starts real Dolt lifecycle")
 	dir := t.TempDir()
 	cityPath := filepath.Join(dir, "city")
+	cleanupManagedDoltTestCity(t, cityPath)
 	rigPath := filepath.Join(dir, "rig")
 	cityPackScripts := filepath.Join(dir, "packs/city/assets/scripts")
 	rigPackScripts := filepath.Join(dir, "packs/rig/assets/scripts")

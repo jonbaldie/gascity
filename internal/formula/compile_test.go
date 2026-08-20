@@ -2,13 +2,17 @@ package formula
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/testfixtures/reviewworkflows"
+	"github.com/jonbaldie/gascity/internal/beadmeta"
+	"github.com/jonbaldie/gascity/internal/testfixtures/reviewworkflows"
 )
 
 func TestCompileSimpleFormula(t *testing.T) {
@@ -391,6 +395,42 @@ title = "Scan"
 	if !recipe.RootOnly {
 		t.Error("vapor formula should be RootOnly by default")
 	}
+	if recipe.RootStep().Type != "task" {
+		t.Errorf("root Type = %q, want %q", recipe.RootStep().Type, "task")
+	}
+	if got := recipe.RootStep().Metadata["gc.kind"]; got != "wisp" {
+		t.Errorf("root gc.kind = %q, want wisp", got)
+	}
+}
+
+func TestCompileStepLessFormulaUsesRunnableWispRoot(t *testing.T) {
+	dir := t.TempDir()
+	formulaContent := `
+formula = "router"
+description = "Route pending work"
+version = 1
+`
+	if err := os.WriteFile(filepath.Join(dir, "router.toml"), []byte(formulaContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	recipe, err := Compile(context.Background(), "router", []string{dir}, nil)
+	if err != nil {
+		t.Fatalf("Compile: %v", err)
+	}
+
+	if len(recipe.Steps) != 1 {
+		t.Fatalf("len(Steps) = %d, want root only", len(recipe.Steps))
+	}
+	if !recipe.RootOnly {
+		t.Fatal("step-less formula should be RootOnly")
+	}
+	if recipe.RootStep().Type != "task" {
+		t.Fatalf("root Type = %q, want task", recipe.RootStep().Type)
+	}
+	if got := recipe.RootStep().Metadata["gc.kind"]; got != "wisp" {
+		t.Fatalf("root gc.kind = %q, want wisp", got)
+	}
 }
 
 // TestCompileExtendsPhasePour regresses the merge bug where the 'extends'
@@ -644,7 +684,7 @@ extends = ` + tc.extends + `
 	}
 }
 
-func TestCompileCheckSyntaxWithoutGraphContractKeepsMoleculeRoot(t *testing.T) {
+func TestCompileCheckSyntaxWithoutRequirementFailsClosed(t *testing.T) {
 	enableV2ForTest(t)
 
 	dir := t.TempDir()
@@ -673,24 +713,12 @@ timeout = "30s"
 		t.Fatal(err)
 	}
 
-	recipe, err := Compile(context.Background(), "ralph-demo", []string{dir}, nil)
-	if err != nil {
-		t.Fatalf("Compile: %v", err)
+	_, err := Compile(context.Background(), "ralph-demo", []string{dir}, nil)
+	if err == nil {
+		t.Fatal("Compile succeeded, want explicit compiler requirement error")
 	}
-
-	root := recipe.RootStep()
-	if root == nil {
-		t.Fatal("root step missing")
-	}
-	if got := root.Metadata["gc.kind"]; got != "" {
-		t.Fatalf("root gc.kind = %q, want empty", got)
-	}
-	if got := root.Metadata["gc.formula_contract"]; got != "" {
-		t.Fatalf("root gc.formula_contract = %q, want empty", got)
-	}
-	if root.Type != "molecule" {
-		t.Fatalf("root type = %q, want molecule", root.Type)
-	}
+	requireErrorContains(t, err, "graph-only constructs")
+	requireErrorContains(t, err, `[requires] formula_compiler = ">=2.0.0"`)
 }
 
 func TestCompileCheckSyntaxWithGraphContractMarksWorkflowRoot(t *testing.T) {
@@ -738,6 +766,9 @@ timeout = "30s"
 	if got := root.Metadata["gc.formula_contract"]; got != "graph.v2" {
 		t.Fatalf("root gc.formula_contract = %q, want graph.v2", got)
 	}
+	if got := root.Metadata["gc.formula_name"]; got != "ralph-demo" {
+		t.Fatalf("root gc.formula_name = %q, want ralph-demo (canonical run-recipe identity for city_events.formula / \"Run of <formula>\")", got)
+	}
 	if root.Type != "task" {
 		t.Fatalf("root type = %q, want task", root.Type)
 	}
@@ -764,7 +795,10 @@ timeout = "30s"
 		t.Fatal("missing workflow finalizer")
 	}
 
-	assertHasDep("ralph-demo", "ralph-demo.workflow-finalize", "blocks")
+	// The root reaches its finalizer through an informational edge, never a
+	// blocking one: the finalizer is what closes the root (ga-a6zy9).
+	assertHasDep("ralph-demo", "ralph-demo.workflow-finalize", "tracks")
+	assertLacksDep("ralph-demo", "ralph-demo.workflow-finalize", "blocks")
 	assertLacksDep("ralph-demo", "ralph-demo.design", "blocks")
 	assertLacksDep("ralph-demo", "ralph-demo.implement", "blocks")
 	assertLacksDep("ralph-demo", "ralph-demo.implement.run.1", "blocks")
@@ -779,6 +813,9 @@ func TestCompileExpansionFormulaSubstitutesTimeoutsFromFile(t *testing.T) {
 formula = "exp-timeout"
 version = 1
 type = "expansion"
+
+[requires]
+formula_compiler = ">=2.0.0"
 
 [vars.step_timeout]
 default = "10m"
@@ -831,6 +868,9 @@ func TestCompileExpansionFormulaAllowsUnresolvedTimeoutVars(t *testing.T) {
 formula = "exp-timeout"
 version = 1
 type = "expansion"
+
+[requires]
+formula_compiler = ">=2.0.0"
 
 [[template]]
 id = "{target}.check"
@@ -933,7 +973,10 @@ needs = ["setup"]
 		if dep.StepID == "graph-demo.work" && dep.DependsOnID == "graph-demo.setup" && dep.Type == "blocks" {
 			foundBlocks = true
 		}
-		if dep.StepID == "graph-demo" && dep.DependsOnID == "graph-demo.workflow-finalize" && dep.Type == "blocks" {
+		if dep.StepID == "graph-demo" && dep.DependsOnID == "graph-demo.workflow-finalize" {
+			if dep.Type != "tracks" {
+				t.Fatalf("root -> workflow-finalize dep type = %q, want tracks (the finalizer closes the root)", dep.Type)
+			}
 			foundRootFinalize = true
 		}
 	}
@@ -941,7 +984,7 @@ needs = ["setup"]
 		t.Fatal("missing work -> setup blocks dep")
 	}
 	if !foundRootFinalize {
-		t.Fatal("missing root -> workflow-finalize blocks dep")
+		t.Fatal("missing root -> workflow-finalize tracks dep")
 	}
 }
 
@@ -1047,7 +1090,7 @@ func TestCompileScopedWorkCarriesScopeAndCleanupMetadata(t *testing.T) {
 		if dep.StepID == cleanup.ID && dep.DependsOnID == body.ID && dep.Type == "blocks" {
 			foundCleanupDep = true
 		}
-		if dep.StepID == root.ID && dep.DependsOnID == finalizer.ID && dep.Type == "blocks" {
+		if dep.StepID == root.ID && dep.DependsOnID == finalizer.ID && dep.Type == "tracks" {
 			foundRootFinalize = true
 		}
 		if dep.StepID == finalizer.ID && dep.DependsOnID == body.ID && dep.Type == "blocks" {
@@ -1058,7 +1101,7 @@ func TestCompileScopedWorkCarriesScopeAndCleanupMetadata(t *testing.T) {
 		t.Fatalf("missing cleanup -> body blocks dep")
 	}
 	if !foundRootFinalize {
-		t.Fatalf("missing workflow root -> workflow-finalize blocks dep")
+		t.Fatalf("missing workflow root -> workflow-finalize tracks dep")
 	}
 	if !foundFinalizeBody {
 		t.Fatalf("missing workflow-finalize -> body blocks dep")
@@ -1078,9 +1121,16 @@ func TestCompileScopedWorkCarriesScopeAndCleanupMetadata(t *testing.T) {
 	assertBefore("mol-scoped-work.load-context", "mol-scoped-work.workspace-setup")
 	assertBefore("mol-scoped-work.workspace-setup", "mol-scoped-work.workspace-setup-scope-check")
 	assertBefore("mol-scoped-work.preflight-tests", "mol-scoped-work.preflight-tests-scope-check")
-	assertBefore("mol-scoped-work.submit-scope-check", "mol-scoped-work.body")
+	assertBefore("mol-scoped-work.submit", "mol-scoped-work.submit-scope-check")
+	// The body latches its members directly, not their scope-checks: a
+	// scope-check closes the body, so a body blocked on one never converges
+	// (ga-a6zy9). The body therefore sorts after its last member, and the
+	// now-unreferenced trailing scope-check sorts before the finalizer that
+	// waits on it.
+	assertBefore("mol-scoped-work.submit", "mol-scoped-work.body")
 	assertBefore("mol-scoped-work.body", "mol-scoped-work.cleanup-worktree")
 	assertBefore("mol-scoped-work.cleanup-worktree", "mol-scoped-work.workflow-finalize")
+	assertBefore("mol-scoped-work.submit-scope-check", "mol-scoped-work.workflow-finalize")
 
 	// The teardown retry control must block on its own attempt.1, matching
 	// the invariant in processRetryControl: a retry-manager is only ever
@@ -1104,6 +1154,177 @@ func TestCompileScopedWorkCarriesScopeAndCleanupMetadata(t *testing.T) {
 	}
 }
 
+func TestCompileReviewQuorumCoreFormula(t *testing.T) {
+	enableV2ForTest(t)
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	repoRoot := filepath.Clean(filepath.Join(cwd, "..", ".."))
+	searchDir := filepath.Join(repoRoot, "internal", "bootstrap", "packs", "core", "formulas")
+
+	parser := NewParser(searchDir)
+	parsed, err := parser.ParseFile(filepath.Join(searchDir, "mol-review-quorum.toml"))
+	if err != nil {
+		t.Fatalf("ParseFile: %v", err)
+	}
+
+	var reviewerLanes []string
+	for _, step := range parsed.Steps {
+		if lane := step.Metadata["gc.review_quorum_lane"]; lane != "" {
+			reviewerLanes = append(reviewerLanes, lane)
+			if step.Retry == nil {
+				t.Fatalf("%s missing retry spec", step.ID)
+			}
+			if step.Retry.MaxAttempts != 3 {
+				t.Fatalf("%s retry max_attempts = %d, want 3", step.ID, step.Retry.MaxAttempts)
+			}
+			if step.Retry.OnExhausted != "soft_fail" {
+				t.Fatalf("%s retry on_exhausted = %q, want soft_fail", step.ID, step.Retry.OnExhausted)
+			}
+			for _, required := range []string{
+				"lane_id",
+				"provider",
+				"model",
+				"verdict",
+				"findings_count",
+				"evidence",
+				"usage",
+				"read_only_enforcement",
+				"mutations_delta",
+				"failure_class",
+				"failure_reason",
+			} {
+				if !strings.Contains(step.Description, required) {
+					t.Fatalf("%s description missing structured output key %q", step.ID, required)
+				}
+			}
+			if !strings.Contains(step.Description, "{{base_ref}}") {
+				t.Fatalf("%s description missing base_ref prompt placeholder", step.ID)
+			}
+		}
+	}
+	if got, want := strings.Join(reviewerLanes, ","), "{{lane_one_id}},{{lane_two_id}}"; got != want {
+		t.Fatalf("reviewer lanes = %q, want %q", got, want)
+	}
+	var synthesisPrompts int
+	for _, step := range parsed.Steps {
+		if step.Metadata["gc.review_quorum_role"] != "synthesis" {
+			continue
+		}
+		synthesisPrompts++
+		for _, required := range []string{
+			"subject",
+			"base_ref",
+			"lanes",
+			"verdict",
+			"summary",
+			"findings_count",
+			"findings",
+			"evidence",
+			"usage",
+			"read_only_enforcement",
+			"mutations_delta",
+			"failure_class",
+			"failure_reason",
+			"lane=<lane_id> reason=<stable_reason>",
+		} {
+			if !strings.Contains(step.Description, required) {
+				t.Fatalf("%s description missing synthesis contract key %q", step.ID, required)
+			}
+		}
+	}
+	if synthesisPrompts != 1 {
+		t.Fatalf("synthesis prompt count = %d, want 1", synthesisPrompts)
+	}
+	for _, name := range []string{
+		"lane_one_id",
+		"lane_one_provider",
+		"lane_one_model",
+		"lane_one_target",
+		"lane_two_id",
+		"lane_two_provider",
+		"lane_two_model",
+		"lane_two_target",
+		"synthesis_target",
+	} {
+		if !parsed.Vars[name].Required {
+			t.Fatalf("%s required = false, want true", name)
+		}
+	}
+
+	recipe, err := Compile(context.Background(), "mol-review-quorum", []string{searchDir}, map[string]string{
+		"subject":           "PR-123",
+		"lane_one_id":       "primary",
+		"lane_one_provider": "provider-a",
+		"lane_one_model":    "model-a",
+		"lane_one_target":   "target-a",
+		"lane_two_id":       "secondary",
+		"lane_two_provider": "provider-b",
+		"lane_two_model":    "model-b",
+		"lane_two_target":   "target-b",
+		"synthesis_target":  "custom-review-synthesis",
+	})
+	if err != nil {
+		t.Fatalf("Compile: %v", err)
+	}
+
+	for _, stepID := range []string{"mol-review-quorum.review-lane-one", "mol-review-quorum.review-lane-two"} {
+		control := recipe.StepByID(stepID)
+		if control == nil {
+			t.Fatalf("%s control step missing", stepID)
+		}
+		if got := control.Metadata["gc.kind"]; got != "retry" {
+			t.Fatalf("%s gc.kind = %q, want retry", stepID, got)
+		}
+		if got := control.Metadata["gc.on_exhausted"]; got != "soft_fail" {
+			t.Fatalf("%s gc.on_exhausted = %q, want soft_fail", stepID, got)
+		}
+		if got := control.Metadata["gc.max_attempts"]; got != "3" {
+			t.Fatalf("%s gc.max_attempts = %q, want 3", stepID, got)
+		}
+		attempt := recipe.StepByID(stepID + ".attempt.1")
+		if attempt == nil {
+			t.Fatalf("%s attempt.1 missing", stepID)
+		}
+		if got := attempt.Metadata["gc.output_json"]; got != "" {
+			t.Fatalf("%s attempt gc.output_json = %q, want empty until worker writes JSON", stepID, got)
+		}
+		if got := attempt.Metadata["gc.output_json_schema"]; got != "review-quorum.lane.v1" {
+			t.Fatalf("%s attempt gc.output_json_schema = %q, want review-quorum.lane.v1", stepID, got)
+		}
+		if got := attempt.Metadata["gc.provider"]; !strings.HasPrefix(got, "{{lane_") {
+			t.Fatalf("%s attempt gc.provider = %q, want lane provider placeholder", stepID, got)
+		}
+		if got := attempt.Metadata["opt_model"]; !strings.HasPrefix(got, "{{lane_") {
+			t.Fatalf("%s attempt opt_model = %q, want lane model placeholder", stepID, got)
+		}
+		if !strings.Contains(attempt.Description, "{{base_ref}}") {
+			t.Fatalf("%s attempt description missing base_ref prompt placeholder", stepID)
+		}
+	}
+
+	synthesis := recipe.StepByID("mol-review-quorum.synthesize-review-quorum")
+	if synthesis == nil {
+		t.Fatal("synthesis step missing")
+	}
+	if got := synthesis.Metadata["gc.output_json"]; got != "" {
+		t.Fatalf("synthesis gc.output_json = %q, want empty until worker writes JSON", got)
+	}
+	if got := synthesis.Metadata["gc.output_json_schema"]; got != "review-quorum.summary.v1" {
+		t.Fatalf("synthesis gc.output_json_schema = %q, want review-quorum.summary.v1", got)
+	}
+	if got := synthesis.Metadata["gc.run_target"]; got != "{{synthesis_target}}" {
+		t.Fatalf("synthesis gc.run_target = %q, want {{synthesis_target}}", got)
+	}
+	for _, dep := range []string{"mol-review-quorum.review-lane-one", "mol-review-quorum.review-lane-two"} {
+		if !hasRecipeDep(recipe.Deps, synthesis.ID, dep, "blocks") {
+			t.Fatalf("synthesis missing blocks dep on %s", dep)
+		}
+	}
+}
+
 // TestCompileBugReportFlowV2 is an integration-style check that loads
 // the real tooling formula used by the bugflow workflow and asserts
 // the teardown retry control carries a blocks dep on its attempt.
@@ -1113,7 +1334,7 @@ func TestCompileBugReportFlowV2(t *testing.T) {
 	t.Cleanup(func() { SetFormulaV2Enabled(prev) })
 
 	const toolingPath = "/home/ubuntu/tooling/formulas"
-	if _, err := os.Stat(filepath.Join(toolingPath, "mol-bug-report-flow-v2.formula.toml")); err != nil {
+	if _, err := os.Stat(filepath.Join(toolingPath, "mol-bug-report-flow-v2.toml")); err != nil {
 		t.Skipf("tooling formula not present: %v", err)
 	}
 
@@ -1251,16 +1472,15 @@ max_attempts = 3
 	}
 }
 
-func TestCompileGraphRetryWorkflowRequiresExplicitGraphContract(t *testing.T) {
+func TestCompileRetryWorkflowWithoutRequirementFailsClosed(t *testing.T) {
 	prev := IsFormulaV2Enabled()
 	SetFormulaV2Enabled(true)
 	t.Cleanup(func() { SetFormulaV2Enabled(prev) })
 
 	dir := t.TempDir()
 	formulaText := `
-formula = "implicit-v2"
+formula = "legacy-retry"
 phase = "liquid"
-version = 2
 
 [[steps]]
 id = "work"
@@ -1269,20 +1489,19 @@ title = "Do the work"
 [steps.retry]
 max_attempts = 2
 `
-	if err := os.WriteFile(filepath.Join(dir, "implicit-v2.toml"), []byte(formulaText), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "legacy-retry.toml"), []byte(formulaText), 0o644); err != nil {
 		t.Fatalf("write formula: %v", err)
 	}
 
-	_, err := Compile(context.Background(), "implicit-v2", []string{dir}, nil)
+	_, err := Compile(context.Background(), "legacy-retry", []string{dir}, nil)
 	if err == nil {
-		t.Fatal("Compile succeeded, want explicit contract error")
+		t.Fatal("Compile succeeded, want explicit compiler requirement error")
 	}
-	if !strings.Contains(err.Error(), `contract = "graph.v2"`) {
-		t.Fatalf("Compile error = %v, want graph.v2 contract guidance", err)
-	}
+	requireErrorContains(t, err, "graph-only constructs")
+	requireErrorContains(t, err, `[requires] formula_compiler = ">=2.0.0"`)
 }
 
-func TestCompileVersion1DetachedGraphMetadataRequiresExplicitGraphContract(t *testing.T) {
+func TestCompileDetachedGraphMetadataRequiresExplicitGraphContract(t *testing.T) {
 	prev := IsFormulaV2Enabled()
 	SetFormulaV2Enabled(true)
 	t.Cleanup(func() { SetFormulaV2Enabled(prev) })
@@ -1291,7 +1510,6 @@ func TestCompileVersion1DetachedGraphMetadataRequiresExplicitGraphContract(t *te
 	formulaText := `
 formula = "implicit-v1-detached"
 phase = "liquid"
-version = 1
 
 [[steps]]
 id = "work"
@@ -1311,16 +1529,190 @@ metadata = { "gc.kind" = "retry" }
 	}
 }
 
-func TestCompileGraphOnCompleteWorkflowRequiresExplicitGraphContract(t *testing.T) {
+func TestValidateRejectsHandWrittenEngineMintedKindMetadata(t *testing.T) {
+	cases := []struct {
+		name    string
+		formula *Formula
+		want    []string
+	}{
+		{
+			name: "fanout top-level step",
+			formula: &Formula{
+				Formula: "hand-fanout",
+				Steps: []*Step{{
+					ID:       "work",
+					Title:    "Do the work",
+					Metadata: map[string]string{"gc.kind": "fanout"},
+				}},
+			},
+			want: []string{`steps[0] (work)`, `gc.kind="fanout" is engine-minted`, "[steps.on_complete]"},
+		},
+		{
+			name: "fanout in child step",
+			formula: &Formula{
+				Formula: "hand-fanout-child",
+				Steps: []*Step{{
+					ID:    "parent",
+					Title: "Parent",
+					Children: []*Step{{
+						ID:       "child",
+						Title:    "Child",
+						Metadata: map[string]string{"gc.kind": "fanout"},
+					}},
+				}},
+			},
+			want: []string{`steps[0] (parent).children[0] (child)`, `gc.kind="fanout" is engine-minted`},
+		},
+		{
+			name: "fanout in loop body",
+			formula: &Formula{
+				Formula: "hand-fanout-loop",
+				Steps: []*Step{{
+					ID:    "looper",
+					Title: "Looper",
+					Loop: &LoopSpec{
+						Count: 2,
+						Body: []*Step{{
+							ID:       "body",
+							Title:    "Body",
+							Metadata: map[string]string{"gc.kind": "fanout"},
+						}},
+					},
+				}},
+			},
+			want: []string{`steps[0] (looper).loop.body[0] (body)`, `gc.kind="fanout" is engine-minted`},
+		},
+		{
+			name: "fanout in template step",
+			formula: &Formula{
+				Formula: "hand-fanout-template",
+				Type:    TypeExpansion,
+				Template: []*Step{{
+					ID:       "{target}.work",
+					Title:    "Work",
+					Metadata: map[string]string{"gc.kind": "fanout"},
+				}},
+			},
+			want: []string{`template[0] ({target}.work)`, `gc.kind="fanout" is engine-minted`},
+		},
+		{
+			name: "fanout with declared graph contract still errors",
+			formula: &Formula{
+				Formula:  "hand-fanout-graph",
+				Contract: "graph.v2",
+				Type:     TypeWorkflow,
+				Steps: []*Step{{
+					ID:       "work",
+					Title:    "Do the work",
+					Metadata: map[string]string{"gc.kind": "fanout"},
+				}},
+			},
+			want: []string{`gc.kind="fanout" is engine-minted`, "[steps.on_complete]"},
+		},
+		{
+			name: "untrimmed key and value still caught",
+			formula: &Formula{
+				Formula: "hand-fanout-spaces",
+				Steps: []*Step{{
+					ID:       "work",
+					Title:    "Do the work",
+					Metadata: map[string]string{" gc.kind ": " fanout "},
+				}},
+			},
+			want: []string{`gc.kind="fanout" is engine-minted`},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.formula.Validate()
+			if err == nil {
+				t.Fatal("Validate succeeded, want engine-minted kind error")
+			}
+			for _, want := range tc.want {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("Validate error = %q, want it to contain %q", err, want)
+				}
+			}
+		})
+	}
+}
+
+func TestValidateAcceptsHandAuthorableKindMetadata(t *testing.T) {
+	// Hand-authoring structural kinds (scope, cleanup) in a declared graph.v2
+	// formula is a supported surface (see core pack mol-scoped-work) and must
+	// stay valid.
+	f := &Formula{
+		Formula:  "hand-scope",
+		Contract: "graph.v2",
+		Type:     TypeWorkflow,
+		Steps: []*Step{
+			{
+				ID:       "body",
+				Title:    "Body",
+				Metadata: map[string]string{"gc.kind": "scope", "gc.scope_name": "worktree", "gc.scope_role": "body"},
+			},
+			{
+				ID:        "teardown",
+				Title:     "Teardown",
+				DependsOn: []string{"body"},
+				Metadata:  map[string]string{"gc.kind": "cleanup", "gc.scope_ref": "body", "gc.scope_role": "teardown"},
+			},
+		},
+	}
+	if err := f.Validate(); err != nil {
+		t.Fatalf("Validate(hand-authored scope/cleanup) = %v, want nil", err)
+	}
+}
+
+func TestEngineMintedAuthoringSurfacesCoverEngineMintedOnlyKinds(t *testing.T) {
+	for _, kind := range beadmeta.EngineMintedOnlyKinds {
+		if _, ok := engineMintedAuthoringSurfaces[kind]; !ok {
+			t.Errorf("engineMintedAuthoringSurfaces missing guidance for engine-minted-only kind %q", kind)
+		}
+	}
+	for kind := range engineMintedAuthoringSurfaces {
+		if !slices.Contains(beadmeta.EngineMintedOnlyKinds, kind) {
+			t.Errorf("engineMintedAuthoringSurfaces has guidance for %q, which is not in beadmeta.EngineMintedOnlyKinds", kind)
+		}
+	}
+}
+
+func TestCompileRejectsHandWrittenFanoutKindMetadata(t *testing.T) {
 	prev := IsFormulaV2Enabled()
 	SetFormulaV2Enabled(true)
 	t.Cleanup(func() { SetFormulaV2Enabled(prev) })
 
 	dir := t.TempDir()
 	formulaText := `
-formula = "implicit-v2-fanout"
+formula = "hand-fanout"
 phase = "liquid"
-version = 2
+
+[[steps]]
+id = "work"
+title = "Do the work"
+metadata = { "gc.kind" = "fanout" }
+`
+	if err := os.WriteFile(filepath.Join(dir, "hand-fanout.toml"), []byte(formulaText), 0o644); err != nil {
+		t.Fatalf("write formula: %v", err)
+	}
+
+	_, err := Compile(context.Background(), "hand-fanout", []string{dir}, nil)
+	if err == nil {
+		t.Fatal("Compile succeeded, want engine-minted kind error")
+	}
+	requireErrorContains(t, err, "engine-minted")
+	requireErrorContains(t, err, "[steps.on_complete]")
+}
+
+func TestCompileOnCompleteWithoutRequirementFailsClosed(t *testing.T) {
+	prev := IsFormulaV2Enabled()
+	SetFormulaV2Enabled(true)
+	t.Cleanup(func() { SetFormulaV2Enabled(prev) })
+
+	dir := t.TempDir()
+	formulaText := `
+formula = "legacy-fanout"
+phase = "liquid"
 
 [[steps]]
 id = "survey"
@@ -1330,17 +1722,16 @@ title = "Survey"
 for_each = "output.items"
 bond = "mol-item"
 `
-	if err := os.WriteFile(filepath.Join(dir, "implicit-v2-fanout.toml"), []byte(formulaText), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "legacy-fanout.toml"), []byte(formulaText), 0o644); err != nil {
 		t.Fatalf("write formula: %v", err)
 	}
 
-	_, err := Compile(context.Background(), "implicit-v2-fanout", []string{dir}, nil)
+	_, err := Compile(context.Background(), "legacy-fanout", []string{dir}, nil)
 	if err == nil {
-		t.Fatal("Compile succeeded, want explicit contract error")
+		t.Fatal("Compile succeeded, want explicit compiler requirement error")
 	}
-	if !strings.Contains(err.Error(), `contract = "graph.v2"`) {
-		t.Fatalf("Compile error = %v, want graph.v2 contract guidance", err)
-	}
+	requireErrorContains(t, err, "graph-only constructs")
+	requireErrorContains(t, err, `[requires] formula_compiler = ">=2.0.0"`)
 }
 
 func TestCompileStandaloneExpansionRejectsDuplicateParentTemplateIDs(t *testing.T) {
@@ -1601,6 +1992,56 @@ func TestCompileInlineExpansionUsesExpandVarsForConditionalTemplateSelection(t *
 	}
 }
 
+func TestCompileInlineExpansionResolvesExpandVarsFromParentVarsForConditions(t *testing.T) {
+	dir := t.TempDir()
+
+	expansion := `{
+		"formula": "report-mode-expansion",
+		"type": "expansion",
+		"version": 1,
+		"vars": {
+			"review_mode": {"default": "agent"}
+		},
+		"template": [
+			{"id": "{target}.report", "title": "Write report"},
+			{"id": "{target}.apply", "title": "Apply findings", "condition": "{{review_mode}} != report"}
+		]
+	}`
+	if err := os.WriteFile(filepath.Join(dir, "report-mode-expansion.formula.json"), []byte(expansion), 0o644); err != nil {
+		t.Fatalf("write expansion: %v", err)
+	}
+
+	formulaText := `{
+		"formula": "report-mode-parent",
+		"version": 1,
+		"vars": {
+			"review_mode": {"default": "report"}
+		},
+		"steps": [
+			{"id": "work", "title": "Work", "expand": "report-mode-expansion", "expand_vars": {"review_mode": "{{review_mode}}"}}
+		]
+	}`
+	if err := os.WriteFile(filepath.Join(dir, "report-mode-parent.formula.json"), []byte(formulaText), 0o644); err != nil {
+		t.Fatalf("write formula: %v", err)
+	}
+
+	recipe, err := Compile(context.Background(), "report-mode-parent", []string{dir}, nil)
+	if err != nil {
+		t.Fatalf("Compile: %v", err)
+	}
+	for _, step := range recipe.Steps {
+		if step.ID == "report-mode-parent.work.apply" {
+			t.Fatalf("report-only inline expansion included apply step: %#v", step)
+		}
+	}
+	if len(recipe.Steps) != 2 {
+		t.Fatalf("len(recipe.Steps) = %d, want 2", len(recipe.Steps))
+	}
+	if got := recipe.Steps[1].ID; got != "report-mode-parent.work.report" {
+		t.Fatalf("recipe.Steps[1].ID = %q, want report-mode-parent.work.report", got)
+	}
+}
+
 func formatDepsForCleanup(deps []RecipeDep, stepID string) string {
 	var lines []string
 	for _, d := range deps {
@@ -1651,7 +2092,7 @@ func TestCompileReviewWorkflowSkipGeminiFiltersExpansionLane(t *testing.T) {
 	writeReviewWorkflowFixtures(t, dir)
 
 	recipe, err := Compile(context.Background(), "mol-adopt-pr-v2", []string{dir}, map[string]string{
-		"issue":       "GC-1",
+		"convoy_id":   "convoy-1",
 		"pr_ref":      "refs/heads/test",
 		"skip_gemini": "true",
 	})
@@ -1682,6 +2123,75 @@ func TestCompileReviewWorkflowSkipGeminiFiltersExpansionLane(t *testing.T) {
 	}
 }
 
+func TestCompilePersonalWorkSkipGeminiFiltersExpansionLanes(t *testing.T) {
+	enableV2ForTest(t)
+
+	dir := t.TempDir()
+	writeReviewWorkflowFixtures(t, dir)
+
+	recipe, err := Compile(context.Background(), "mol-personal-work-v2", []string{dir}, map[string]string{
+		"convoy_id":     "convoy-1",
+		"base_branch":   "main",
+		"skip_gemini":   "true",
+		"setup_command": "true",
+		"test_command":  "true",
+	})
+	if err != nil {
+		t.Fatalf("Compile: %v", err)
+	}
+
+	for _, step := range recipe.Steps {
+		if strings.Contains(step.ID, "gemini") {
+			t.Fatalf("compiled recipe unexpectedly retained Gemini lane with skip_gemini=true: %s", step.ID)
+		}
+	}
+	for _, dep := range recipe.Deps {
+		if strings.Contains(dep.StepID, "gemini") || strings.Contains(dep.DependsOnID, "gemini") {
+			t.Fatalf("compiled recipe unexpectedly retained Gemini dependency with skip_gemini=true: %+v", dep)
+		}
+	}
+
+	for _, want := range []string{
+		"mol-personal-work-v2.design-review-loop.iteration.1.design-review-pipeline.persona-gen-claude",
+		"mol-personal-work-v2.design-review-loop.iteration.1.design-review-pipeline.persona-gen-codex",
+		"mol-personal-work-v2.design-review-loop.iteration.1.design-review-pipeline.persona-synthesis",
+		"mol-personal-work-v2.code-review-loop.iteration.1.review-pipeline.review-claude",
+		"mol-personal-work-v2.code-review-loop.iteration.1.review-pipeline.review-codex",
+		"mol-personal-work-v2.code-review-loop.iteration.1.review-pipeline.synthesize",
+	} {
+		if recipe.StepByID(want) == nil {
+			t.Fatalf("compiled recipe missing expected step %q", want)
+		}
+	}
+}
+
+func TestCompilePersonalWorkHappyPathDoesNotAddRetryWrappers(t *testing.T) {
+	enableV2ForTest(t)
+
+	dir := t.TempDir()
+	writeReviewWorkflowFixtures(t, dir)
+
+	recipe, err := Compile(context.Background(), "mol-personal-work-v2", []string{dir}, map[string]string{
+		"convoy_id":     "convoy-1",
+		"base_branch":   "main",
+		"skip_gemini":   "true",
+		"setup_command": "true",
+		"test_command":  "true",
+	})
+	if err != nil {
+		t.Fatalf("Compile: %v", err)
+	}
+
+	for _, step := range recipe.Steps {
+		if got := step.Metadata["gc.kind"]; got == "retry" {
+			t.Fatalf("personal-work happy path should not add retry control step %q", step.ID)
+		}
+		if strings.Contains(step.ID, ".attempt.") {
+			t.Fatalf("personal-work happy path should not add retry attempt step %q", step.ID)
+		}
+	}
+}
+
 func TestCompileReviewWorkflowAnnotatesNestedReviewerRetries(t *testing.T) {
 	enableV2ForTest(t)
 
@@ -1689,7 +2199,7 @@ func TestCompileReviewWorkflowAnnotatesNestedReviewerRetries(t *testing.T) {
 	writeReviewWorkflowFixtures(t, dir)
 
 	recipe, err := Compile(context.Background(), "mol-adopt-pr-v2", []string{dir}, map[string]string{
-		"issue":       "GC-1",
+		"convoy_id":   "convoy-1",
 		"pr_ref":      "refs/heads/test",
 		"skip_gemini": "false",
 	})
@@ -1732,8 +2242,12 @@ func TestCompileReviewWorkflowAnnotatesNestedReviewerRetries(t *testing.T) {
 func writeReviewWorkflowFixtures(t *testing.T, dir string) {
 	t.Helper()
 	for name, content := range map[string]string{
-		"expansion-review-pr.toml": reviewworkflows.ExpansionReviewPR,
-		"mol-adopt-pr-v2.toml":     reviewworkflows.AdoptPR,
+		"expansion-design-review.toml":      reviewworkflows.ExpansionDesignReview,
+		"expansion-review-pr.toml":          reviewworkflows.ExpansionReviewPR,
+		"expansion-design-review-lite.toml": reviewworkflows.ExpansionDesignReviewLite,
+		"expansion-review-pr-lite.toml":     reviewworkflows.ExpansionReviewPRLite,
+		"mol-adopt-pr-v2.toml":              reviewworkflows.AdoptPR,
+		"mol-personal-work-v2.toml":         reviewworkflows.PersonalWork,
 	} {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
 			t.Fatalf("write %s: %v", name, err)
@@ -1758,7 +2272,7 @@ contract = "graph.v2"
 id = "work"
 title = "Do work"
 `
-		if err := os.WriteFile(filepath.Join(dir, "needs-v2.formula.toml"), []byte(formulaContent), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(dir, "needs-v2.toml"), []byte(formulaContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1780,7 +2294,7 @@ version = 8
 id = "work"
 title = "Do work"
 `
-		if err := os.WriteFile(filepath.Join(dir, "legacy-v8.formula.toml"), []byte(formulaContent), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(dir, "legacy-v8.toml"), []byte(formulaContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1802,7 +2316,7 @@ version = 1
 id = "work"
 title = "Do work"
 `
-		if err := os.WriteFile(filepath.Join(dir, "still-v1.formula.toml"), []byte(formulaContent), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(dir, "still-v1.toml"), []byte(formulaContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1812,7 +2326,7 @@ title = "Do work"
 		}
 	})
 
-	t.Run("check syntax without graph contract stays on molecule contract", func(t *testing.T) {
+	t.Run("check syntax without compiler requirement fails closed", func(t *testing.T) {
 		formulaContent := `
 formula = "legacy-check"
 version = 1
@@ -1828,22 +2342,39 @@ max_attempts = 1
 mode = "exec"
 path = "check.sh"
 `
-		if err := os.WriteFile(filepath.Join(dir, "legacy-check.formula.toml"), []byte(formulaContent), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(dir, "legacy-check.toml"), []byte(formulaContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
-		recipe, err := Compile(context.Background(), "legacy-check", []string{dir}, nil)
-		if err != nil {
-			t.Fatalf("Compile(legacy-check): %v", err)
+		_, err := Compile(context.Background(), "legacy-check", []string{dir}, nil)
+		if err == nil {
+			t.Fatal("Compile(legacy-check) succeeded, want explicit compiler requirement error")
 		}
-		root := recipe.RootStep()
-		if root == nil {
-			t.Fatal("root step missing")
-		}
-		if root.Type != "molecule" || root.Metadata["gc.kind"] != "" {
-			t.Fatalf("root = %+v, want legacy molecule root", root)
-		}
+		requireErrorContains(t, err, "graph-only constructs")
 	})
+}
+
+func TestCompileAcceptsLegacyFormulaFilename(t *testing.T) {
+	dir := t.TempDir()
+	formulaContent := `
+formula = "legacy-name"
+version = 1
+
+[[steps]]
+id = "work"
+title = "Do work"
+`
+	if err := os.WriteFile(filepath.Join(dir, "legacy-name.formula.toml"), []byte(formulaContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := Compile(context.Background(), "legacy-name", []string{dir}, nil)
+	if err != nil {
+		t.Fatalf("Compile: %v", err)
+	}
+	if got.Name != "legacy-name" {
+		t.Fatalf("Name = %q, want legacy-name", got.Name)
+	}
 }
 
 func TestCompileValidatesRequiredVars(t *testing.T) {
@@ -1920,6 +2451,193 @@ description = "Review the {{feature}} implementation."
 		}
 		if recipe.Name != "repro-unresolved" {
 			t.Errorf("Name = %q, want %q", recipe.Name, "repro-unresolved")
+		}
+	})
+}
+
+func TestCompile_PropagatesContentHash(t *testing.T) {
+	dir := t.TempDir()
+	content := `
+formula = "mol-hash-prop"
+description = "Hash propagation test"
+
+[[steps]]
+id = "work"
+title = "Do work"
+type = "task"
+`
+	path := filepath.Join(dir, "mol-hash-prop.toml")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	recipe, err := Compile(context.Background(), "mol-hash-prop", []string{dir}, nil)
+	if err != nil {
+		t.Fatalf("Compile: %v", err)
+	}
+
+	if recipe.ContentHash == "" {
+		t.Fatal("ContentHash should propagate from Formula to Recipe")
+	}
+	if recipe.FormulaSource == "" {
+		t.Fatal("FormulaSource should propagate from Formula to Recipe")
+	}
+
+	// Verify hash matches direct computation
+	want := ContentHash([]byte(content))
+	if recipe.ContentHash != want {
+		t.Errorf("ContentHash = %q, want %q", recipe.ContentHash, want)
+	}
+}
+
+func TestCompile_PropagatesRootMetadata(t *testing.T) {
+	dir := t.TempDir()
+	content := `
+formula = "mol-metadata"
+description = "Metadata propagation test"
+
+[metadata.gc.methodology]
+interaction_modes = ["headless", "autonomous"]
+review_modes = ["report"]
+
+[[steps]]
+id = "work"
+title = "Do work"
+type = "task"
+`
+	if err := os.WriteFile(filepath.Join(dir, "mol-metadata.toml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	recipe, err := Compile(context.Background(), "mol-metadata", []string{dir}, nil)
+	if err != nil {
+		t.Fatalf("Compile: %v", err)
+	}
+
+	var got struct {
+		GC struct {
+			Methodology struct {
+				InteractionModes []string `json:"interaction_modes"`
+				ReviewModes      []string `json:"review_modes"`
+			} `json:"methodology"`
+		} `json:"gc"`
+	}
+	data, err := json.Marshal(recipe.Metadata)
+	if err != nil {
+		t.Fatalf("marshal recipe metadata: %v", err)
+	}
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("metadata has unexpected shape: %v\n%s", err, string(data))
+	}
+	if want := []string{"headless", "autonomous"}; !reflect.DeepEqual(got.GC.Methodology.InteractionModes, want) {
+		t.Fatalf("metadata.gc.methodology.interaction_modes = %+v, want %+v", got.GC.Methodology.InteractionModes, want)
+	}
+	if want := []string{"report"}; !reflect.DeepEqual(got.GC.Methodology.ReviewModes, want) {
+		t.Fatalf("metadata.gc.methodology.review_modes = %+v, want %+v", got.GC.Methodology.ReviewModes, want)
+	}
+}
+
+func TestCompile_LoopCountStringParseError(t *testing.T) {
+	dir := t.TempDir()
+	formulaContent := `
+formula = "loop-count-string"
+version = 1
+
+[vars.cups]
+description = "Cup count"
+required = true
+
+[[steps]]
+id = "brew"
+title = "Brew"
+
+[steps.loop]
+count = "{{cups}}"
+
+[[steps.loop.body]]
+id = "pour"
+title = "Pour"
+`
+	if err := os.WriteFile(filepath.Join(dir, "loop-count-string.toml"), []byte(formulaContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := Compile(context.Background(), "loop-count-string", []string{dir}, nil)
+	if err == nil {
+		t.Fatal("Compile should reject string-valued loop.count")
+	}
+	if !strings.Contains(err.Error(), "integer") {
+		t.Errorf("error = %q, want to mention 'integer'", err.Error())
+	}
+	if !strings.Contains(err.Error(), "range") {
+		t.Errorf("error = %q, want to mention 'range'", err.Error())
+	}
+}
+
+func TestApplyDrainControlMetadata(t *testing.T) {
+	t.Parallel()
+
+	t.Run("separate context defaults", func(t *testing.T) {
+		t.Parallel()
+		maxUnits := 7
+		metadata := map[string]string{"existing": "kept"}
+		ApplyDrainControlMetadata(metadata, &DrainSpec{
+			Context:  "separate",
+			Formula:  "item-formula",
+			MaxUnits: &maxUnits,
+		})
+		want := map[string]string{
+			"existing":                 "kept",
+			"gc.kind":                  "drain",
+			"gc.drain_context":         "separate",
+			"gc.drain_formula":         "item-formula",
+			"gc.drain_member_access":   "read",
+			"gc.drain_max_units":       "7",
+			"gc.drain_on_item_failure": "continue",
+		}
+		for k, v := range want {
+			if metadata[k] != v {
+				t.Errorf("metadata[%q] = %q, want %q", k, metadata[k], v)
+			}
+		}
+		if len(metadata) != len(want) {
+			t.Errorf("metadata = %v, want exactly %v", metadata, want)
+		}
+	})
+
+	t.Run("shared context defaults", func(t *testing.T) {
+		t.Parallel()
+		metadata := map[string]string{}
+		ApplyDrainControlMetadata(metadata, &DrainSpec{
+			Context:           "shared",
+			Formula:           "item-formula",
+			MemberAccess:      "exclusive",
+			OnItemFailure:     "",
+			ContinuationGroup: "lane-a",
+			Item:              &DrainItemSpec{SingleLane: true},
+		})
+		want := map[string]string{
+			"gc.kind":                     "drain",
+			"gc.drain_context":            "shared",
+			"gc.drain_formula":            "item-formula",
+			"gc.drain_member_access":      "exclusive",
+			"gc.drain_on_item_failure":    "skip_remaining",
+			"gc.drain_continuation_group": "lane-a",
+			"gc.drain_item_single_lane":   "true",
+		}
+		for k, v := range want {
+			if metadata[k] != v {
+				t.Errorf("metadata[%q] = %q, want %q", k, metadata[k], v)
+			}
+		}
+	})
+
+	t.Run("nil spec is a no-op", func(t *testing.T) {
+		t.Parallel()
+		metadata := map[string]string{"existing": "kept"}
+		ApplyDrainControlMetadata(metadata, nil)
+		if len(metadata) != 1 || metadata["existing"] != "kept" {
+			t.Errorf("metadata = %v, want unchanged", metadata)
 		}
 	})
 }

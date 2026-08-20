@@ -7,8 +7,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/citylayout"
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/citylayout"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
 
 type SessionReconcilerTraceArmStore struct {
@@ -162,7 +162,7 @@ func (s *SessionReconcilerTraceArmStore) list() (TraceArmState, error) {
 }
 
 func traceArmStatus(state TraceArmState, now time.Time) []TraceArm {
-	var out []TraceArm
+	out := make([]TraceArm, 0, len(state.Arms))
 	for _, arm := range state.Arms {
 		if !arm.ExpiresAt.IsZero() && arm.ExpiresAt.Before(now) {
 			continue

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/worker"
+	"github.com/jonbaldie/gascity/internal/worker"
 )
 
 // entryToTurn converts a provider transcript entry to a human-readable output turn.
@@ -149,9 +149,17 @@ func historySnapshotRawMessages(snapshot *worker.HistorySnapshot) ([]json.RawMes
 	}
 	rawMessages := make([]json.RawMessage, 0, len(snapshot.Entries))
 	ids := make([]string, 0, len(snapshot.Entries))
+	recordIndexes := make(map[string]int)
 	for _, entry := range snapshot.Entries {
 		if len(entry.Provenance.Raw) == 0 {
 			continue
+		}
+		if recordID := entry.Provenance.RawRecordID; recordID != "" {
+			if index, seen := recordIndexes[recordID]; seen {
+				ids[index] = entry.ID
+				continue
+			}
+			recordIndexes[recordID] = len(rawMessages)
 		}
 		rawMessages = append(rawMessages, entry.Provenance.Raw)
 		ids = append(ids, entry.ID)

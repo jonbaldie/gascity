@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/gastownhall/gascity/internal/worker"
+	"github.com/jonbaldie/gascity/internal/worker"
 )
 
 // handleSessionAgentList returns subagent mappings for a session.
@@ -12,19 +12,19 @@ import (
 //	GET /v0/session/{id}/agents
 //	Response: { "agents": [{ "agent_id": "...", "parent_tool_use_id": "..." }] }
 func (s *Server) handleSessionAgentList(w http.ResponseWriter, r *http.Request) {
-	store := s.state.CityBeadStore()
-	if store == nil {
+	store := s.state.SessionsBeadStore()
+	if store.Store == nil {
 		writeError(w, http.StatusServiceUnavailable, "unavailable", "no bead store configured")
 		return
 	}
 
-	id, err := s.resolveSessionIDAllowClosedWithConfig(store, r.PathValue("id"))
+	id, err := s.resolveSessionIDAllowClosedWithConfig(store.Store, r.PathValue("id"))
 	if err != nil {
 		writeResolveError(w, err)
 		return
 	}
 
-	handle, err := s.workerHandleForSession(store, id)
+	handle, err := s.workerHandleForSession(store.Store, id)
 	if err != nil {
 		writeSessionManagerError(w, err)
 		return
@@ -32,7 +32,7 @@ func (s *Server) handleSessionAgentList(w http.ResponseWriter, r *http.Request) 
 	mappings, err := handle.AgentMappings(r.Context())
 	if err != nil {
 		if errors.Is(err, worker.ErrHistoryUnavailable) {
-			writeJSON(w, http.StatusOK, map[string]any{"agents": []any{}})
+			writeJSON(w, http.StatusOK, sessionAgentListResponse{})
 			return
 		}
 		writeSessionManagerError(w, err)
@@ -41,11 +41,7 @@ func (s *Server) handleSessionAgentList(w http.ResponseWriter, r *http.Request) 
 	if mappings == nil {
 		mappings = []worker.AgentMapping{}
 	}
-	if len(mappings) == 0 {
-		writeJSON(w, http.StatusOK, map[string]any{"agents": []any{}})
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"agents": mappings})
+	writeJSON(w, http.StatusOK, sessionAgentListResponse{Agents: mappings})
 }
 
 // handleSessionAgentGet returns the transcript and status of a subagent.
@@ -53,13 +49,13 @@ func (s *Server) handleSessionAgentList(w http.ResponseWriter, r *http.Request) 
 //	GET /v0/session/{id}/agents/{agentId}
 //	Response: { "messages": [...], "status": "completed|running|pending|failed" }
 func (s *Server) handleSessionAgentGet(w http.ResponseWriter, r *http.Request) {
-	store := s.state.CityBeadStore()
-	if store == nil {
+	store := s.state.SessionsBeadStore()
+	if store.Store == nil {
 		writeError(w, http.StatusServiceUnavailable, "unavailable", "no bead store configured")
 		return
 	}
 
-	id, err := s.resolveSessionIDAllowClosedWithConfig(store, r.PathValue("id"))
+	id, err := s.resolveSessionIDAllowClosedWithConfig(store.Store, r.PathValue("id"))
 	if err != nil {
 		writeResolveError(w, err)
 		return
@@ -76,7 +72,7 @@ func (s *Server) handleSessionAgentGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handle, err := s.workerHandleForSession(store, id)
+	handle, err := s.workerHandleForSession(store.Store, id)
 	if err != nil {
 		writeSessionManagerError(w, err)
 		return
@@ -95,9 +91,8 @@ func (s *Server) handleSessionAgentGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Build raw message array for API pass-through (same as raw transcript).
-	writeJSON(w, http.StatusOK, map[string]any{
-		"messages": agentSession.RawMessages,
-		"status":   agentSession.Session.Status,
+	writeJSON(w, http.StatusOK, sessionAgentGetResponse{
+		Messages: agentSession.Session.RawPayloads(),
+		Status:   agentSession.Session.Status,
 	})
 }

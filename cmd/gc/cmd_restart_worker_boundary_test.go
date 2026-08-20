@@ -5,11 +5,11 @@ import (
 	"context"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/events"
-	"github.com/gastownhall/gascity/internal/runtime"
-	sessionpkg "github.com/gastownhall/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/runtime"
+	sessionpkg "github.com/jonbaldie/gascity/internal/session"
 )
 
 func intPtrRestartBoundary(n int) *int { return &n }
@@ -18,7 +18,7 @@ func TestDoRigRestartUsesWorkerBoundaryForKnownSession(t *testing.T) {
 	sp := runtime.NewFake()
 	store := beads.NewMemStore()
 	mgr := newSessionManagerWithConfig("", store, sp, nil)
-	info, err := mgr.Create(context.Background(), "frontend/worker", "Worker", "claude", t.TempDir(), "claude", nil, sessionpkg.ProviderResume{}, runtime.Config{})
+	info, err := mgr.CreateSession(context.Background(), sessionpkg.CreateOptions{Template: "frontend/worker", Title: "Worker", Command: "claude", WorkDir: t.TempDir(), Provider: "claude", Env: nil, Resume: sessionpkg.ProviderResume{}, Hints: runtime.Config{}, ExtraMeta: map[string]string{"session_origin": "manual"}})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}

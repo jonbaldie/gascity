@@ -35,13 +35,13 @@ title = "Run tests"
 needs = ["analyze"]
 ```
 
-For the file format itself, see [Formula Files](../../docs/reference/formula.md).
+For the file format itself, see [the v1 formula spec](../../docs/reference/specs/formula-spec-v1.md).
 
 ## Phase 2: Resolution
 
 `ComputeFormulaLayers()` in `internal/config/pack.go` builds ordered formula
 layers for the city and each rig. `ResolveFormulas()` in
-[`cmd/gc/formula_resolve.go`](https://github.com/gastownhall/gascity/blob/main/cmd/gc/formula_resolve.go) then:
+[`cmd/gc/formula_resolve.go`](https://github.com/jonbaldie/gascity/blob/main/cmd/gc/formula_resolve.go) then:
 
 1. scans all layers for `*.formula.toml`
 2. keeps the highest-priority file for each filename
@@ -70,9 +70,9 @@ For a production city, `BdStore` is the normal path.
 
 After instantiation, `gc sling` or order dispatch routes the molecule root:
 
-- [`cmd/gc/cmd_sling.go`](https://github.com/gastownhall/gascity/blob/main/cmd/gc/cmd_sling.go) handles explicit user
+- [`cmd/gc/cmd_sling.go`](https://github.com/jonbaldie/gascity/blob/main/cmd/gc/cmd_sling.go) handles explicit user
   dispatch
-- [`cmd/gc/order_dispatch.go`](https://github.com/gastownhall/gascity/blob/main/cmd/gc/order_dispatch.go) handles
+- [`cmd/gc/order_dispatch.go`](https://github.com/jonbaldie/gascity/blob/main/cmd/gc/order_dispatch.go) handles
   formula-backed scheduled work
 
 The routing step labels or assigns the resulting root bead so an agent or pool

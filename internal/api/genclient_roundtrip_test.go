@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/api/genclient"
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/api/genclient"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // TestGenClientRoundTripCitiesList exercises the supervisor-scope
@@ -118,6 +118,36 @@ func TestGenClientRoundTripSessionList(t *testing.T) {
 	// are valid spec responses; 500 or non-Problem-Details would not be.
 	if resp.StatusCode() != http.StatusOK && resp.StatusCode() != http.StatusServiceUnavailable {
 		t.Fatalf("unexpected status %d: %s", resp.StatusCode(), string(resp.Body))
+	}
+}
+
+func TestGenClientStreamSessionRequestSeparatesResumeCursorLocations(t *testing.T) {
+	afterCursor := "st1.snapshot+cursor/with=padding"
+	lastEventID := "st1.latest+cursor/with=padding"
+	req, err := genclient.NewStreamSessionRequest(
+		"https://example.test",
+		"alpha",
+		"gc-session-1",
+		&genclient.StreamSessionParams{
+			AfterCursor: &afterCursor,
+			LastEventID: &lastEventID,
+		},
+	)
+	if err != nil {
+		t.Fatalf("NewStreamSessionRequest: %v", err)
+	}
+
+	if got := req.URL.Query().Get("after_cursor"); got != afterCursor {
+		t.Fatalf("after_cursor query = %q, want %q", got, afterCursor)
+	}
+	if got := req.Header.Get("Last-Event-ID"); got != lastEventID {
+		t.Fatalf("Last-Event-ID header = %q, want %q", got, lastEventID)
+	}
+	if _, ok := req.URL.Query()["Last-Event-ID"]; ok {
+		t.Fatalf("Last-Event-ID unexpectedly encoded in query: %q", req.URL.RawQuery)
+	}
+	if got := req.Header.Get("after_cursor"); got != "" {
+		t.Fatalf("after_cursor unexpectedly encoded as header: %q", got)
 	}
 }
 

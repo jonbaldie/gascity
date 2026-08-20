@@ -2,6 +2,7 @@
 package nudgequeue
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,9 +12,14 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/citylayout"
-	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/jonbaldie/gascity/internal/citylayout"
+	"github.com/jonbaldie/gascity/internal/fsys"
 )
+
+// wakeSocketPathLimit caps the canonical socket path length below the
+// platform sockaddr_un limit (108 bytes on Linux, 104 on macOS). Matches
+// the controllerSocketPathLimit pattern in cmd/gc/controller.go.
+const wakeSocketPathLimit = 100
 
 // Reference links a queued nudge back to the object that produced it.
 type Reference struct {
@@ -47,6 +53,15 @@ type State struct {
 	Pending  []Item `json:"pending,omitempty"`
 	InFlight []Item `json:"in_flight,omitempty"`
 	Dead     []Item `json:"dead,omitempty"`
+
+	// DispatchSkips counts, by reason, how many times the supervisor
+	// dispatch tick's per-session loop has silently skipped a target
+	// without delivering (see dispatchAllQueuedNudges in cmd/gc). It is a
+	// running total since this state file was first created; there is no
+	// reset/rotation. Persisted here (rather than kept in-process) so it
+	// stays visible to a `gc nudge status` invocation running in a
+	// different process than the supervisor that incremented it.
+	DispatchSkips map[string]int64 `json:"dispatch_skips,omitempty"`
 }
 
 // SortState orders items deterministically inside each queue bucket.
@@ -143,4 +158,27 @@ func StatePath(cityPath string) string {
 // LockPath returns the queue state lock path for a city.
 func LockPath(cityPath string) string {
 	return citylayout.RuntimePath(cityPath, "nudges", "state.lock")
+}
+
+// WakeSocketPath returns the path to the supervisor nudge-dispatcher wake
+// socket. Producers connect to this path after enqueue to trigger immediate
+// dispatch; the supervisor listens on it when daemon.nudge_dispatcher is
+// "supervisor".
+//
+// Preserves the legacy `<city>/.gc/runtime/nudges/wake.sock` location for
+// short city paths but falls back to a deterministic short temp-path
+// when the legacy pathname is too close to the platform sockaddr_un
+// limit. Mirrors the controllerSocketPath pattern in cmd/gc/controller.go.
+func WakeSocketPath(cityPath string) string {
+	legacy := citylayout.RuntimePath(cityPath, "nudges", "wake.sock")
+	if len(legacy) <= wakeSocketPathLimit {
+		return legacy
+	}
+	canonical, err := filepath.Abs(cityPath)
+	if err != nil {
+		canonical = cityPath
+	}
+	canonical = filepath.Clean(canonical)
+	sum := sha256.Sum256([]byte(canonical))
+	return filepath.Join("/tmp", "gascity-nudge", fmt.Sprintf("%x.sock", sum[:16]))
 }

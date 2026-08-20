@@ -32,7 +32,7 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/api"
+	"github.com/jonbaldie/gascity/internal/api"
 )
 
 func main() {
@@ -44,7 +44,7 @@ func main() {
 
 func run() error {
 	// Step 1: fetch the 3.0-downgraded spec from the supervisor.
-	sm := api.NewSupervisorMux(emptyResolver{}, nil, false, "", time.Time{})
+	sm := api.NewSupervisorMux(emptyResolver{}, nil, false, "", "", time.Time{})
 	req := httptest.NewRequest(http.MethodGet, "/openapi-3.0.json", nil)
 	rec := httptest.NewRecorder()
 	sm.ServeHTTP(rec, req)

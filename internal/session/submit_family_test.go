@@ -3,7 +3,7 @@ package session
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 // TestUsesSoftEscapeInterrupt_WrappedCodex verifies that a session bead
@@ -73,6 +73,37 @@ func TestUsesImmediateDefaultSubmit_WrappedCodex(t *testing.T) {
 	}}
 	if !usesImmediateDefaultSubmit(wrapped) {
 		t.Error("wrapped codex (builtin_ancestor=codex) should use immediate default submit")
+	}
+}
+
+func TestUsesImmediateDefaultSubmit_KimiWaitsForIdle(t *testing.T) {
+	kimi := beads.Bead{Metadata: map[string]string{
+		"provider": "kimi",
+	}}
+	if usesImmediateDefaultSubmit(kimi) {
+		t.Error("kimi must use the idle-wait submit path")
+	}
+}
+
+func TestWaitsForIdleAfterInterrupt_Kimi(t *testing.T) {
+	kimi := beads.Bead{Metadata: map[string]string{
+		"provider": "kimi",
+	}}
+	if !waitsForIdleAfterInterrupt(kimi) {
+		t.Error("kimi interrupt handling should wait for idle after interrupt")
+	}
+	if !usesSoftEscapeInterrupt(kimi) {
+		t.Error("kimi interrupt handling should use soft escape")
+	}
+	wrapped := beads.Bead{Metadata: map[string]string{
+		"builtin_ancestor": "kimi",
+		"provider":         "kimi-safe",
+	}}
+	if !waitsForIdleAfterInterrupt(wrapped) {
+		t.Error("wrapped kimi should wait for idle after interrupt")
+	}
+	if !usesSoftEscapeInterrupt(wrapped) {
+		t.Error("wrapped kimi should use soft escape")
 	}
 }
 

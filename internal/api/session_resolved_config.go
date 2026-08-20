@@ -3,13 +3,15 @@ package api
 import (
 	"fmt"
 
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/runtime"
-	"github.com/gastownhall/gascity/internal/session"
-	"github.com/gastownhall/gascity/internal/worker"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/worker"
 )
 
 func resolvedSessionConfigForProvider(
+	cityPath string,
+	workspaceEnv map[string]string,
 	alias, explicitName, template, title, transport string,
 	metadata map[string]string,
 	resolved *config.ResolvedProvider,
@@ -36,6 +38,7 @@ func resolvedSessionConfigForProvider(
 	if transport == "acp" {
 		resolvedCommand = resolved.ACPCommandString()
 	}
+	sessionEnv := cityAnchoredSessionEnv(cityPath, workspaceEnv, resolved.Env)
 	return worker.NormalizeResolvedSessionConfig(worker.ResolvedSessionConfig{
 		Alias:        alias,
 		ExplicitName: explicitName,
@@ -47,14 +50,14 @@ func resolvedSessionConfigForProvider(
 			Command:    firstNonEmptyString(command, resolvedCommand, resolved.Name),
 			WorkDir:    workDir,
 			Provider:   resolved.Name,
-			SessionEnv: resolved.Env,
+			SessionEnv: sessionEnv,
 			Resume: session.ProviderResume{
 				ResumeFlag:    resolved.ResumeFlag,
 				ResumeStyle:   resolved.ResumeStyle,
 				ResumeCommand: resolved.ResumeCommand,
 				SessionIDFlag: resolved.SessionIDFlag,
 			},
-			Hints: sessionCreateHints(resolved, mcpServers),
+			Hints: sessionCreateHints(resolved, sessionEnv, mcpServers),
 		},
 	})
 }

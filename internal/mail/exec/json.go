@@ -3,7 +3,7 @@ package exec //nolint:revive // internal package, always imported with alias
 import (
 	"encoding/json"
 
-	"github.com/gastownhall/gascity/internal/mail"
+	"github.com/jonbaldie/gascity/internal/mail"
 )
 
 // sendInput is the JSON wire format sent to the script's stdin on Send.

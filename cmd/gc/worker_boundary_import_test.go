@@ -30,15 +30,13 @@ func TestGCNonTestFilesStayOnWorkerBoundary(t *testing.T) {
 		}
 		content := string(data)
 		for _, needle := range []string{
-			`"github.com/gastownhall/gascity/internal/sessionlog"`,
+			`"github.com/jonbaldie/gascity/internal/sessionlog"`,
 			"worker.NewSessionHandle(",
 			"worker.NewSessionCatalog(",
 			"worker.SessionHandle",
 			"worker.SessionSpec",
 			"worker.SessionLogAdapter{",
-			"session.NewManager(",
-			"session.NewManagerWithCityPath(",
-			"session.NewManagerWithTransportResolverAndCityPath(",
+			"session.NewManagerWithOptions(",
 			"sp.Start(ctx,",
 			"setBeadRestartRequested(",
 		} {

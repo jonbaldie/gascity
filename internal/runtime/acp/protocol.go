@@ -19,7 +19,7 @@ import (
 	"sort"
 	"sync/atomic"
 
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
 // nextID is a package-level counter for JSON-RPC request IDs.
@@ -149,8 +149,24 @@ type SessionPromptParams struct {
 
 // SessionUpdateParams is the params for "session/update" notifications.
 type SessionUpdateParams struct {
-	SessionID string         `json:"sessionId"`
-	Content   []ContentBlock `json:"content"`
+	SessionID string               `json:"sessionId"`
+	Update    SessionUpdateContent `json:"update"`
+	Content   []ContentBlock       `json:"content,omitempty"` // legacy pre-spec shape
+}
+
+// SessionUpdateContent is the ACP discriminated union for session updates.
+// The Type field ("sessionUpdate") determines which other fields are populated.
+// Content is RawMessage because gc handles chunk and tool-call variants, whose
+// schemas differ.
+type SessionUpdateContent struct {
+	Type    string          `json:"sessionUpdate"`
+	Content json.RawMessage `json:"content,omitempty"`
+	Title   string          `json:"title,omitempty"`
+}
+
+type toolCallContent struct {
+	Type    string          `json:"type"`
+	Content json.RawMessage `json:"content,omitempty"`
 }
 
 // newRequest creates a JSON-RPC request with a unique ID.

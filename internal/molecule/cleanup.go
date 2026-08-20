@@ -5,12 +5,30 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beadmeta"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads/closeorder"
 )
 
-// ListSubtree returns the root bead and all transitive parent-child
-// descendants, including already-closed beads so nested open descendants are
-// still reachable through a closed intermediate node.
+// SubtreeClosedReason is the canonical close_reason stamped on every
+// bead in a molecule subtree when CloseSubtree force-closes it. Without
+// an explicit reason of >=20 chars, bd's validation.on-close=error
+// rejects the close, the subtree stays open, and downstream cleanup
+// (sling.CloseAttachedSubtree, formula teardown, etc.) is silently
+// incomplete.
+const SubtreeClosedReason = "molecule cleanup: subtree force-closed by CloseSubtree"
+
+// ListSubtree returns the beads.MembershipRootIDAndParentClosure member set of
+// the molecule rooted at rootID: the root, every bead carrying
+// gc.root_bead_id == rootID, and the transitive parent-child closure of all of
+// them. Closed beads are included so a nested open descendant is still
+// reachable through a closed intermediate node.
+//
+// The root-id arm is load-bearing, not decorative. Teardown callers
+// (CloseSubtree, sling.CloseAttachedSubtree, formula teardown) must reach the
+// dependency-isolated members — gc.kind=spec sidecars carry no dep edges and,
+// when materialization set no parent, no parent edge either — or the subtree
+// stays half-open and cleanup reports success on an incomplete close.
 func ListSubtree(store beads.Store, rootID string) ([]beads.Bead, error) {
 	rootID = strings.TrimSpace(rootID)
 	if store == nil || rootID == "" {
@@ -25,7 +43,7 @@ func ListSubtree(store beads.Store, rootID string) ([]beads.Bead, error) {
 	out := []beads.Bead{root}
 	queue := []string{root.ID}
 
-	logicalMembers, err := store.ListByMetadata(map[string]string{"gc.root_bead_id": root.ID}, 0, beads.IncludeClosed)
+	logicalMembers, err := store.ListByMetadata(map[string]string{beadmeta.RootBeadIDMetadataKey: root.ID}, 0, beads.IncludeClosed, beads.WithBothTiers)
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +63,7 @@ func ListSubtree(store beads.Store, rootID string) ([]beads.Bead, error) {
 		parentID := queue[0]
 		queue = queue[1:]
 
-		children, err := store.Children(parentID, beads.IncludeClosed)
+		children, err := store.Children(parentID, beads.IncludeClosed, beads.WithBothTiers)
 		if err != nil {
 			return nil, err
 		}
@@ -64,10 +82,36 @@ func ListSubtree(store beads.Store, rootID string) ([]beads.Bead, error) {
 	return out, nil
 }
 
-// CloseSubtree closes the root bead and every open descendant. Descendants are
-// closed before the root so stores with stricter parent/child close rules can
-// still accept the operation.
+// CloseSubtree closes the root bead and every open descendant.
+// Descendants are closed before the root so stores with stricter
+// parent/child close rules can still accept the operation. Within the
+// open set, closes are emitted in topological order honoring "blocks"
+// dependency edges between subtree members (blockers first), so strict
+// stores do not reject a bead while its in-batch blocker is still open.
+// Parent/child depth (deepest first) is used as the tie-breaker when no
+// blocks edge constrains the order.
 func CloseSubtree(store beads.Store, rootID string) (int, error) {
+	return CloseSubtreeWithMetadata(store, rootID, map[string]string{
+		"close_reason": SubtreeClosedReason,
+	})
+}
+
+// CloseSubtreeWithMetadata closes the root bead and every open descendant,
+// stamping metadata on each newly closed bead. It preserves CloseSubtree's
+// descendant-first, blocker-first ordering and is idempotent for an already
+// closed subtree.
+func CloseSubtreeWithMetadata(store beads.Store, rootID string, metadata map[string]string) (int, error) {
+	return CloseSubtreeWithMetadataExcept(store, rootID, metadata, nil)
+}
+
+// CloseSubtreeWithMetadataExcept is CloseSubtreeWithMetadata with an exclusion
+// predicate: any member for which exclude reports true is left untouched. A nil
+// predicate closes the whole subtree.
+//
+// The exclusion exists for members that stay executable after their molecule
+// reaches a terminal state — teardown work, which by contract runs after the
+// root settles. Callers own the policy; this function only skips.
+func CloseSubtreeWithMetadataExcept(store beads.Store, rootID string, metadata map[string]string, exclude func(beads.Bead) bool) (int, error) {
 	matched, err := ListSubtree(store, rootID)
 	if err != nil {
 		return 0, err
@@ -117,10 +161,17 @@ func CloseSubtree(store beads.Store, rootID string) (int, error) {
 		if bead.ID == "" || bead.Status == "closed" {
 			continue
 		}
+		if exclude != nil && exclude(bead) {
+			continue
+		}
 		ids = append(ids, bead.ID)
 	}
 	if len(ids) == 0 {
 		return 0, nil
 	}
-	return store.CloseAll(ids, nil)
+	ordered, err := closeorder.Order(store, ids)
+	if err != nil {
+		return 0, err
+	}
+	return store.CloseAll(ordered, metadata)
 }

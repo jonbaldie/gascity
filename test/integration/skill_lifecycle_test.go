@@ -6,7 +6,7 @@
 // supervisor tick uses — materialize.Run and the
 // end-to-end catalog discovery wiring — against a real filesystem.
 // Fast (no runtime.Provider spawned) but with real os.Symlink,
-// os.Readlink, and filepath.EvalSymlinks behaviour.
+// os.Readlink, and filepath.EvalSymlinks behavior.
 //
 // The spec-called-out "full add/edit/delete lifecycle with drain/
 // restart observation" is covered in two layers:
@@ -24,8 +24,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/materialize"
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/materialize"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
 // TestSkillLifecycle_AddEditDeleteRename walks a city-pack skill

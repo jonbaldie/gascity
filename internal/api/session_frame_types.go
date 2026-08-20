@@ -2,10 +2,11 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/runtime"
 )
 
 // Session transcript wire types.
@@ -55,16 +56,71 @@ func wrapRawFrameBytes(values []json.RawMessage) []SessionRawMessageFrame {
 	return out
 }
 
-// MarshalJSON emits Raw verbatim if set; otherwise json.Marshal(Value).
-// Emits `null` when both are empty.
+// MarshalJSON emits valid Raw verbatim if set; otherwise json.Marshal(Value).
+// Some provider transcript sources have historically produced frames with
+// literal control characters inside JSON strings. Repair that producer bug at
+// the API boundary so SSE streams never emit malformed JSON. Emits `null`
+// when both are empty.
 func (f SessionRawMessageFrame) MarshalJSON() ([]byte, error) {
 	if len(f.Raw) > 0 {
-		return f.Raw, nil
+		if json.Valid(f.Raw) {
+			return f.Raw, nil
+		}
+		if repaired := escapeRawControlsInJSONStringLiterals(f.Raw); json.Valid(repaired) {
+			return repaired, nil
+		}
+		return nil, fmt.Errorf("invalid raw session frame JSON")
 	}
 	if f.Value == nil {
 		return []byte("null"), nil
 	}
 	return json.Marshal(f.Value)
+}
+
+func escapeRawControlsInJSONStringLiterals(raw []byte) []byte {
+	out := make([]byte, 0, len(raw))
+	inString := false
+	escaped := false
+
+	for _, b := range raw {
+		if inString {
+			if escaped {
+				escaped = false
+				out = append(out, b)
+				continue
+			}
+
+			switch b {
+			case '\\':
+				escaped = true
+				out = append(out, b)
+			case '"':
+				inString = false
+				out = append(out, b)
+			case '\n':
+				out = append(out, '\\', 'n')
+			case '\r':
+				out = append(out, '\\', 'r')
+			case '\t':
+				out = append(out, '\\', 't')
+			default:
+				if b < 0x20 {
+					const hex = "0123456789abcdef"
+					out = append(out, '\\', 'u', '0', '0', hex[b>>4], hex[b&0x0f])
+				} else {
+					out = append(out, b)
+				}
+			}
+			continue
+		}
+
+		if b == '"' {
+			inString = true
+		}
+		out = append(out, b)
+	}
+
+	return out
 }
 
 // UnmarshalJSON stashes the raw JSON into Raw so round-tripping
@@ -95,7 +151,8 @@ func (SessionRawMessageFrame) Schema(r huma.Registry) *huma.Schema {
 
 // SessionStreamCommonEvent is a documentation-only union over the
 // lifecycle/state events emitted on the session SSE stream
-// (SessionActivityEvent, runtime.PendingInteraction, HeartbeatEvent).
+// (SessionActivityEvent, runtime.PendingInteraction,
+// SessionPendingClearedEvent, HeartbeatEvent).
 // The wire shape of each variant is unchanged; this type exists purely
 // to give downstream consumers a single schema name that groups the
 // non-message events the stream can emit.
@@ -109,6 +166,7 @@ func (SessionStreamCommonEvent) Schema(r huma.Registry) *huma.Schema {
 		variants := []reflect.Type{
 			reflect.TypeOf(SessionActivityEvent{}),
 			reflect.TypeOf(runtime.PendingInteraction{}),
+			reflect.TypeOf(SessionPendingClearedEvent{}),
 			reflect.TypeOf(HeartbeatEvent{}),
 		}
 		oneOf := make([]*huma.Schema, len(variants))
@@ -117,7 +175,7 @@ func (SessionStreamCommonEvent) Schema(r huma.Registry) *huma.Schema {
 		}
 		r.Map()[name] = &huma.Schema{
 			Title:       "Session stream lifecycle event",
-			Description: "Non-message events emitted on the session SSE stream: activity transitions, pending interactions, and keepalive heartbeats. The concrete variant is identified by the SSE event name.",
+			Description: "Non-message events emitted on the session SSE stream: activity transitions, pending-interaction lifecycle updates, and keepalive heartbeats. The concrete variant is identified by the SSE event name.",
 			OneOf:       oneOf,
 		}
 	}

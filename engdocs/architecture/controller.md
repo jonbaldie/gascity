@@ -3,7 +3,7 @@ title: "Controller"
 ---
 
 
-> Last verified against code: 2026-03-01
+> Last verified against code: 2026-08-03
 
 ## Summary
 
@@ -53,7 +53,7 @@ automations, and garbage-collects expired wisps.
 
 The controller is implemented entirely in `cmd/gc/` as a set of
 collaborating functions and interfaces -- not as a standalone package.
-It composes primitives (Agent Protocol, Config, Event Bus, Beads, Prompts)
+It composes primitives (Session, Config, Event Bus, Beads, Prompts)
 into the runtime orchestration loop.
 
 ### Data Flow
@@ -83,11 +83,12 @@ gc start --foreground
   │           └─ ticker loop:
   │                 ├─ if dirty: tryReloadConfig() + rebuild trackers
   │                 ├─ buildAgents(cfg)  →  evaluate pools in parallel
-  │                 ├─ doReconcileAgents()
+  │                 ├─ reconcileSessionBeads()
   │                 ├─ wispGC.runGC()
   │                 └─ orderDispatcher.dispatch()
   │
   └─ shutdown:
+        ├─ orderDispatcher.drain(ctx) →  wait for in-flight order goroutines
         ├─ gracefulStopAll()         →  interrupt → wait → kill
         ├─ record controller.stopped event
         └─ release lock + remove socket + pid
@@ -110,8 +111,8 @@ Each tick of `controllerLoop()` (`cmd/gc/controller.go:268-320`) performs:
    individually. Each agent gets its environment, prompt, hooks, overlay,
    and session setup expanded.
 
-3. **Reconciliation** (`doReconcileAgents()`): Declarative convergence --
-   make running sessions match the desired list. See
+3. **Reconciliation** (`reconcileSessionBeads()`): Declarative convergence --
+   make session beads and running sessions match the desired list. See
    [Health Patrol](health-patrol.md) for the reconciliation state machine,
    crash loop quarantine, and idle tracking details.
 
@@ -178,9 +179,17 @@ indicate bugs.
   goroutines. Results are processed sequentially after `wg.Wait()`.
 
 - **Supervisor-managed and standalone runtimes share reconciliation code**:
-  `CityRuntime.run()` and `doReconcileAgents()` power both the
+  `CityRuntime.run()` and `reconcileSessionBeads()` power both the
   machine-wide supervisor path and the hidden standalone
   `gc start --foreground` path.
+
+- **Controller hosting identity is process-authored**: Every
+  `startControllerSocket()` caller declares whether the serving process is
+  the machine-wide supervisor or the hidden standalone controller. The typed
+  `identify` command returns that hosting mode with the process PID. The
+  legacy `ping` command remains a numeric PID for mixed-version compatibility;
+  clients may use it for liveness but must leave ambiguous legacy hosting
+  unknown rather than silently labeling it standalone.
 
 - **Graceful shutdown sends Interrupt before Stop**: `gracefulStopAll()`
   always sends `Interrupt()` to all sessions before sleeping
@@ -234,7 +243,8 @@ All controller implementation lives in `cmd/gc/`:
 | `cmd/gc/cmd_supervisor.go` | Machine-wide supervisor lifecycle, registry reconciliation, API hosting, and child `CityRuntime` management |
 | `cmd/gc/cmd_stop.go` | `cmdStop()`, `tryStopController()` (Unix socket IPC), `doStop()`, `gracefulStopAll()` |
 | `cmd/gc/cmd_suspend.go` | `doSuspendCity()` (sets `workspace.suspended` in TOML), `citySuspended()`, `isAgentEffectivelySuspended()` |
-| `cmd/gc/reconcile.go` | `reconcileOps` interface, `doReconcileAgents()` (4-state reconciliation + parallel starts + orphan cleanup) |
+| `cmd/gc/session_reconciler.go` | `reconcileSessionBeads()` bead-driven state machine for desired/live convergence, orphan/suspended drains, crash handling, idle drains, and config-drift repair |
+| `cmd/gc/session_lifecycle_parallel.go` | Dependency-aware bounded parallel session starts and force-stops |
 | `cmd/gc/pool.go` | `evaluatePool()`, `poolAgents()`, `expandSessionSetup()`, `expandDirTemplate()` |
 | `cmd/gc/providers.go` | `newSessionProvider()`, `beadsProvider()`, `newMailProvider()`, `newEventsProvider()` |
 | `cmd/gc/beads_provider_lifecycle.go` | `ensureBeadsProvider()`, `shutdownBeadsProvider()`, `initBeadsForDir()` |
@@ -304,7 +314,8 @@ Controller tests use in-memory fakes and require no external infrastructure:
 | Test file | Coverage |
 |---|---|
 | `cmd/gc/controller_test.go` | Controller loop tick behavior, config reload, dirty flag, fsnotify debounce, tracker rebuild on reload, order dispatch integration |
-| `cmd/gc/reconcile_test.go` | All reconciliation states, parallel starts, zombie capture, crash quarantine integration, idle restart, pool drain, suspended agent handling, orphan cleanup |
+| `cmd/gc/session_reconciler_test.go` | Session reconciliation states, zombie capture, crash quarantine integration, idle drains, pool drain, suspended session handling, orphan cleanup |
+| `cmd/gc/session_lifecycle_parallel_test.go` | Dependency-aware bounded parallel starts and force-stops |
 | `cmd/gc/pool_test.go` | `evaluatePool()` (clamping, error handling), `poolAgents()` (naming, deep-copy), `expandSessionSetup()`, `expandDirTemplate()` |
 | `cmd/gc/formula_resolve_test.go` | Layer priority, symlink creation/update/cleanup, idempotence, real file preservation |
 | `cmd/gc/wisp_gc_test.go` | TTL-based purging, `shouldRun()` interval, empty list handling |
@@ -334,9 +345,10 @@ testing philosophy and tier boundaries.
   until all checks complete. A hung `check` command blocks the entire
   reconciliation cycle. There is no per-check timeout.
 
-- **Socket probes are for discovery, not liveness**: Per-city controller
-  status uses `controller.sock` ping responses, and supervisor status uses
-  `supervisor.sock`. Liveness still comes from `flock` for singleton
+- **Socket probes are for discovery, not sole liveness authority**: Per-city
+  controller status uses the typed `controller.sock` `identify` response and
+  retains numeric `ping` as a legacy liveness fallback; supervisor status uses
+  `supervisor.sock`. Singleton authority still comes from `flock` for
   control loops and `runtime.Provider.IsRunning()` for agents.
 
 - **Unix socket has no authentication**: Any local process with filesystem
@@ -356,13 +368,16 @@ testing philosophy and tier boundaries.
   crash loop quarantine, idle tracking, and order dispatch details
 - [Architecture glossary](glossary.md) -- authoritative definitions
   of controller, pool, provider, rig, and other terms used in this doc
-- [Config struct definitions](https://github.com/gastownhall/gascity/blob/main/internal/config/config.go) --
+- [Config struct definitions](https://github.com/jonbaldie/gascity/blob/main/internal/config/config.go) --
   `DaemonConfig`, `City`, `Agent`, `PoolConfig` struct fields and defaults
-- [Runtime Provider interface](https://github.com/gastownhall/gascity/blob/main/internal/runtime/runtime.go) --
+- [Runtime Provider interface](https://github.com/jonbaldie/gascity/blob/main/internal/runtime/runtime.go) --
   the provider interface that the controller uses for all session operations
 - [Orders architecture](orders.md) -- trigger types, dispatch
   model, and order configuration
 - [Formulas architecture](formulas.md) -- formula resolution, layering,
   and symlink materialization
-- [Nine Concepts overview](nine-concepts.md) -- how the controller relates
-  to the five primitives and four derived mechanisms
+- [Primitives](../../docs/getting-started/how-gas-city-works.md) -- the six-primitive user-facing model
+  the controller serves (Agent, Bead, Formula, Rig, Pack, Event)
+- [Code-layering View](nine-concepts.md) -- the deeper
+  implementation-layering reference mapping the code substrate onto the six
+  primitives

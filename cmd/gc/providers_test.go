@@ -2,15 +2,19 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/agent"
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/agent"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/session"
 )
 
 func TestTmuxConfigFromSessionDefaultsSocketToCityName(t *testing.T) {
@@ -75,6 +79,61 @@ func TestRawBeadsProviderNormalizesManagedExecEnv(t *testing.T) {
 	}
 }
 
+type apiMailCacheCountingStore struct {
+	*beads.MemStore
+	mu               sync.Mutex
+	sessionListCalls int
+}
+
+func (s *apiMailCacheCountingStore) List(query beads.ListQuery) ([]beads.Bead, error) {
+	if query.Label == session.LabelSession && len(query.Metadata) == 0 {
+		s.mu.Lock()
+		s.sessionListCalls++
+		s.mu.Unlock()
+	}
+	return s.MemStore.List(query)
+}
+
+func (s *apiMailCacheCountingStore) sessionListCallCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.sessionListCalls
+}
+
+func TestNewMailProviderUsesCachedBeadmailProvider(t *testing.T) {
+	t.Setenv("GC_MAIL", "")
+	store := &apiMailCacheCountingStore{MemStore: beads.NewMemStore()}
+	if _, err := store.Create(beads.Bead{
+		Type:   session.BeadType,
+		Labels: []string{session.LabelSession},
+		Metadata: map[string]string{
+			"alias":         "worker-a",
+			"alias_history": "old-route",
+			"session_name":  "wf__a",
+		},
+	}); err != nil {
+		t.Fatalf("Create session: %v", err)
+	}
+	provider := newMailProvider(store)
+	for _, recipient := range []string{"old-route", "old-route", "old-route"} {
+		if _, err := provider.Inbox(recipient); err != nil {
+			t.Fatalf("Inbox(%q): %v", recipient, err)
+		}
+	}
+	if got := store.sessionListCallCount(); got != 1 {
+		t.Fatalf("broad gc:session List calls = %d, want 1 from cached API mail provider", got)
+	}
+}
+
+func TestRawBeadsProviderNormalizesLegacyManagedExecEnv(t *testing.T) {
+	cityPath := t.TempDir()
+	t.Setenv("GC_BEADS", "exec:"+filepath.Join(cityPath, ".gc", "scripts", "gc-beads-bd.sh"))
+
+	if got := rawBeadsProvider(cityPath); got != "bd" {
+		t.Fatalf("rawBeadsProvider() = %q, want bd", got)
+	}
+}
+
 func TestRawBeadsProviderPreservesCustomExecOverride(t *testing.T) {
 	t.Setenv("GC_BEADS", "exec:/tmp/custom-beads")
 
@@ -128,6 +187,9 @@ provider = "exec:/tmp/custom-beads"
 	if got := rawBeadsProviderForScope(rigDir, cityDir); got != "exec:/tmp/custom-beads" {
 		t.Fatalf("rawBeadsProviderForScope() = %q, want custom exec provider", got)
 	}
+	if got := authoritativeBeadsProviderForScope(rigDir, cityDir); got != "exec:/tmp/custom-beads" {
+		t.Fatalf("authoritativeBeadsProviderForScope() = %q, want custom exec provider", got)
+	}
 }
 
 func TestRawBeadsProviderForScopeKeepsSessionOverrideScoped(t *testing.T) {
@@ -153,8 +215,14 @@ provider = "file"
 	if got := rawBeadsProviderForScope(rigDir, cityDir); got != "bd" {
 		t.Fatalf("rawBeadsProviderForScope(rig) = %q, want bd", got)
 	}
+	if got := authoritativeBeadsProviderForScope(rigDir, cityDir); got != "bd" {
+		t.Fatalf("authoritativeBeadsProviderForScope(rig) = %q, want scope-pinned bd override", got)
+	}
 	if got := rawBeadsProviderForScope(cityDir, cityDir); got != "file" {
 		t.Fatalf("rawBeadsProviderForScope(city) = %q, want file outside scoped override", got)
+	}
+	if got := beadsProvider(cityDir); got != "file" {
+		t.Fatalf("beadsProvider(city) = %q, want file outside scoped override", got)
 	}
 }
 
@@ -210,6 +278,59 @@ provider = "file"
 	}
 }
 
+// TestRawBeadsProviderForScopeDetectsBdMetadataAtCityRoot reproduces dr-h6ze:
+// a city's own root can host a Dolt-backed HQ store even though [beads]
+// provider declares "file" as the default for rigs. Regression for the
+// samePath(scopeRoot, cityPath) shortcut that returned the configured/ambient
+// default for city-root scope without ever consulting the on-disk store
+// marker -- a bead whose prefix resolves to the city root (e.g. the HQ
+// prefix) was silently pointed at the wrong backend and could never be found.
+func TestAuthoritativeBeadsProviderForScopeDetectsBdMetadataAtCityRootDespiteAmbientFile(t *testing.T) {
+	cityDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(cityDir, ".beads"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cityDir, "city.toml"), []byte(`[workspace]
+name = "hq-demo"
+
+[beads]
+provider = "file"
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cityDir, ".beads", "metadata.json"), []byte(`{"database":"dolt","backend":"dolt","dolt_mode":"server","dolt_database":"gc"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	setScopedBeadsProviderForTest(t, "", "file")
+
+	if got := authoritativeBeadsProviderForScope(cityDir, cityDir); got != "bd" {
+		t.Fatalf("authoritativeBeadsProviderForScope(cityRoot) = %q, want bd metadata to outrank unscoped ambient GC_BEADS=file", got)
+	}
+	if got := rawBeadsProviderForScope(cityDir, cityDir); got != "file" {
+		t.Fatalf("rawBeadsProviderForScope(cityRoot) = %q, want caller-scope GC_BEADS=file semantics preserved", got)
+	}
+}
+
+// TestRawBeadsProviderForScopeCityRootWithoutMarkersKeepsConfiguredDefault is
+// the regression guard alongside the fix above: a city root that carries no
+// on-disk store marker at all (the common case -- no separate HQ Dolt store)
+// must keep resolving to the configured/ambient default exactly as before.
+func TestRawBeadsProviderForScopeCityRootWithoutMarkersKeepsConfiguredDefault(t *testing.T) {
+	cityDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(cityDir, "city.toml"), []byte(`[workspace]
+name = "plain-demo"
+
+[beads]
+provider = "file"
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := rawBeadsProviderForScope(cityDir, cityDir); got != "file" {
+		t.Fatalf("rawBeadsProviderForScope(cityRoot) = %q, want configured file default preserved when no store marker exists", got)
+	}
+}
+
 func TestConfiguredACPSessionNames_UsesProvidedSnapshot(t *testing.T) {
 	snapshot := newSessionBeadSnapshot([]beads.Bead{{
 		Type:   sessionBeadType,
@@ -242,7 +363,7 @@ func TestConfiguredACPSessionNames_UsesProvidedSnapshot(t *testing.T) {
 	}
 }
 
-func TestSessionBeadSnapshotFindSessionNameByNamedIdentity(t *testing.T) {
+func TestSessionBeadSnapshotFindInfoByNamedIdentity(t *testing.T) {
 	snapshot := newSessionBeadSnapshot([]beads.Bead{{
 		Type:   sessionBeadType,
 		Labels: []string{sessionBeadLabel},
@@ -253,8 +374,12 @@ func TestSessionBeadSnapshotFindSessionNameByNamedIdentity(t *testing.T) {
 		},
 	}})
 
-	if got := snapshot.FindSessionNameByNamedIdentity("reviewer"); got != "custom-reviewer" {
-		t.Fatalf("FindSessionNameByNamedIdentity(reviewer) = %q, want %q", got, "custom-reviewer")
+	info, ok := snapshot.FindInfoByNamedIdentity("reviewer")
+	if !ok {
+		t.Fatal("FindInfoByNamedIdentity(reviewer) = false, want the seeded session")
+	}
+	if got := strings.TrimSpace(info.SessionNameMetadata); got != "custom-reviewer" {
+		t.Fatalf("FindInfoByNamedIdentity(reviewer) session_name = %q, want %q", got, "custom-reviewer")
 	}
 }
 
@@ -390,6 +515,175 @@ func TestConfiguredACPRouteNames_IncludeLegacyObservedCustomACPProviderSessionsW
 	}
 }
 
+// TestResolveProviderForACPTransport_PrefersResolvedProviderCache proves the
+// cache-first path (ga-soqo5g): the raw ProviderSpec here has no ACP fields
+// at all, so a fresh chain-walk would never produce an ACP-capable result.
+// The populated ResolvedProviders cache entry deliberately diverges from the
+// raw spec — if the function returns ACP, it read the cache, not the spec.
+func TestResolveProviderForACPTransport_PrefersResolvedProviderCache(t *testing.T) {
+	cfg := &config.City{
+		Providers: map[string]config.ProviderSpec{
+			"custom": {Command: "custom-cli"},
+		},
+		ResolvedProviders: map[string]config.ResolvedProvider{
+			"custom": {
+				Name:        "custom",
+				SupportsACP: true,
+				ACPCommand:  "/bin/echo",
+				ACPArgs:     []string{"acp"},
+			},
+		},
+	}
+	got := resolveProviderForACPTransport(cfg, "custom")
+	if got == nil || got.ProviderSessionCreateTransport() != "acp" {
+		t.Fatalf("resolveProviderForACPTransport = %+v, want cached ACP-capable provider", got)
+	}
+}
+
+// TestResolveProviderForACPTransport_FallsBackWhenNoCache keeps Phase A
+// configs working: when ResolvedProviders is unpopulated, the raw
+// config.ResolveProvider chain-walk still runs and produces the same answer
+// it always has.
+func TestResolveProviderForACPTransport_FallsBackWhenNoCache(t *testing.T) {
+	cfg := &config.City{
+		Workspace: config.Workspace{Name: "test-city"},
+		Providers: map[string]config.ProviderSpec{
+			"opencode": {
+				Command:     "/bin/echo",
+				SupportsACP: boolPtr(true),
+				ACPCommand:  "/bin/echo",
+				ACPArgs:     []string{"acp"},
+			},
+		},
+	}
+	got := resolveProviderForACPTransport(cfg, "opencode")
+	if got == nil || got.ProviderSessionCreateTransport() != "acp" {
+		t.Fatalf("resolveProviderForACPTransport = %+v, want raw-resolved ACP-capable provider", got)
+	}
+}
+
+// TestAgentSessionCreateTransport_PrefersResolvedProviderCache mirrors
+// TestResolveProviderForACPTransport_PrefersResolvedProviderCache for the
+// agent-level entry point.
+func TestAgentSessionCreateTransport_PrefersResolvedProviderCache(t *testing.T) {
+	cfg := &config.City{
+		Providers: map[string]config.ProviderSpec{
+			"custom": {Command: "custom-cli"},
+		},
+		ResolvedProviders: map[string]config.ResolvedProvider{
+			"custom": {
+				Name:        "custom",
+				SupportsACP: true,
+				ACPCommand:  "/bin/echo",
+				ACPArgs:     []string{"acp"},
+			},
+		},
+	}
+	got := agentSessionCreateTransport(cfg, config.Agent{Provider: "custom"})
+	if got != "acp" {
+		t.Fatalf("agentSessionCreateTransport = %q, want acp (from cache)", got)
+	}
+}
+
+// TestAgentSessionCreateTransport_UsesWorkspaceProviderWhenAgentHasNoOverride
+// proves the cache lookup falls back to the workspace-level provider name
+// (matching ResolveProvider's own name-resolution order) when the agent
+// itself has no per-agent Provider override.
+func TestAgentSessionCreateTransport_UsesWorkspaceProviderWhenAgentHasNoOverride(t *testing.T) {
+	cfg := &config.City{
+		Workspace: config.Workspace{Provider: "custom"},
+		Providers: map[string]config.ProviderSpec{
+			"custom": {Command: "custom-cli"},
+		},
+		ResolvedProviders: map[string]config.ResolvedProvider{
+			"custom": {
+				Name:        "custom",
+				SupportsACP: true,
+				ACPCommand:  "/bin/echo",
+				ACPArgs:     []string{"acp"},
+			},
+		},
+	}
+	got := agentSessionCreateTransport(cfg, config.Agent{})
+	if got != "acp" {
+		t.Fatalf("agentSessionCreateTransport = %q, want acp (from cache via workspace provider)", got)
+	}
+}
+
+// TestAgentSessionCreateTransport_FallsBackWhenNoCache is
+// TestResolveProviderForACPTransport_FallsBackWhenNoCache for the
+// agent-level entry point.
+func TestAgentSessionCreateTransport_FallsBackWhenNoCache(t *testing.T) {
+	cfg := &config.City{
+		Providers: map[string]config.ProviderSpec{
+			"opencode": {
+				Command:     "/bin/echo",
+				SupportsACP: boolPtr(true),
+				ACPCommand:  "/bin/echo",
+				ACPArgs:     []string{"acp"},
+			},
+		},
+	}
+	got := agentSessionCreateTransport(cfg, config.Agent{Provider: "opencode"})
+	if got != "acp" {
+		t.Fatalf("agentSessionCreateTransport = %q, want acp (raw fallback)", got)
+	}
+}
+
+// TestAgentSessionCreateTransport_SkipsCacheForStartCommandEscapeHatch proves
+// an agent using the StartCommand escape hatch (ResolveProvider's step 1,
+// which bypasses provider-catalog/cache resolution entirely and constructs a
+// synthetic ResolvedProvider with SupportsACP left at its zero value) is not
+// short-circuited into reading an unrelated cache entry for its Provider
+// name. Session is left empty so the decision routes through the resolved
+// provider rather than an explicit per-agent override.
+func TestAgentSessionCreateTransport_SkipsCacheForStartCommandEscapeHatch(t *testing.T) {
+	cfg := &config.City{
+		ResolvedProviders: map[string]config.ResolvedProvider{
+			"custom": {Name: "custom", SupportsACP: true, ACPCommand: "/bin/echo", ACPArgs: []string{"acp"}},
+		},
+	}
+	got := agentSessionCreateTransport(cfg, config.Agent{Provider: "custom", StartCommand: "/bin/my-agent"})
+	if got != "" {
+		t.Fatalf("agentSessionCreateTransport = %q, want \"\" (StartCommand escape hatch must bypass provider/cache resolution)", got)
+	}
+}
+
+// TestAgentSessionCreateTransport_CachedMatchesRawForOverrideAgent is the
+// bead's equivalence check: the cached path and the raw config.ResolveProvider
+// path must agree for an agent with its own Provider override, given a cache
+// entry that mirrors what BuildResolvedProviderCache would actually produce
+// for the same spec.
+func TestAgentSessionCreateTransport_CachedMatchesRawForOverrideAgent(t *testing.T) {
+	providers := map[string]config.ProviderSpec{
+		"opencode": {
+			Command:     "/bin/echo",
+			SupportsACP: boolPtr(true),
+			ACPCommand:  "/bin/echo",
+			ACPArgs:     []string{"acp"},
+		},
+	}
+	agentCfg := config.Agent{Provider: "opencode", Name: "myagent"}
+
+	rawCfg := &config.City{Providers: providers}
+	rawGot := agentSessionCreateTransport(rawCfg, agentCfg)
+
+	cachedCfg := &config.City{
+		Providers: providers,
+		ResolvedProviders: map[string]config.ResolvedProvider{
+			"opencode": {Name: "opencode", SupportsACP: true, ACPCommand: "/bin/echo", ACPArgs: []string{"acp"}},
+		},
+	}
+	cachedGot := agentSessionCreateTransport(cachedCfg, agentCfg)
+
+	if rawGot != cachedGot {
+		t.Fatalf("cached path = %q, raw path = %q; want equal", cachedGot, rawGot)
+	}
+	if cachedGot != "acp" {
+		t.Fatalf("agentSessionCreateTransport = %q, want acp", cachedGot)
+	}
+}
+
 func TestNewSessionProvider_PreregistersACPBeadAndLegacyNames(t *testing.T) {
 	t.Setenv("GC_BEADS", "file")
 	t.Setenv("GC_SESSION", "fake")
@@ -414,7 +708,10 @@ func TestNewSessionProvider_PreregistersACPBeadAndLegacyNames(t *testing.T) {
 		t.Fatalf("Create(session bead): %v", err)
 	}
 
-	sp := newSessionProvider()
+	sp, err := newSessionProvider()
+	if err != nil {
+		t.Fatalf("newSessionProvider: %v", err)
+	}
 
 	if err := sp.Attach("custom-reviewer"); err == nil || !strings.Contains(err.Error(), "ACP transport") {
 		t.Fatalf("Attach(custom-reviewer) error = %v, want ACP transport error", err)
@@ -431,6 +728,159 @@ func TestNewSessionProvider_PreregistersACPBeadAndLegacyNames(t *testing.T) {
 	}
 }
 
+func TestEventsProviderNameUsesMergedCityConfig(t *testing.T) {
+	cityDir := t.TempDir()
+	t.Setenv("GC_EVENTS", "")
+	t.Setenv("GC_CITY", cityDir)
+	t.Setenv("GC_CITY_PATH", "")
+	t.Setenv("GC_CITY_ROOT", "")
+	t.Setenv("GC_RIG", "")
+
+	oldCityFlag, oldRigFlag := cityFlag, rigFlag
+	cityFlag, rigFlag = "", ""
+	t.Cleanup(func() {
+		cityFlag = oldCityFlag
+		rigFlag = oldRigFlag
+	})
+
+	if err := os.WriteFile(filepath.Join(cityDir, "city.toml"), []byte(`
+include = ["infra.toml"]
+
+[workspace]
+name = "test-city"
+
+[events]
+provider = "fake"
+`), 0o644); err != nil {
+		t.Fatalf("write city.toml: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(cityDir, "infra.toml"), []byte(`
+[events]
+provider = "fail"
+`), 0o644); err != nil {
+		t.Fatalf("write infra.toml: %v", err)
+	}
+
+	if got := eventsProviderName(); got != "fail" {
+		t.Fatalf("eventsProviderName() = %q, want included provider %q", got, "fail")
+	}
+}
+
+func TestOpenCityEventsProviderUsesMergedCityConfig(t *testing.T) {
+	cityDir := t.TempDir()
+	t.Setenv("GC_EVENTS", "")
+	t.Setenv("GC_CITY", cityDir)
+	t.Setenv("GC_CITY_PATH", "")
+	t.Setenv("GC_CITY_ROOT", "")
+	t.Setenv("GC_RIG", "")
+
+	oldCityFlag, oldRigFlag := cityFlag, rigFlag
+	cityFlag, rigFlag = "", ""
+	t.Cleanup(func() {
+		cityFlag = oldCityFlag
+		rigFlag = oldRigFlag
+	})
+
+	if err := os.WriteFile(filepath.Join(cityDir, "city.toml"), []byte(`
+include = ["infra.toml"]
+
+[workspace]
+name = "test-city"
+
+[events]
+provider = "fail"
+`), 0o644); err != nil {
+		t.Fatalf("write city.toml: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(cityDir, "infra.toml"), []byte(`
+[events]
+provider = "fake"
+`), 0o644); err != nil {
+		t.Fatalf("write infra.toml: %v", err)
+	}
+
+	var stderr strings.Builder
+	ep, code := openCityEventsProvider(&stderr, "test")
+	if code != 0 || ep == nil {
+		t.Fatalf("openCityEventsProvider() code = %d, provider nil = %t, stderr = %q", code, ep == nil, stderr.String())
+	}
+	t.Cleanup(func() { _ = ep.Close() })
+
+	if _, err := ep.List(events.Filter{}); err != nil {
+		t.Fatalf("openCityEventsProvider() did not use included fake provider: %v", err)
+	}
+}
+
+func TestEventsProviderNamePrefersEnvOverCityConfig(t *testing.T) {
+	cityDir := t.TempDir()
+	t.Setenv("GC_EVENTS", "fake")
+	t.Setenv("GC_CITY", cityDir)
+	t.Setenv("GC_CITY_PATH", "")
+	t.Setenv("GC_CITY_ROOT", "")
+	t.Setenv("GC_RIG", "")
+
+	oldCityFlag, oldRigFlag := cityFlag, rigFlag
+	cityFlag, rigFlag = "", ""
+	t.Cleanup(func() {
+		cityFlag = oldCityFlag
+		rigFlag = oldRigFlag
+	})
+
+	if err := os.WriteFile(filepath.Join(cityDir, "city.toml"), []byte(`
+[workspace]
+name = "test-city"
+
+[events]
+provider = "fail"
+`), 0o644); err != nil {
+		t.Fatalf("write city.toml: %v", err)
+	}
+
+	if got := eventsProviderName(); got != "fake" {
+		t.Fatalf("eventsProviderName() = %q, want env provider %q", got, "fake")
+	}
+}
+
+func TestEventsProviderNameFallsBackOnMalformedCityTOML(t *testing.T) {
+	cityDir := t.TempDir()
+	t.Setenv("GC_EVENTS", "")
+	t.Setenv("GC_CITY", cityDir)
+	t.Setenv("GC_CITY_PATH", "")
+	t.Setenv("GC_CITY_ROOT", "")
+	t.Setenv("GC_RIG", "")
+
+	oldCityFlag, oldRigFlag := cityFlag, rigFlag
+	cityFlag, rigFlag = "", ""
+	t.Cleanup(func() {
+		cityFlag = oldCityFlag
+		rigFlag = oldRigFlag
+	})
+
+	if err := os.WriteFile(filepath.Join(cityDir, "city.toml"), []byte(`invalid ][`), 0o644); err != nil {
+		t.Fatalf("write city.toml: %v", err)
+	}
+
+	if got := eventsProviderName(); got != "" {
+		t.Fatalf("eventsProviderName() = %q, want empty fallback", got)
+	}
+}
+
+func TestNewSessionProviderForCityByName_UsesFirstClassT3Bridge(t *testing.T) {
+	sp, err := newSessionProviderForCityByName(nil, "t3bridge", config.SessionConfig{}, "city", t.TempDir())
+	if err != nil {
+		t.Fatalf("newSessionProviderForCityByName(t3bridge): %v", err)
+	}
+	assertProviderPkg(t, sp, "t3bridge")
+}
+
+func TestNewSessionProviderForCityByName_LegacyExecT3BridgeStillMapsNative(t *testing.T) {
+	sp, err := newSessionProviderForCityByName(nil, "exec:/tmp/gc-session-t3", config.SessionConfig{}, "city", t.TempDir())
+	if err != nil {
+		t.Fatalf("newSessionProviderForCityByName(exec gc-session-t3): %v", err)
+	}
+	assertProviderPkg(t, sp, "t3bridge")
+}
+
 func TestNewSessionProvider_PreregistersACPNamedSessionRuntimeName(t *testing.T) {
 	t.Setenv("GC_BEADS", "file")
 	t.Setenv("GC_SESSION", "fake")
@@ -439,7 +889,10 @@ func TestNewSessionProvider_PreregistersACPNamedSessionRuntimeName(t *testing.T)
 	t.Setenv("GC_CITY", cityDir)
 	writeACPNamedSessionRouteCityTOML(t, cityDir, "test-city")
 
-	sp := newSessionProvider()
+	sp, err := newSessionProvider()
+	if err != nil {
+		t.Fatalf("newSessionProvider: %v", err)
+	}
 	namedRuntime := config.NamedSessionRuntimeName("test-city", config.Workspace{}, "reviewer")
 	if err := sp.Attach(namedRuntime); err == nil || !strings.Contains(err.Error(), "ACP transport") {
 		t.Fatalf("Attach(%q) error = %v, want ACP transport error", namedRuntime, err)
@@ -454,7 +907,10 @@ func TestNewSessionProvider_PreregistersProviderDefaultACPNamedSessionRuntimeNam
 	t.Setenv("GC_CITY", cityDir)
 	writeProviderDefaultACPNamedSessionRouteCityTOML(t, cityDir, "test-city")
 
-	sp := newSessionProvider()
+	sp, err := newSessionProvider()
+	if err != nil {
+		t.Fatalf("newSessionProvider: %v", err)
+	}
 	namedRuntime := config.NamedSessionRuntimeName("test-city", config.Workspace{}, "reviewer")
 	if err := sp.Attach(namedRuntime); err == nil || !strings.Contains(err.Error(), "ACP transport") {
 		t.Fatalf("Attach(%q) error = %v, want ACP transport error", namedRuntime, err)
@@ -478,7 +934,10 @@ func TestNewSessionProviderWrapsACPProvidersWithoutACPAgents(t *testing.T) {
 		},
 	}, t.TempDir(), "fake")
 
-	sp := newSessionProviderFromContext(ctx, nil)
+	sp, err := newSessionProviderFromContext(ctx, nil)
+	if err != nil {
+		t.Fatalf("newSessionProviderFromContext: %v", err)
+	}
 	if _, ok := sp.(interface{ RouteACP(string) }); !ok {
 		t.Fatalf("provider = %T, want ACP-routing wrapper", sp)
 	}
@@ -501,7 +960,10 @@ func TestNewSessionProviderWrapsCustomACPProvidersWithExplicitACPConfig(t *testi
 		},
 	}, t.TempDir(), "fake")
 
-	sp := newSessionProviderFromContext(ctx, nil)
+	sp, err := newSessionProviderFromContext(ctx, nil)
+	if err != nil {
+		t.Fatalf("newSessionProviderFromContext: %v", err)
+	}
 	if _, ok := sp.(interface{ RouteACP(string) }); !ok {
 		t.Fatalf("provider = %T, want ACP-routing wrapper", sp)
 	}
@@ -510,11 +972,11 @@ func TestNewSessionProviderWrapsCustomACPProvidersWithExplicitACPConfig(t *testi
 func TestNewSessionProviderIgnoresACPInitFailureForUnusedACPProviders(t *testing.T) {
 	oldBuild := buildSessionProviderByName
 	t.Cleanup(func() { buildSessionProviderByName = oldBuild })
-	buildSessionProviderByName = func(name string, sc config.SessionConfig, cityName, cityPath string) (runtime.Provider, error) {
+	buildSessionProviderByName = func(cfg *config.City, name string, sc config.SessionConfig, cityName, cityPath string) (runtime.Provider, error) {
 		if name == "acp" {
 			return nil, errors.New("acp unavailable")
 		}
-		return oldBuild(name, sc, cityName, cityPath)
+		return oldBuild(cfg, name, sc, cityName, cityPath)
 	}
 
 	ctx := sessionProviderContextForCity(&config.City{
@@ -533,9 +995,9 @@ func TestNewSessionProviderIgnoresACPInitFailureForUnusedACPProviders(t *testing
 		},
 	}, t.TempDir(), "fake")
 
-	sp, err := newSessionProviderFromContextWithError(ctx, nil)
+	sp, err := newSessionProviderFromContext(ctx, nil)
 	if err != nil {
-		t.Fatalf("newSessionProviderFromContextWithError: %v", err)
+		t.Fatalf("newSessionProviderFromContext: %v", err)
 	}
 	if _, ok := sp.(interface{ RouteACP(string) }); ok {
 		t.Fatalf("provider = %T, want plain provider fallback when ACP is unavailable", sp)
@@ -545,11 +1007,11 @@ func TestNewSessionProviderIgnoresACPInitFailureForUnusedACPProviders(t *testing
 func TestNewSessionProviderRequiresACPInitForACPAgents(t *testing.T) {
 	oldBuild := buildSessionProviderByName
 	t.Cleanup(func() { buildSessionProviderByName = oldBuild })
-	buildSessionProviderByName = func(name string, sc config.SessionConfig, cityName, cityPath string) (runtime.Provider, error) {
+	buildSessionProviderByName = func(cfg *config.City, name string, sc config.SessionConfig, cityName, cityPath string) (runtime.Provider, error) {
 		if name == "acp" {
 			return nil, errors.New("acp unavailable")
 		}
-		return oldBuild(name, sc, cityName, cityPath)
+		return oldBuild(cfg, name, sc, cityName, cityPath)
 	}
 
 	ctx := sessionProviderContextForCity(&config.City{
@@ -570,19 +1032,19 @@ func TestNewSessionProviderRequiresACPInitForACPAgents(t *testing.T) {
 		},
 	}, t.TempDir(), "fake")
 
-	if _, err := newSessionProviderFromContextWithError(ctx, nil); err == nil {
-		t.Fatal("newSessionProviderFromContextWithError() error = nil, want ACP init failure")
+	if _, err := newSessionProviderFromContext(ctx, nil); err == nil {
+		t.Fatal("newSessionProviderFromContext() error = nil, want ACP init failure")
 	}
 }
 
 func TestNewSessionProviderRequiresACPInitForImplicitACPTemplates(t *testing.T) {
 	oldBuild := buildSessionProviderByName
 	t.Cleanup(func() { buildSessionProviderByName = oldBuild })
-	buildSessionProviderByName = func(name string, sc config.SessionConfig, cityName, cityPath string) (runtime.Provider, error) {
+	buildSessionProviderByName = func(cfg *config.City, name string, sc config.SessionConfig, cityName, cityPath string) (runtime.Provider, error) {
 		if name == "acp" {
 			return nil, errors.New("acp unavailable")
 		}
-		return oldBuild(name, sc, cityName, cityPath)
+		return oldBuild(cfg, name, sc, cityName, cityPath)
 	}
 
 	ctx := sessionProviderContextForCity(&config.City{
@@ -603,8 +1065,8 @@ func TestNewSessionProviderRequiresACPInitForImplicitACPTemplates(t *testing.T) 
 		},
 	}, t.TempDir(), "fake")
 
-	if _, err := newSessionProviderFromContextWithError(ctx, nil); err == nil {
-		t.Fatal("newSessionProviderFromContextWithError() error = nil, want ACP init failure")
+	if _, err := newSessionProviderFromContext(ctx, nil); err == nil {
+		t.Fatal("newSessionProviderFromContext() error = nil, want ACP init failure")
 	}
 }
 
@@ -633,7 +1095,10 @@ func TestNewSessionProviderRoutesObservedACPProviderSessionsWithoutACPAgents(t *
 		t.Fatalf("Create(provider session bead): %v", err)
 	}
 
-	sp := newSessionProvider()
+	sp, err := newSessionProvider()
+	if err != nil {
+		t.Fatalf("newSessionProvider: %v", err)
+	}
 	if err := sp.Attach("provider-session"); err == nil || !strings.Contains(err.Error(), "ACP transport") {
 		t.Fatalf("Attach(provider-session) error = %v, want ACP transport error", err)
 	}
@@ -664,7 +1129,10 @@ func TestNewSessionProviderRoutesLegacyObservedACPProviderSessionsWithoutTranspo
 		t.Fatalf("Create(provider session bead): %v", err)
 	}
 
-	sp := newSessionProvider()
+	sp, err := newSessionProvider()
+	if err != nil {
+		t.Fatalf("newSessionProvider: %v", err)
+	}
 	if err := sp.Attach("provider-session"); err == nil || !strings.Contains(err.Error(), "ACP transport") {
 		t.Fatalf("Attach(provider-session) error = %v, want ACP transport error", err)
 	}
@@ -692,6 +1160,68 @@ func TestLoadProviderSessionSnapshotLoadsStoreWithoutACPAgents(t *testing.T) {
 	}
 	if calls != 1 {
 		t.Fatalf("openSessionProviderStore called %d times, want 1", calls)
+	}
+}
+
+func TestStatusSessionProviderSkipsSessionSnapshot(t *testing.T) {
+	oldOpen := openSessionProviderStore
+	t.Cleanup(func() { openSessionProviderStore = oldOpen })
+
+	calls := 0
+	openSessionProviderStore = func(string) (beads.Store, error) {
+		calls++
+		return nil, errors.New("session snapshot should not load for status")
+	}
+
+	sp, err := newStatusSessionProviderForCity(&config.City{
+		Workspace: config.Workspace{Name: "city"},
+		Session:   config.SessionConfig{Provider: "subprocess"},
+	}, "/tmp/city")
+	if err != nil {
+		t.Fatalf("newStatusSessionProviderForCity: %v", err)
+	}
+	if sp == nil {
+		t.Fatal("newStatusSessionProviderForCity() = nil")
+	}
+	if calls != 0 {
+		t.Fatalf("openSessionProviderStore called %d times, want 0", calls)
+	}
+}
+
+func TestStatusSessionProviderUsesProvidedSnapshotToWrapObservedACPSessions(t *testing.T) {
+	oldBuild := buildSessionProviderByName
+	t.Cleanup(func() { buildSessionProviderByName = oldBuild })
+
+	defaultSP := runtime.NewFake()
+	acpSP := runtime.NewFake()
+	buildSessionProviderByName = func(_ *config.City, name string, _ config.SessionConfig, _, _ string) (runtime.Provider, error) {
+		if name == "acp" {
+			return acpSP, nil
+		}
+		return defaultSP, nil
+	}
+
+	cfg := &config.City{
+		Workspace: config.Workspace{Name: "city"},
+		Session:   config.SessionConfig{Provider: "fake"},
+		Agents:    []config.Agent{{Name: "mayor"}},
+	}
+	snapshot := newSessionBeadSnapshot([]beads.Bead{{
+		Type:   sessionBeadType,
+		Labels: []string{sessionBeadLabel},
+		Metadata: map[string]string{
+			"template":     "orphan-acp",
+			"transport":    "acp",
+			"session_name": "provider-session",
+		},
+	}})
+
+	sp, err := newStatusSessionProviderForCityWithSnapshot(cfg, t.TempDir(), snapshot)
+	if err != nil {
+		t.Fatalf("newStatusSessionProviderForCityWithSnapshot: %v", err)
+	}
+	if err := sp.Attach("provider-session"); err == nil || !strings.Contains(err.Error(), "ACP transport") {
+		t.Fatalf("Attach(provider-session) error = %v, want ACP transport error from snapshot-backed wrapper", err)
 	}
 }
 
@@ -855,5 +1385,177 @@ acp_args = ["acp"]
 `)
 	if err := os.WriteFile(filepath.Join(dir, "city.toml"), data, 0o644); err != nil {
 		t.Fatalf("WriteFile(city.toml): %v", err)
+	}
+}
+
+func TestNewSessionProviderFromContext_PackRuntimeSelected(t *testing.T) {
+	script := writeRPPScript(t, "exit 2\n")
+	cfg := &config.City{Runtimes: map[string]config.DiscoveredRuntime{
+		"packrt": {Name: "packrt", Command: script, PackName: "p", PackDir: filepath.Dir(script)},
+	}}
+	ctx := sessionProviderContextForCity(cfg, t.TempDir(), "packrt")
+	sp, err := newSessionProviderFromContext(ctx, nil)
+	if err != nil {
+		t.Fatalf("newSessionProviderFromContext: %v", err)
+	}
+	assertProviderPkg(t, sp, "exec")
+}
+
+func TestNewSessionProviderFromContext_PackRuntimeCollisionSurfaces(t *testing.T) {
+	cfg := &config.City{Runtimes: map[string]config.DiscoveredRuntime{
+		"tmux": {Name: "tmux", Command: "/bin/true", PackName: "badpack"},
+	}}
+	ctx := sessionProviderContextForCity(cfg, t.TempDir(), "")
+	if _, err := newSessionProviderFromContext(ctx, nil); err == nil {
+		t.Fatal("builtin-shadowing pack runtime must fail provider construction, not fall back silently")
+	}
+}
+
+func TestErrorReturningSessionProviderFactoriesPreserveSuccessBehavior(t *testing.T) {
+	// The "default" case calls newSessionProvider with no explicit city, so it
+	// falls through to ambient discovery. findCity walks up from the working
+	// directory, and a checkout nested under a real city root (every gc rig
+	// worktree) resolves that live city, wrapping the injected fake in an
+	// auto.Provider. Pin the discovery ceiling to the package directory so the
+	// walk stops before it can reach an ambient city.toml.
+	clearGCEnv(t)
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	t.Setenv("GC_CEILING_DIRECTORIES", wd)
+	t.Setenv("GC_SESSION", "fake")
+
+	base := runtime.NewFake()
+	oldBuild := buildSessionProviderByName
+	buildSessionProviderByName = func(*config.City, string, config.SessionConfig, string, string) (runtime.Provider, error) {
+		return base, nil
+	}
+	t.Cleanup(func() { buildSessionProviderByName = oldBuild })
+
+	cfg := &config.City{Session: config.SessionConfig{Provider: "fake"}}
+	tests := map[string]struct {
+		build      func() (runtime.Provider, error)
+		wantStatus bool
+	}{
+		"default": {
+			build: newSessionProvider,
+		},
+		"city": {
+			build: func() (runtime.Provider, error) {
+				return newSessionProviderForCity(cfg, "")
+			},
+		},
+		"status": {
+			build: func() (runtime.Provider, error) {
+				return newStatusSessionProviderForCity(cfg, "")
+			},
+			wantStatus: true,
+		},
+		"status with snapshot": {
+			build: func() (runtime.Provider, error) {
+				return newStatusSessionProviderForCityWithSnapshot(cfg, "", nil)
+			},
+			wantStatus: true,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			sp, err := tt.build()
+			if err != nil {
+				t.Fatalf("factory error = %v, want nil", err)
+			}
+			if tt.wantStatus {
+				bounded, ok := sp.(*statusProvider)
+				if !ok {
+					t.Fatalf("factory provider = %T, want *statusProvider", sp)
+				}
+				if bounded.base != base {
+					t.Fatalf("status provider base = %T, want injected provider %T", bounded.base, base)
+				}
+				return
+			}
+			if sp != base {
+				t.Fatalf("factory provider = %T, want injected provider %T", sp, base)
+			}
+		})
+	}
+}
+
+func TestErrorReturningSessionProviderFactoriesReturnContextualErrors(t *testing.T) {
+	// Same ambient-discovery exposure as the sibling above: the "default" case
+	// calls newSessionProvider with no explicit city, so findCity walks up from
+	// the working directory and a checkout nested under a real city root
+	// resolves that live city — attempting a real connection to its production
+	// store from a unit test. This test passes today only because the injected
+	// stub returns an error before the auto.Provider wrap that breaks the
+	// sibling's identity assertion, so it is one behavior change away from
+	// failing the same way. Pin the ceiling here too rather than rely on that.
+	clearGCEnv(t)
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	t.Setenv("GC_CEILING_DIRECTORIES", wd)
+	t.Setenv("GC_SESSION", "broken")
+
+	wantErr := errors.New("injected provider failure")
+	oldBuild := buildSessionProviderByName
+	buildSessionProviderByName = func(*config.City, string, config.SessionConfig, string, string) (runtime.Provider, error) {
+		return nil, wantErr
+	}
+	t.Cleanup(func() { buildSessionProviderByName = oldBuild })
+
+	cfg := &config.City{Session: config.SessionConfig{Provider: "broken"}}
+	tests := map[string]func() (runtime.Provider, error){
+		"default": newSessionProvider,
+		"city": func() (runtime.Provider, error) {
+			return newSessionProviderForCity(cfg, "")
+		},
+		"status": func() (runtime.Provider, error) {
+			return newStatusSessionProviderForCity(cfg, "")
+		},
+		"status with snapshot": func() (runtime.Provider, error) {
+			return newStatusSessionProviderForCityWithSnapshot(cfg, "", nil)
+		},
+	}
+
+	for name, build := range tests {
+		t.Run(name, func(t *testing.T) {
+			sp, err := build()
+			if sp != nil {
+				t.Fatalf("factory provider = %T, want nil", sp)
+			}
+			if !errors.Is(err, wantErr) {
+				t.Fatalf("factory error = %v, want wrapped %v", err, wantErr)
+			}
+			if got, want := err.Error(), "constructing session provider: injected provider failure"; got != want {
+				t.Fatalf("factory error = %q, want %q", got, want)
+			}
+		})
+	}
+}
+
+func TestNewSessionProviderFromContextPreservesRawErrorForExistingCallers(t *testing.T) {
+	wantErr := errors.New("injected provider failure")
+	oldBuild := buildSessionProviderByName
+	buildSessionProviderByName = func(*config.City, string, config.SessionConfig, string, string) (runtime.Provider, error) {
+		return nil, wantErr
+	}
+	t.Cleanup(func() { buildSessionProviderByName = oldBuild })
+
+	sp, err := newSessionProviderFromContext(sessionProviderContext{providerName: "broken"}, nil)
+	if sp != nil {
+		t.Fatalf("raw factory provider = %T, want nil", sp)
+	}
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("raw factory error = %v, want original %v", err, wantErr)
+	}
+	if got, want := err.Error(), "injected provider failure"; got != want {
+		t.Fatalf("raw factory error = %q, want %q; existing supervisor and completion callers must not receive new context", got, want)
+	}
+	if got, want := fmt.Sprintf("session provider: %v", err), "session provider: injected provider failure"; got != want {
+		t.Fatalf("supervisor boundary error = %q, want %q", got, want)
 	}
 }

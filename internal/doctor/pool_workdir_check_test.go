@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 func TestPoolWorkDirIsolationCheck_WarnsOnShared(t *testing.T) {
@@ -25,7 +25,7 @@ func TestPoolWorkDirIsolationCheck_WarnsOnShared(t *testing.T) {
 func TestPoolWorkDirIsolationCheck_OKAfterImplicitIsolation(t *testing.T) {
 	cityPath := t.TempDir()
 	cfg := &config.City{
-		Daemon:    config.DaemonConfig{FormulaV2: true},
+		Daemon:    config.DaemonConfig{FormulaV2: boolPtr(true)},
 		Providers: map[string]config.ProviderSpec{"claude": {}},
 		Rigs:      []config.Rig{{Name: "demo", Path: filepath.Join(cityPath, "repos", "demo")}},
 	}

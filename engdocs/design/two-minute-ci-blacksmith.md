@@ -7,7 +7,8 @@ title: "Two-Minute CI With Blacksmith"
 | Status | Proposed |
 | Date | 2026-04-29 |
 | Author(s) | Codex |
-| Issue | ga-nakct |
+| Program | ga-80po0c |
+| Timing/planner milestone | ga-80po0c.4 |
 | Supersedes | N/A |
 
 ## Summary
@@ -60,7 +61,7 @@ Recent production PR CI runs show a stable critical path:
 
 The last sampled real `ci.yml` PR runs clustered around a 23-24 minute wall
 clock. A representative run was
-<https://github.com/gastownhall/gascity/actions/runs/25097289892>.
+<https://github.com/jonbaldie/gascity/actions/runs/25097289892>.
 
 The `Check` job serializes several independent gates:
 
@@ -439,7 +440,7 @@ Timing records include a stable identity:
 {
   "schema": 1,
   "unit_id": "test/integration:TestGraphWorkflowSuccessPath",
-  "package": "github.com/gastownhall/gascity/test/integration",
+  "package": "github.com/jonbaldie/gascity/test/integration",
   "test": "TestGraphWorkflowSuccessPath",
   "subtest": "",
   "variant": "default",
@@ -775,7 +776,7 @@ disables PR path gating and runs the full deterministic Linux suite:
 - `scripts/test-integration-shard`
 - CI image build files
 - `internal/api/openapi.json`
-- `docs/schema/openapi.*`
+- `docs/reference/schema/openapi.*`
 - `internal/api/genclient/**`
 - `cmd/gc/dashboard/**`
 - `internal/**`

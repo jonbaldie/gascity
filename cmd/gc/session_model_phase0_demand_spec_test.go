@@ -3,8 +3,8 @@ package main
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
-	"github.com/gastownhall/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/config"
 )
 
 // Phase 0 spec coverage from engdocs/design/session-model-unification.md:
@@ -29,7 +29,7 @@ func TestPhase0NamedOnDemand_WakesFromAssignedBeadID(t *testing.T) {
 		Agents:        []AwakeAgent{{QualifiedName: "hello-world/refinery"}},
 		NamedSessions: []AwakeNamedSession{{Identity: "hello-world/refinery", Template: "hello-world/refinery", Mode: "on_demand"}},
 		SessionBeads:  []AwakeSessionBead{{ID: "mc-1", SessionName: "hello-world--refinery", Template: "hello-world/refinery", State: "asleep", NamedIdentity: "hello-world/refinery"}},
-		WorkBeads:     []AwakeWorkBead{{ID: "hw-1", Assignee: "mc-1", Status: "open"}},
+		WorkBeads:     []AwakeWorkBead{{ID: "hw-1", Assignee: "mc-1", Status: "open", Ready: true}},
 		Now:           now,
 	})
 
@@ -41,7 +41,7 @@ func TestPhase0NamedOnDemand_WakesFromExactConfiguredNamedIdentityAssignee(t *te
 		Agents:        []AwakeAgent{{QualifiedName: "hello-world/refinery"}},
 		NamedSessions: []AwakeNamedSession{{Identity: "hello-world/refinery", Template: "hello-world/refinery", Mode: "on_demand"}},
 		SessionBeads:  []AwakeSessionBead{{ID: "mc-1", SessionName: "hello-world--refinery", Template: "hello-world/refinery", State: "asleep", NamedIdentity: "hello-world/refinery"}},
-		WorkBeads:     []AwakeWorkBead{{ID: "hw-1", Assignee: "hello-world/refinery", Status: "open"}},
+		WorkBeads:     []AwakeWorkBead{{ID: "hw-1", Assignee: "hello-world/refinery", Status: "open", Ready: true}},
 		Now:           now,
 	})
 
@@ -53,7 +53,7 @@ func TestPhase0NamedOnDemand_DoesNotWakeFromBackingTemplateAssigneeToken(t *test
 		Agents:        []AwakeAgent{{QualifiedName: "hello-world/refinery"}},
 		NamedSessions: []AwakeNamedSession{{Identity: "triage", Template: "hello-world/refinery", Mode: "on_demand"}},
 		SessionBeads:  []AwakeSessionBead{{ID: "mc-1", SessionName: "test-city--triage", Template: "hello-world/refinery", State: "asleep", NamedIdentity: "triage"}},
-		WorkBeads:     []AwakeWorkBead{{ID: "hw-1", Assignee: "hello-world/refinery", Status: "open"}},
+		WorkBeads:     []AwakeWorkBead{{ID: "hw-1", Assignee: "hello-world/refinery", Status: "open", Ready: true}},
 		Now:           now,
 	})
 
@@ -71,7 +71,7 @@ func TestPhase0PoolDesiredStates_AssigneeOnlyKeepsConcreteSessionAlive(t *testin
 	}}
 	sessions := []beads.Bead{sessionBead("sess-1", "open")}
 
-	result := ComputePoolDesiredStates(cfg, work, sessions, nil)
+	result := ComputePoolDesiredStates(cfg, work, sessionInfosFromBeads(sessions), nil)
 
 	if len(result) != 1 {
 		t.Fatalf("len(result) = %d, want 1", len(result))

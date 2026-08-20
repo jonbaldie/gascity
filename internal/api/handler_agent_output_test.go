@@ -11,11 +11,29 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gastownhall/gascity/internal/config"
-	"github.com/gastownhall/gascity/internal/events"
-	"github.com/gastownhall/gascity/internal/runtime"
-	"github.com/gastownhall/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/config"
+	"github.com/jonbaldie/gascity/internal/events"
+	"github.com/jonbaldie/gascity/internal/runtime"
+	"github.com/jonbaldie/gascity/internal/session"
+	"github.com/jonbaldie/gascity/internal/worker"
 )
+
+func TestHistorySnapshotRawMessagesEmitsEachProviderRecordOnce(t *testing.T) {
+	repeated := json.RawMessage(`{"type":"ToolResults"}`)
+	snapshot := &worker.HistorySnapshot{Entries: []worker.HistoryEntry{
+		{ID: "child-1", Provenance: worker.Provenance{Raw: repeated, RawRecordID: "record-1"}},
+		{ID: "child-2", Provenance: worker.Provenance{Raw: repeated, RawRecordID: "record-1"}},
+		{ID: "child-3", Provenance: worker.Provenance{Raw: repeated, RawRecordID: "record-2"}},
+	}}
+
+	rawMessages, ids := historySnapshotRawMessages(snapshot)
+	if len(rawMessages) != 2 {
+		t.Fatalf("raw messages = %d, want two repeated source records", len(rawMessages))
+	}
+	if got, want := strings.Join(ids, ","), "child-2,child-3"; got != want {
+		t.Fatalf("raw cursor IDs = %q, want final child of each source record %q", got, want)
+	}
+}
 
 // writeSessionJSONL creates a JSONL session file at the slug path for
 // the given workDir.
@@ -85,8 +103,8 @@ func newGeminiAgentOutputStreamFixture(t *testing.T) *geminiAgentOutputStreamFix
 		t.Fatalf("chtimes(first transcript): %v", err)
 	}
 
-	mgr := session.NewManager(fs.cityBeadStore, fs.sp)
-	info, err := mgr.Create(context.Background(), "myrig/worker", "Chat", "gemini", workDir, "gemini", nil, session.ProviderResume{}, runtime.Config{})
+	mgr := session.NewManagerWithOptions(fs.cityBeadStore, fs.sp)
+	info, err := mgr.CreateSession(context.Background(), session.CreateOptions{Template: "myrig/worker", Title: "Chat", Command: "gemini", WorkDir: workDir, Provider: "gemini", Env: nil, Resume: session.ProviderResume{}, Hints: runtime.Config{}, ExtraMeta: map[string]string{"session_origin": "manual"}})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -336,22 +354,10 @@ func TestResolveAgentTranscriptUsesBeadSessionIDWhenRuntimeMetaMissing(t *testin
 	}
 
 	srv := newServerWithSearchPaths(state, searchBase)
-	mgr := session.NewManager(state.cityBeadStore, state.sp)
+	mgr := session.NewManagerWithOptions(state.cityBeadStore, state.sp)
 	sessionName := agentSessionName(state.CityName(), "myrig/worker", state.cfg.Workspace.SessionTemplate)
-	info, err := mgr.CreateAliasedNamedWithTransport(
-		context.Background(),
-		"",
-		sessionName,
-		"myrig/worker",
-		"Chat",
-		"claude",
-		workDir,
-		"claude/tmux-cli",
-		"",
-		nil,
-		session.ProviderResume{},
-		runtime.Config{},
-	)
+	info, err := mgr.CreateSession(
+		context.Background(), session.CreateOptions{Alias: "", ExplicitName: sessionName, Template: "myrig/worker", Title: "Chat", Command: "claude", WorkDir: workDir, Provider: "claude/tmux-cli", Transport: "", Env: nil, Resume: session.ProviderResume{}, Hints: runtime.Config{}, ExtraMeta: map[string]string{"session_origin": "manual"}})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -530,11 +536,47 @@ func TestAgentOutputStreamStoppedAgent(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d; body: %s", rec.Code, http.StatusOK, rec.Body.String())
 	}
-	if got := rec.Header().Get("GC-Agent-Status"); got != "stopped" {
-		t.Errorf("GC-Agent-Status = %q, want %q", got, "stopped")
+	if got := rec.Result().Header.Get("GC-Agent-Status"); got != "stopped" {
+		t.Errorf("committed GC-Agent-Status = %q, want %q", got, "stopped")
 	}
 	if !strings.Contains(rec.Body.String(), "hello") {
 		t.Errorf("body should contain session data, got: %s", rec.Body.String())
+	}
+}
+
+func TestAgentOutputStreamStoppedAgentCommitsStatusHeader(t *testing.T) {
+	state := newFakeState(t)
+	rigDir := t.TempDir()
+	state.cfg.Rigs = []config.Rig{{Name: "myrig", Path: rigDir}}
+
+	searchBase := t.TempDir()
+	writeSessionJSONL(t, searchBase, rigDir,
+		`{"uuid":"1","parentUuid":"","type":"user","message":"{\"role\":\"user\",\"content\":\"hello\"}","timestamp":"2025-01-01T00:00:00Z"}`,
+	)
+
+	srv := newServerWithSearchPaths(state, searchBase)
+	h := newTestCityHandlerWith(t, state, srv)
+	ts := httptest.NewServer(h)
+	defer ts.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, ts.URL+cityURL(state, "/agent/myrig/worker/output/stream"), nil)
+	if err != nil {
+		t.Fatalf("NewRequest: %v", err)
+	}
+	resp, err := ts.Client().Do(req)
+	if err != nil {
+		t.Fatalf("Do: %v", err)
+	}
+	defer resp.Body.Close() //nolint:errcheck
+	cancel()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusOK)
+	}
+	if got := resp.Header.Get("GC-Agent-Status"); got != "stopped" {
+		t.Fatalf("committed GC-Agent-Status = %q, want %q", got, "stopped")
 	}
 }
 
@@ -700,22 +742,10 @@ func TestAgentOutputStreamWorkerOperationEventWakesPeekFallback(t *testing.T) {
 
 func TestAgentOutputStreamWorkerOperationSessionIDWakesPeekFallback(t *testing.T) {
 	state := newSessionFakeState(t)
-	mgr := session.NewManager(state.cityBeadStore, state.sp)
+	mgr := session.NewManagerWithOptions(state.cityBeadStore, state.sp)
 	sessionName := agentSessionName(state.CityName(), "myrig/worker", state.cfg.Workspace.SessionTemplate)
-	info, err := mgr.CreateAliasedNamedWithTransport(
-		context.Background(),
-		"",
-		sessionName,
-		"myrig/worker",
-		"Chat",
-		"claude",
-		t.TempDir(),
-		"claude",
-		"",
-		nil,
-		session.ProviderResume{},
-		runtime.Config{},
-	)
+	info, err := mgr.CreateSession(
+		context.Background(), session.CreateOptions{Alias: "", ExplicitName: sessionName, Template: "myrig/worker", Title: "Chat", Command: "claude", WorkDir: t.TempDir(), Provider: "claude", Transport: "", Env: nil, Resume: session.ProviderResume{}, Hints: runtime.Config{}, ExtraMeta: map[string]string{"session_origin": "manual"}})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}

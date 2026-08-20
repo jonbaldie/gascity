@@ -3,7 +3,7 @@ package convoy
 import (
 	"testing"
 
-	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/jonbaldie/gascity/internal/beads"
 )
 
 func TestApplyConvoyFields(t *testing.T) {
