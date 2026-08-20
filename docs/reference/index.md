@@ -27,6 +27,7 @@ pages.
 |---|---|
 | [Gas Town → Gas City Command Map](/reference/gastown-command-map) | The closest `gc`/`bd` equivalent for each `gt` command |
 | [System Packs](/reference/system-packs) | Built-in packs bundled with `gc` |
+| [Container Verification](/reference/container-verification) | Run exploratory commands in a resource-bounded Docker container |
 | [Command Execution Trust Boundaries](/reference/trust-boundaries) | Which component runs what, and with whose authority |
 | [Exec Session Provider](/reference/exec-session-provider) | The `exec` session runtime provider contract |
 | [Exec Beads Provider](/reference/exec-beads-provider) | The `exec` beads backend contract |
